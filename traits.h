@@ -205,10 +205,10 @@ struct Status // 1 byte
  
 	enum eStatus:uint8_t
 	{
-        eSuspended			= 0b00000100,
+		eSuspended			= 0b00000100,
 		eLocked				= 0b00001000,
 		eStatusMask			= 0b00001111
-    };
+	};
 
 		
 	bool isStatus(uint8_t s){ return ((mStatus&s) == s);}
@@ -271,8 +271,8 @@ struct StatusNotify : private Status // 1 byte
  
 	enum eNotifyStatus
 	{
-        eNotifyStarted		= Status::eStarted	<<3,	// 0b00010000
-        eNotifySuspended	= Status::eSuspended<<3,	// 0b00100000
+		eNotifyStarted		= Status::eStarted	<<3,	// 0b00010000
+		eNotifySuspended	= Status::eSuspended<<3,	// 0b00100000
 		eNotifyLocked		= Status::eLocked	<<3,	// 0b01000000
 		eNotifyDeleted		= 0b10000000,				// 0b10000000
 		eNotifyMask			= ~Status::eStatusMask
