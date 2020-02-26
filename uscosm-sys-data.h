@@ -56,4 +56,5 @@ struct SysKernelData
 
 
 uint8_t SysKernelData::sCnt;
-//iScheduler SysKernelData::*sMaster;
+
+
