@@ -392,7 +392,7 @@ private:
 
 
 // periodic call of the function, guarantees a constant average execution rate
-struct Chrono // 6 bytes
+struct Periodic // 6 bytes
 {
 
 	using period_t = uint16_t;
@@ -665,47 +665,7 @@ ListItem *LinkedList<listIndex>::sTopHandle = nullptr;
 
 
 
-// Be careful with this one!
-// It should not be employed in an infinite loop
-// It will mess up thisTaskHandle()
-// You'll have to store the current task value
-struct Coroutine
-{
 
-	void waitFor(tick_t inDuration)
-	{
-		if(SysKernelData::sMaster)
-		{	
-			SysKernelData::sMaster->schedule(inDuration);	
-		}
-	}
-						
-
-protected:
-
-	template<typename derived_t>
-	void init()
-	{ 
-		static_assert(std::is_base_of<Status, derived_t>::value, "Coroutine must implement Status");
-	}
-	
-	bool isExeReady() 
-	{ 
-		return !(reinterpret_cast<Status *>(this)->isRunning());
-	}
-	
-	bool isDelReady()
-	{
-		return true; 
-	}
-	
-	void makePreExe(){}
-	void makePreDel(){}
-	void makePostExe(){}
-
-private:
-	
-};
 
 
 
@@ -906,6 +866,55 @@ private:
 	bool mIsParent;
 };
 
+
+
+
+
+
+
+
+
+// Be careful with this one!
+// It should not be employed in an infinite loop
+// It will mess up thisTaskHandle()
+// You'll have to store the current task value
+struct Coroutine
+{
+
+	void waitFor(tick_t inDuration)
+	{
+		if(SysKernelData::sMaster)
+		{	
+			SysKernelData::sMaster->schedule(inDuration);	
+		}
+	}
+						
+
+protected:
+
+	template<typename derived_t>
+	void init()
+	{ 
+		static_assert(std::is_base_of<Status, derived_t>::value, "Coroutine must implement Status");
+	}
+	
+	bool isExeReady() 
+	{ 
+		return !(reinterpret_cast<Status *>(this)->isRunning());
+	}
+	
+	bool isDelReady()
+	{
+		return true; 
+	}
+	
+	void makePreExe(){}
+	void makePreDel(){}
+	void makePostExe(){}
+
+private:
+	
+};
 
 
 
