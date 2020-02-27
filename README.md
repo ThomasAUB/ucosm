@@ -10,6 +10,7 @@ Module based cooperative scheduler for microcontroler(Beta)
     - Creation of custom task and handler properties called "traits".
     - Fairly low RAM overhead of 10 bytes per tasks. 
     - TaskHandle management.
+    - Minimal use of virtual functions.
   
   
   
