@@ -32,10 +32,11 @@ Module based cooperative scheduler for microcontroler(Beta)
     - LinkedList    : Automatically updated linked list of chronologically executed tasks.
     - MemPool32     : Allows a fast buffer dynamic allocation of specified size and type, the max buffer
                     count is 32.
-    - Parent        : Allows to set a Parent/Child relationship between two tasks, will forbid the deletion of the
-                    parent task if the child task is alive. 
+    - Parent        : Allows to set a Parent/Child relationship between two tasks, will forbid the
+                    deletion of the parent task if the child task is alive. 
     - Coroutine     : Implementation of coroutine allowing non-blocking delay.
-    - Coroutine2    : Implementation of coroutine allowing to yield and saving context (Inspired by protothread).
+    - Coroutine2    : Implementation of coroutine allowing to yield and saving context (Inspired by
+                    protothread).
     
   
 
