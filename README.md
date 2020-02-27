@@ -37,7 +37,27 @@ Traits definition
     
       Here are some examples of traits definition:
       
+        Traits<>
         Traits< Prio >
         Traits< Prio, Delay, LinkedList<0> >
-        Traits<MemPool32< std::array<uint8_t, 16>, 32>, Parent, Signal<uint32_t, 8> >
+        Traits< MemPool32<std::array<uint8_t, 16>, 32>, Parent, Signal<uint32_t, 8> >
+        
+        
+TaskHandler definition example
+
+      using myTaskTraits = Traits< Prio >;
+      const uint8_t maxSimultaneousTaskCount = 1;
+
+      class MyClass : public TaskHandler<MyClass, myTaskTraits, maxSimultaneousTaskCount>
+      {
+          void shedulableFunction()
+          {
+          }
+      };
     
+Kernel definition example
+  
+    using myHandlerTraits = Traits<>;
+    const uint8_t maxSimultaneousHandlerCount = 1;
+    
+    Kernel kernel<myHandlerTraits, maxSimultaneousHandlerCount>
