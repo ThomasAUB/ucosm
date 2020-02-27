@@ -51,7 +51,7 @@ struct Kernel : public iScheduler
 		return &mHandlerTraits[mHandlerCount++];
 	}
 
-	bool removeHandle(handler_t *inHandler)
+	void removeHandle(handler_t *inHandler)
 	{
 		index_t i = inHandler->index;	
 		while(i<mHandlerCount-1)

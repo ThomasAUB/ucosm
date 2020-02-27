@@ -82,7 +82,7 @@ struct Traits : public TraitsCollection..., public ObjectCounter<Traits<TraitsCo
 		bool ready[] = {
 			true, (TraitsCollection::isExeReady())...
 		};
-		for(int i=0 ; i<sizeof(ready) ; i++)
+		for(index_t i=0 ; i<sizeof(ready) ; i++)
 		{
 			if(!ready[i]){ return false; }
 		}
@@ -94,7 +94,7 @@ struct Traits : public TraitsCollection..., public ObjectCounter<Traits<TraitsCo
 		bool ready[] = {
 			true, (TraitsCollection::isDelReady())...
 		};
-		for(int i=0 ; i<sizeof(ready) ; i++)
+		for(index_t i=0 ; i<sizeof(ready) ; i++)
 		{
 			if(!ready[i]){ return false; }
 		}
