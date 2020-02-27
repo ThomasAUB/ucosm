@@ -64,7 +64,7 @@ TaskHandler definition example
 
       class MyClass : public TaskHandler<MyClass, myTaskTraits, maxSimultaneousTaskCount>
       {
-          void shedulableFunction()
+          void schedulableFunction()
           {
           }
       };
