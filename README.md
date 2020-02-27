@@ -1,7 +1,19 @@
 # uCoSM
 Module based cooperative scheduler for microcontroler(Beta)
 
-  uCoSM is an embedded scheduler designed in C++. Its purpose is to be able to dynamically add and remove schedulable items.
+  uCoSM is a lightweight and modular embedded scheduler designed in C++. 
+  
+  Its features are :
+  
+    - Dynamically add and remove schedulable items such as function and class.
+    - No use of heap memory.
+    - Creation of custom task and handler properties called "traits".
+    - Fairly low RAM overhead of 10 bytes per tasks. 
+    - TaskHandle management.
+  
+  
+  
+  Schedulable function prototype is defined as : void foo(void). 
   
   
   Schedulable items can be functions and classes containing these functions. 
