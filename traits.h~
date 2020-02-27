@@ -531,6 +531,12 @@ struct Buffer
 		if(inIdx >= size) { return 0; }
 		return mBuffer[inIdx];
 	}
+
+	buffer_t& getDataRef(uint16_t inIdx)
+	{
+		if(inIdx >= size) { return 0; }
+		return mBuffer[inIdx];
+	}
 	
 	buffer_t *getBuffer()
 	{
