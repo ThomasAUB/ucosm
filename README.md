@@ -33,7 +33,7 @@ Module based cooperative scheduler for microcontroler(Beta)
     - Kernel : the master scheduler, contains the TaskHandlers and their specified traits.
     
     
-#Traits definition
+Traits definition
     
       Here are some examples of traits definition:
       
