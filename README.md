@@ -8,7 +8,7 @@ Module based cooperative scheduler for microcontroler(Beta)
     - Dynamically add and remove schedulable items such as function and class.
     - No use of heap memory.
     - Creation of custom task and handler properties called "traits".
-    - Fairly low RAM overhead of 10 bytes per tasks. 
+    - Fairly low RAM overhead of 10 bytes per tasks on a 32 bit architecture. 
     - TaskHandle management.
     - Minimal use of virtual functions.
   
