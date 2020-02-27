@@ -33,3 +33,11 @@ Module based cooperative scheduler for microcontroler(Beta)
     - Kernel : the master scheduler, contains the TaskHandlers and their specified traits.
     
     
+    #Traits definition
+    
+      Here are some examples of traits definition:
+      
+        Traits< Prio >
+        Traits< Prio, Delay, LinkedList<0> >
+        Traits<MemPool32< std::array<uint8_t, 16>, 32>, Parent, Signal<uint32_t, 8> >
+    
