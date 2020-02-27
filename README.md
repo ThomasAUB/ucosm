@@ -1,7 +1,7 @@
 # uCoSM
 Module based cooperative scheduler for microcontroler(Beta)
 
-  uCoSM is a lightweight and modular embedded scheduler designed in C++. 
+  uCoSM is a lightweight and modular embedded scheduler designed in C++ (c++14 or above). 
   
   Its features are :
   
