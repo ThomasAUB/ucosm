@@ -61,7 +61,7 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, task_trait_t, 2 >
 
 			createTask(&PeriodicProcess::slowProcess, &slowHandle);
 
-			slowExeCount = &thisTaskHandle()->getBuffer()[0];
+			slowExeCount = &slowHandle->getBuffer()[0];
 			*slowExeCount = 0; // initialize buffer value
 			
 		}
