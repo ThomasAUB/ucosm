@@ -61,7 +61,7 @@ public:
 		{
 			if(mTasks[i].index != i)
 			{
-				catchException("Critical declaration error");
+				catchException("Critical Declaration Error");
 				while(1){}
 			}
 		}

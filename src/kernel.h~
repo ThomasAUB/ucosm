@@ -51,7 +51,7 @@ public:
 		if(mHandlerCount == max_handler_count){ return false; }
 		mHandlers[mHandlerCount] = inHandler;
 		mHandlerTraits[mHandlerCount].init();		
-		mHandlerCount++;
+		//mHandlerCount++;
 		return true;
 	}
 
