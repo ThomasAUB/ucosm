@@ -22,7 +22,7 @@ Module based cooperative scheduler for microcontroler(Beta)
   
   The traits are :
   
-    - Prio          : Simple priority handling, the higher priority is 1 and the lowest is 255.
+    - Prio          : Simple priority handling, the highest priority is 1 and the lowest is 255.
     - Status        : Contains the status of the task (Running, Started, Suspended, Locked).
     - StatusNotify  : Callback notification when a specified status has changed. 
     - Delay         : Allows to delay the execution of a task.
