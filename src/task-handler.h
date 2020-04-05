@@ -30,11 +30,11 @@
 #pragma once
 
 
-#include "traits.h"
+#include "modules.h"
 
 
 
-template<typename Caller_t, typename task_traits, index_t task_count>
+template<typename Caller_t, typename task_modules, index_t task_count>
 class TaskHandler : public iScheduler
 {
 	
@@ -42,7 +42,7 @@ class TaskHandler : public iScheduler
 	
 	using task_function_t = void (Caller_t::*)();
 
-	struct TaskItem : public task_traits
+	struct TaskItem : public task_modules
 	{
 		constexpr TaskItem(): index(sCounterIndex++) {}
 		const index_t index;

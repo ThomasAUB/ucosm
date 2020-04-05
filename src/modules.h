@@ -38,7 +38,7 @@
 // µCoSm - Cooperative Scheduler Module
 
 
-/*  Task traits :
+/*  Task modules :
  * 
  *  must contain a set of funtions :
  * 
@@ -60,23 +60,23 @@
 
 
 
-template<class ...TraitsCollection> 
-struct Traits : public TraitsCollection...
+template<class ...ModuleCollection> 
+struct Modules : public ModuleCollection...
 {
 
-	Traits()
+	Modules()
 	{}
 
 	void init()
 	{
-		uint8_t d[] = {(uint8_t)0, (TraitsCollection::template init<Traits<TraitsCollection...>>(), (uint8_t)0)...};
+		uint8_t d[] = {(uint8_t)0, (ModuleCollection::template init<Modules<ModuleCollection...>>(), (uint8_t)0)...};
 		static_cast<void>(d); // avoid warning for unused variable
 	}
 
 	bool isExeReady()
 	{
 		bool ready[] = {
-			true, (TraitsCollection::isExeReady())...
+			true, (ModuleCollection::isExeReady())...
 		};
 		for(index_t i=0 ; i<sizeof(ready) ; i++)
 		{
@@ -88,7 +88,7 @@ struct Traits : public TraitsCollection...
 	bool isDelReady()
 	{
 		bool ready[] = {
-			true, (TraitsCollection::isDelReady())...
+			true, (ModuleCollection::isDelReady())...
 		};
 		for(index_t i=0 ; i<sizeof(ready) ; i++)
 		{
@@ -99,20 +99,20 @@ struct Traits : public TraitsCollection...
 
 	void makePreExe()
 	{
-		uint8_t d[] = {(uint8_t)0, (TraitsCollection::makePreExe(), (uint8_t)0)...};
+		uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePreExe(), (uint8_t)0)...};
 		static_cast<void>(d); // avoid warning for unused variable
 	}
 
 	void makePostExe()
 	{
-		uint8_t d[] = {(uint8_t)0, (TraitsCollection::makePostExe(), (uint8_t)0)...};
+		uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePostExe(), (uint8_t)0)...};
 		static_cast<void>(d); // avoid warning for unused variable
 	}
 	 
 	void makePreDel()
 	{
 		uint8_t d[] = {
-			(uint8_t)0, (TraitsCollection::makePreDel(), (uint8_t)0)...
+			(uint8_t)0, (ModuleCollection::makePreDel(), (uint8_t)0)...
 		};
 		static_cast<void>(d); // avoid warning for unused variable
 	}
@@ -122,13 +122,13 @@ private:
 };
 
 
-using no_traits = Traits<>;
+using no_module = Modules<>;
 
 
 
 
 
-namespace ucosm_traits
+namespace ucosm_modules
 {
 
 

@@ -30,11 +30,11 @@
 #pragma once
 
 
-#include "traits.h"
+#include "modules.h"
 
 
 
-template<typename Caller_t, typename task_traits, index_t task_count>
+template<typename Caller_t, typename task_modules, index_t task_count>
 class TaskHandler : public iScheduler
 {
 	
@@ -61,7 +61,7 @@ public:
 		{
 			if(mTasks[i].index != i)
 			{
-				catchException("Critical Declaration Error");
+				catchException("Critical declaration error");
 				while(1){}
 			}
 		}

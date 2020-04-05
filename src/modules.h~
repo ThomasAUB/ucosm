@@ -128,7 +128,7 @@ using no_module = Modules<>;
 
 
 
-namespace ucosm_traits
+namespace ucosm_modules
 {
 
 
