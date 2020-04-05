@@ -2,7 +2,7 @@
 
 #include "/uCoSM/kernel.h"
 
-#include "/uCoSM/traits.h"
+#include "/uCoSM/modules.h"
 
 
 
@@ -29,7 +29,7 @@ tick_t (*SysKernelData::sGetTick)() = &getTick;
 
 
 
-using namespace ucosm_traits;
+using namespace ucosm_modules;
 
 
 
@@ -40,7 +40,7 @@ using namespace ucosm_traits;
 
 
 // defines the type of task properties, i.e. delay handling and buffer
-using task_trait_t = Traits< Delay, Buffer<uint8_t, 1> >; 
+using task_module_t = Modules< Delay, Buffer<uint8_t, 1> >; 
 
 
 // PeriodicProcess is an example of class containing the tasks
@@ -49,7 +49,7 @@ using task_trait_t = Traits< Delay, Buffer<uint8_t, 1> >;
 //	  - task_trait_t : the type of task handled by PeriodicProcess.
 //	  - 2 : the max number of simultaneous tasks. 
 
-class PeriodicProcess : public TaskHandler< PeriodicProcess, task_trait_t, 2 >
+class PeriodicProcess : public TaskHandler< PeriodicProcess, task_module_t, 2 >
 {
 	public:
 
@@ -114,7 +114,7 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, task_trait_t, 2 >
 //  Kernel's argument :
 //	  - Traits<> : defines the handler's properties, i.e. no properties
 //	  - 1 : the max number of simultaneous handlers.
-Kernel<Traits<>, 1> kernel;
+Kernel<Modules<>, 1> kernel;
 
 
 PeriodicProcess periodicProcess;
