@@ -57,68 +57,160 @@
 
 
 
-
+#include <tuple>
 
 
 template<class ...ModuleCollection> 
-struct Modules : public ModuleCollection...
+class Modules
 {
 
+	using items_t = std::tuple<ModuleCollection...>;
+
+public:
+	 
 	Modules()
 	{}
 
+	template<typename T>
+	auto get()
+	{
+		return std::get<T>(itemModules);
+	}
+
 	void init()
 	{
-		uint8_t d[] = {(uint8_t)0, (ModuleCollection::template init<Modules<ModuleCollection...>>(), (uint8_t)0)...};
-		static_cast<void>(d); // avoid warning for unused variable
+		//uint8_t d[] = {(uint8_t)0, (ModuleCollection::template init<Modules<ModuleCollection...>>(), (uint8_t)0)...};
+		//static_cast<void>(d); // avoid warning for unused variable
+
+		//uint8_t d[] = {(uint8_t)0, (ModuleCollection::template init<Modules<ModuleCollection...>>(), (uint8_t)0)...};
+		//static_cast<void>(d); // avoid warning for unused variable
 	}
+
+	 
 
 	bool isExeReady()
 	{
-		bool ready[] = {
+		/*bool ready[] = {
 			true, (ModuleCollection::isExeReady())...
 		};
 		for(index_t i=0 ; i<sizeof(ready) ; i++)
 		{
 			if(!ready[i]){ return false; }
-		}
+		}*/
+
+		/*if(std::tuple_size<items_t>::value >= 1){
+			bool te = std::get<0>(itemModules).isExeReady();
+		}*/
+
+		//std::index_sequence<std::tuple_size<items_t>::value> gg = std::make_index_sequence<std::tuple_size<items_t>::value>{};
+
+		auto gg = std::make_index_sequence<std::tuple_size<items_t>::value>{};
+		//auto g5g = get(0);
+
+		
+
+		//((std::get<gg>(itemModules).isExeReady()),...);
+
+  		//((std::get<getSequence()...>(itemModules).isExeReady()),...);
+		
+		
+		//std::get<gg.>
+		
+		unpack(gg);
+
+		bool... res = isExeReady(gg);
+
+		//((std::get<gg>(itemModules).isExeReady()),...);
+
+		//((std::get<Is>(itemModules).isExeReady()),...);
+		
+		/*std::size_t... seq = std::make_index_sequence<std::tuple_size<items_t>::value>{}
+
+		
+
+		((std::get<seq>(itemModules).isExeReady()),...);
+
+		std::tuple<int, bool, char> t = std::make_tuple(1, true, 'a');
+
+    	int  n = std::get<0>(t); // ok
+   	 	bool b = std::get<1>(t); // ok
+    	char c = std::get<2>(t); // ok*/
+		
+		//std::get<0>(itemModules).isExeReady();
+		
+		
+		/*if(!std::get<0>(itemModules).isExeReady())
+		{ 
+			return false; 
+		}*/
+
+		
+		/*if(!std::get<1>(itemModules).isExeReady())
+		{ 
+			return false; 
+		}*/
+		
+/*
+		for(index_t i=0 ; i<std::tuple_size(itemModules) ; i++)
+		{
+			if(!std::get<i>(itemModules).isExeReady())
+			{ 
+				return false; 
+			}
+		}*/
+		
 		return true;
 	}
 	
 	bool isDelReady()
 	{
-		bool ready[] = {
+		/*bool ready[] = {
 			true, (ModuleCollection::isDelReady())...
 		};
 		for(index_t i=0 ; i<sizeof(ready) ; i++)
 		{
 			if(!ready[i]){ return false; }
-		}
+		}*/
 		return true;
 	}
 
 	void makePreExe()
 	{
-		uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePreExe(), (uint8_t)0)...};
-		static_cast<void>(d); // avoid warning for unused variable
+		//uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePreExe(), (uint8_t)0)...};
+		//static_cast<void>(d); // avoid warning for unused variable
 	}
 
 	void makePostExe()
 	{
-		uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePostExe(), (uint8_t)0)...};
-		static_cast<void>(d); // avoid warning for unused variable
+		//uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePostExe(), (uint8_t)0)...};
+		//static_cast<void>(d); // avoid warning for unused variable
 	}
 	 
 	void makePreDel()
 	{
-		uint8_t d[] = {
+		/*uint8_t d[] = {
 			(uint8_t)0, (ModuleCollection::makePreDel(), (uint8_t)0)...
 		};
 		static_cast<void>(d); // avoid warning for unused variable
+		*/
 	}
-	
+
+ 	
 private:
+
 	
+	template<std::size_t... Is>
+	void unpack(std::index_sequence<Is...>){
+		((std::get<Is>(itemModules).isExeReady()),...);
+	}
+
+	template<std::size_t... Is>
+	auto isExeReady(std::index_sequence<Is...>){
+  		return ((std::get<Is>(itemModules).isExeReady()),...);
+	}
+	 
+	items_t itemModules;
+	 
 };
 
 
@@ -152,8 +244,6 @@ struct Prio // 1 byte
 		// priority can't be inferior to 1
 		mPriority = (inPrio)?inPrio:1; 
 	}
-
-protected:
 
 	template<typename derived_t>
 	 void init()
@@ -227,8 +317,6 @@ struct Status // 1 byte
 	{
 		return (mStatus&eStarted);
 	}
-
-protected:
 	
 	template<typename derived_t>
 	void init()	{ mStatus = 0; }
@@ -295,8 +383,6 @@ struct StatusNotify : private Status // 1 byte
 	}
 	
 
-protected:
-
 	template<typename derived_t>
 	void init()	{ mStatus = 0; }
 	
@@ -352,7 +438,6 @@ struct Delay // 4 bytes
 		}
 	}
 
-protected:
 
 	template<typename derived_t>
 	void init()
@@ -414,8 +499,6 @@ struct Periodic // 6 bytes
 		}
 	}
 
-protected:
-
 	template<typename derived_t>
 	void init()
 	{
@@ -472,8 +555,6 @@ struct Signal
 		return !mRxData.isEmpty();
 	}
 
-protected:
-
 	template<typename derived_t>
 	void init()
 	{ 
@@ -528,8 +609,6 @@ struct Buffer
 	{
 		return mBuffer;
 	}
-	
-protected:
 
 	template<typename derived_t>
 	void init() {}
@@ -581,8 +660,6 @@ struct LinkedList : public ListItem // 9 bytes
 
 	ListItem *getNext() { return mNext; }
 	ListItem *getPrev() { return mPrev; }
-	
-protected:
 
 	template<typename derived_t>
 	void init()
@@ -769,8 +846,6 @@ struct MemPool32
 		return &mElems[mAllocIndex&(~kAllocBoolMask)];
 	}
 
-protected:
-
 	template<typename derived_t>
 	void init() { mAllocIndex = 0; }
 	bool isExeReady() const { return true; }
@@ -820,8 +895,6 @@ struct Parent
 		mChild = inChild;
 		mIsParent = true;
 	}
-	
-protected:
 
 	template<typename derived_t>
 	void init()
@@ -881,9 +954,6 @@ struct Coroutine
 		}
 	}
 						
-
-protected:
-
 	template<typename derived_t>
 	void init()
 	{ 
@@ -941,8 +1011,6 @@ struct Coroutine2
 	}
 
 	uint16_t mLine;
-	
-protected:
 
 	template<typename derived_t>
 	void init() { mLine = 0;}
