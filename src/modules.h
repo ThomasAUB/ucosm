@@ -495,6 +495,29 @@ private:
 
 
 
+// contains an element of the specified type
+template<typename T> 
+struct Content
+{	
+	
+	T& getContent()
+	{
+		return content;
+	}
+	
+protected:
+
+	template<typename derived_t>
+	void init() {}
+	bool isExeReady() const { return true; }
+	bool isDelReady() const { return true; } 
+	void makePreExe(){}
+	void makePreDel(){}
+	void makePostExe(){}
+
+	T content;
+};
+
 
 
 
@@ -915,21 +938,24 @@ private:
 
 // macro based coroutine
 // inspired by protothread
-
-template<uint16_t max_context_size> 
+template<uint16_t max_context_size = 0> 
 struct Coroutine2
 {
 
-#define CTX_START				struct Ctx_def{
+#define CR_CTX_START			struct Ctx_def{
 
-#define CTX_END(label)			};Ctx_def *label = thisTaskHandle()->getContext<Ctx_def>();
+#define CR_CTX_END(label)		};Ctx_def *label = thisTaskHandle()->getContext<Ctx_def>();
 
-#define CR_START(label)			switch(thisTaskHandle()->mLine){case 0:
+#define CR_START				switch(thisTaskHandle()->line){case 0:
 
-#define CR_YIELD(label)			thisTaskHandle()->mLine = __LINE__;return;case  __LINE__  :
+#define CR_YIELD				thisTaskHandle()->line = __LINE__;return;case  __LINE__  :
 
-#define CR_WAIT_UNTIL(cond)		thisTaskHandle()->mLine = __LINE__;case __LINE__ :  if(!cond){return;}
+#define CR_WAIT_UNTIL(cond)		thisTaskHandle()->line = __LINE__;case __LINE__ :  if(!(cond)){return;}
 
+#define CR_WAIT_FOR(timestamp)	thisTaskHandle()->line = __LINE__;case __LINE__ :  if(timestamp < SysKernelData::sGetTick()){return;}
+
+#define CR_RESET         		thisTaskHandle()->line = 0;
+		
 #define CR_END         			}deleteTask(thisTaskHandle());
 
 
@@ -937,15 +963,26 @@ struct Coroutine2
 	template<typename T>
 	T *getContext()
 	{
+		static_assert(sizeof(T) <= sizeof(mContext), "Coroutine context size error");
+		if(!line){
+			// instantiate T inside context buffer
+			T temp;
+			uint8_t *dest = mContext;
+			uint8_t *src = reinterpret_cast<uint8_t *>(&temp);
+			const uint8_t *end = src+sizeof(T);
+			while(src != end){
+				*dest++ = *src++;
+			}
+		}
 		return reinterpret_cast<T *>(mContext);
 	}
 
-	uint16_t mLine;
+	uint16_t line;
 	
 protected:
 
 	template<typename derived_t>
-	void init() { mLine = 0;}
+	void init() { line = 0;}
 	bool isExeReady() const { return true; }
 	bool isDelReady() const { return true; } 
 	void makePreExe(){}
