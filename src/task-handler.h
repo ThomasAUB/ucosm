@@ -144,6 +144,22 @@ public:
 			mHandlePtr[i] = nullptr;
 		}
 	}
+
+	 // task tokenizer : can be called several times
+	bool getNextTaskHandle(task_function_t inFunc, TaskHandle *ioHandle)
+ 	{
+		static index_t sI = 0;
+		for(index_t k=0 ; k<task_count ; k++){
+			sI = (sI+1)%task_count;
+			if(mFunctions[sI] == inFunc){
+				*ioHandle = &mTasks[sI];
+				mHandlePtr[sI] = ioHandle;
+				return true;
+			}
+		}
+		return false;
+	}
+
  
 private:
 
