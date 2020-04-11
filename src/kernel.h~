@@ -29,17 +29,16 @@
 
 #pragma once
 
-#include "task-handler.h"
+// iScheduler and getTick
+#include "modules/ucosm-sys-data.h"
 
-#include "uscosm-sys-data.h"
 
-
+using index_t = uint8_t;
 
 
 template<typename handler_t, index_t max_handler_count> 
 class Kernel : public iScheduler
 {
-
 
 public:
 
@@ -49,7 +48,7 @@ public:
 	bool addHandler(iScheduler *inHandler)
 	{
 		if(mHandlerCount == max_handler_count){ return false; }
-		mHandlers[mHandlerCount] = inHandler;
+		mHandlers[mHandlerCount] = static_cast<iScheduler *>(inHandler);
 		mHandlerTraits[mHandlerCount].init(&mHandlerTraits[mHandlerCount]);		
 		mHandlerCount++;
 		return true;
@@ -88,7 +87,7 @@ public:
 	}
 	
 
-	bool schedule final (tick_t inMinDuration = 0)
+	bool schedule (tick_t inMinDuration = 0) final
 	{
 		
 		bool hasExe = false;
@@ -166,6 +165,5 @@ private:
 	void (*mIdleTask)();
 
 };
-
 
 

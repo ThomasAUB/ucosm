@@ -29,17 +29,16 @@
 
 #pragma once
 
-#include "task-handler.h"
+// iScheduler and getTick
+#include "modules/ucosm-sys-data.h"
 
-#include "uscosm-sys-data.h"
 
-
+using index_t = uint8_t;
 
 
 template<typename handler_t, index_t max_handler_count> 
 class Kernel : public iScheduler
 {
-
 
 public:
 
@@ -166,6 +165,5 @@ private:
 	void (*mIdleTask)();
 
 };
-
 
 

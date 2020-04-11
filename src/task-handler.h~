@@ -29,23 +29,27 @@
 
 #pragma once
 
+// iScheduler
+#include "modules/ucosm-sys-data.h"
 
-#include "modules.h"
+using index_t = uint8_t;
 
 
-
-template<typename Caller_t, typename task_modules, index_t task_count>
+template<typename Caller_t, typename task_module, index_t task_count>
 class TaskHandler : public iScheduler
 {
+	 
+	static const index_t max_index = std::numeric_limits<index_t>::max();
 	
 	static_assert(task_count < max_index-1 , "Task count too high");	
 	
 	using task_function_t = void (Caller_t::*)();
 
-	struct TaskItem : public task_modules
+	struct TaskItem : public task_module
 	{
 		constexpr TaskItem(): index(sCounterIndex++) {}
 		const index_t index;
+		private:
 		static index_t sCounterIndex;
 	};
 
@@ -54,7 +58,7 @@ class TaskHandler : public iScheduler
 public:
 	
 	using TaskHandle = task_t*;
-
+	 
 	TaskHandler()
  	{
 		// safety check
@@ -62,13 +66,13 @@ public:
 		{
 			if(mTasks[i].index != i)
 			{
-				catchException("Critical declaration error");
+				HandlerException("Critical declaration error");
 				while(1){}
 			}
 		}
 	}
 	
-	bool schedule(tick_t t)
+	bool schedule(tick_t t) final
 	{
 
 		bool hasExe = false;
@@ -76,12 +80,13 @@ public:
 		index_t i=0;
 		
 		do{
-			if( mFunctions[i] && mTasks[i].isExeReady(static_cast<task_modules *>(&mTasks[i])) )
+			if( mFunctions[i] && mTasks[i].isExeReady(&mTasks[i].mModule) )
 			{
+				
 				mCurrHandleIndex = i;
-				mTasks[i].makePreExe(static_cast<task_modules *>(&mTasks[i]));
+				mTasks[i].makePreExe(&mTasks[i]);
 				(static_cast<Caller_t *>(this)->*mFunctions[i])();
-				mTasks[i].makePostExe(static_cast<task_modules *>(&mTasks[i]));
+				mTasks[i].makePostExe(&mTasks[i]);
 				mCurrHandleIndex = max_index;
 				hasExe = true;
 			}
@@ -94,7 +99,7 @@ public:
 	{
 		if(mCurrHandleIndex == max_index)
 		{
-			catchException("thisTask() not allowed in this context");
+			HandlerException("thisTask() not allowed in this context");
 			return 0;
 		}
 		return &mTasks[mCurrHandleIndex];
@@ -117,7 +122,7 @@ public:
 				}else{
 					mHandlePtr[i] = nullptr;
 				}
-				mTasks[i].init(static_cast<task_modules *>(&mTasks[i]));
+				mTasks[i].init(&mTasks[i].mModule);
 				return true;
 			}
 		}while(++i < task_count);
@@ -131,13 +136,13 @@ public:
 		
 		index_t i = inHandle->index;
 
-		if(mTasks[i].isDelReady(static_cast<task_modules *>(&mTasks[i])))
+		if(mTasks[i].isDelReady(&mTasks[i]))
 		{
 			
-			mTasks[i].makePreDel(static_cast<task_modules *>(&mTasks[i]);
+			mTasks[i].makePreDel(&mTasks[i]);
 			mFunctions[i] = nullptr;
 			
-			if(mHandlePtr[i] && *mHandlePtr[i]==&mTasks[i])
+			if(&mHandlePtr[i] && ( *mHandlePtr[i] == &mTasks[i] ))
 			{
 				*mHandlePtr[i] = nullptr;
 			}
@@ -148,16 +153,14 @@ public:
  
 private:
 
-	virtual void catchException(const char *inErrMsg){}
-	
-	task_function_t mFunctions[task_count];
-
-	TaskHandle *mHandlePtr[task_count];
+	virtual void HandlerException(const char *inErrMsg){}
 
 	task_t mTasks[task_count];
+	task_function_t mFunctions[task_count];
+	TaskHandle *mHandlePtr[task_count];
 
 	index_t mCurrHandleIndex;
-		
+	
 };
 
 

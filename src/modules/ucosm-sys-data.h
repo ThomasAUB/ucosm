@@ -35,17 +35,10 @@
 using tick_t = uint32_t;
 
 
-using index_t = uint8_t;
-
-
-const index_t max_index = std::numeric_limits<index_t>::max();
-
-
 struct iScheduler
 {
 	virtual bool schedule(tick_t t = 0) = 0;
 };
-
 
 struct SysKernelData
 {
@@ -53,7 +46,6 @@ struct SysKernelData
 	static tick_t (*sGetTick)();
 	static iScheduler *sMaster;
 };
-
 
 uint8_t SysKernelData::sCnt;
 
