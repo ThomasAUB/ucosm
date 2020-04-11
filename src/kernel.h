@@ -43,7 +43,7 @@ class Kernel : public iScheduler
 
 public:
 
-	Kernel() : mHandlerCount(0)
+	Kernel() : mHandlerCount(0), mIdleTask(nullptr)
 	{}
 
 	bool addHandler(iScheduler *inHandler)
@@ -68,6 +68,14 @@ public:
 	{
 		index_t i;
 		if(getHandlerIndex(inHandler, i)){
+
+			if(!mHandlerTraits[i].isDelReady(&mHandlerTraits[i]))
+			{
+				return;
+			}
+
+			mHandlerTraits[i].makePreDel(&mHandlerTraits[i]);
+			
 			// shift handlers for contiguous array
 			while(i<mHandlerCount-1)
 			{
@@ -80,10 +88,11 @@ public:
 	}
 	
 
-	bool schedule(tick_t inMinDuration = 0)
+	bool schedule (tick_t inMinDuration = 0) final
 	{
 		
 		bool hasExe = false;
+		bool fullCycleExe = false;
 		tick_t startTick = SysKernelData::sGetTick();
 		
 		do
@@ -92,28 +101,40 @@ public:
 			index_t i = 0;
 			SysKernelData::sCnt++;
 
+			bool singleCycleExe = false;
+
 			while(i < mHandlerCount)
 			{
 							
 				if(mHandlers[i] && mHandlerTraits[i].isExeReady(&mHandlerTraits[i]))
 				{
 					mHandlerTraits[i].makePreExe(&mHandlerTraits[i]);
-					hasExe |= mHandlers[i]->schedule();
+					singleCycleExe |= mHandlers[i]->schedule();
 					mHandlerTraits[i].makePostExe(&mHandlerTraits[i]);
 				}
 				i++;
 			}
 
-			/*
-			if(!hasExe)
+			if(!singleCycleExe) 
 			{
-				// idle task if exists
+				if(mIdleTask)
+				{
+					// idle task if exists
+					mIdleTask();
+				}
+			}else{
+				// at least one execution occured
+				fullCycleExe = true;
 			}
-			*/
 			
 		}while( ( SysKernelData::sGetTick() - startTick ) < inMinDuration );
 
-		return hasExe;
+		return fullCycleExe;
+	}
+
+	void setIdleTask(void (*inIdleTask)())
+ 	{
+		mIdleTask = inIdleTask;
 	}
 
 
@@ -141,6 +162,8 @@ private:
 	handler_t mHandlerTraits[max_handler_count];
 	
 	index_t mHandlerCount;
+
+	void (*mIdleTask)();
 
 };
 
