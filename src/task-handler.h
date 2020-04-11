@@ -57,6 +57,7 @@ public:
 
 	TaskHandler()
  	{
+		// safety check
 		for(index_t i=0 ; i<task_count ; i++)
 		{
 			if(mTasks[i].index != i)
@@ -75,12 +76,12 @@ public:
 		index_t i=0;
 		
 		do{
-			if(mFunctions[i] && mTasks[i].isExeReady())
+			if( mFunctions[i] && mTasks[i].isExeReady(static_cast<task_modules *>(&mTasks[i])) )
 			{
 				mCurrHandleIndex = i;
-				mTasks[i].makePreExe();
+				mTasks[i].makePreExe(static_cast<task_modules *>(&mTasks[i]));
 				(static_cast<Caller_t *>(this)->*mFunctions[i])();
-				mTasks[i].makePostExe();
+				mTasks[i].makePostExe(static_cast<task_modules *>(&mTasks[i]));
 				mCurrHandleIndex = max_index;
 				hasExe = true;
 			}
@@ -100,7 +101,7 @@ public:
 	}
 	
 	bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr)
-	{					
+	{
 				
 		// allocation
 		index_t i=0;
@@ -116,7 +117,7 @@ public:
 				}else{
 					mHandlePtr[i] = nullptr;
 				}
-				mTasks[i].init();
+				mTasks[i].init(static_cast<task_modules *>(&mTasks[i]));
 				return true;
 			}
 		}while(++i < task_count);
@@ -130,10 +131,10 @@ public:
 		
 		index_t i = inHandle->index;
 
-		if(mTasks[i].isDelReady())
+		if(mTasks[i].isDelReady(static_cast<task_modules *>(&mTasks[i])))
 		{
 			
-			mTasks[i].makePreDel();
+			mTasks[i].makePreDel(static_cast<task_modules *>(&mTasks[i]));
 			mFunctions[i] = nullptr;
 			
 			if(mHandlePtr[i] && *mHandlePtr[i]==&mTasks[i])

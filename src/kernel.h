@@ -50,7 +50,7 @@ public:
 	{
 		if(mHandlerCount == max_handler_count){ return false; }
 		mHandlers[mHandlerCount] = inHandler;
-		mHandlerTraits[mHandlerCount].init();		
+		mHandlerTraits[mHandlerCount].init(&mHandlerTraits[mHandlerCount]);		
 		mHandlerCount++;
 		return true;
 	}
@@ -95,11 +95,11 @@ public:
 			while(i < mHandlerCount)
 			{
 							
-				if(mHandlers[i] && mHandlerTraits[i].isExeReady())
+				if(mHandlers[i] && mHandlerTraits[i].isExeReady(&mHandlerTraits[i]))
 				{
-					mHandlerTraits[i].makePreExe();
+					mHandlerTraits[i].makePreExe(&mHandlerTraits[i]);
 					hasExe |= mHandlers[i]->schedule();
-					mHandlerTraits[i].makePostExe();
+					mHandlerTraits[i].makePostExe(&mHandlerTraits[i]);
 				}
 				i++;
 			}

@@ -42,7 +42,7 @@
  * 
  *  must contain a set of funtions :
  * 
- *	  - template<typename derived_t> void init()
+ *	  - template<typename T> void init(T *t)
  * 
  *	  - bool isExeReady const ()
  *	  - bool isDelReady const ()
@@ -60,14 +60,17 @@
 #include <tuple>
 
 
+
 template<class ...ModuleCollection> 
 class Modules
 {
 
 	using items_t = std::tuple<ModuleCollection...>;
+	items_t itemModules;
 
+	
 public:
-	 
+	
 	Modules()
 	{}
 
@@ -77,144 +80,74 @@ public:
 		return std::get<T>(itemModules);
 	}
 
-	void init()
+	template<typename T, size_t I = 0>
+	void init(T *t)
 	{
-		//uint8_t d[] = {(uint8_t)0, (ModuleCollection::template init<Modules<ModuleCollection...>>(), (uint8_t)0)...};
-		//static_cast<void>(d); // avoid warning for unused variable
-
-		//uint8_t d[] = {(uint8_t)0, (ModuleCollection::template init<Modules<ModuleCollection...>>(), (uint8_t)0)...};
-		//static_cast<void>(d); // avoid warning for unused variable
+		std::get<I>(itemModules).init(t);
+		if constexpr(I+1 != std::tuple_size<items_t>::value)
+		    init<T, I+1>(t);
 	}
 
-	 
-
-	bool isExeReady()
+	template<typename T, size_t I = 0>
+	bool isExeReady(T *t)
 	{
-		/*bool ready[] = {
-			true, (ModuleCollection::isExeReady())...
-		};
-		for(index_t i=0 ; i<sizeof(ready) ; i++)
-		{
-			if(!ready[i]){ return false; }
-		}*/
-
-		/*if(std::tuple_size<items_t>::value >= 1){
-			bool te = std::get<0>(itemModules).isExeReady();
-		}*/
-
-		//std::index_sequence<std::tuple_size<items_t>::value> gg = std::make_index_sequence<std::tuple_size<items_t>::value>{};
-
-		auto gg = std::make_index_sequence<std::tuple_size<items_t>::value>{};
-		//auto g5g = get(0);
-
-		
-
-		//((std::get<gg>(itemModules).isExeReady()),...);
-
-  		//((std::get<getSequence()...>(itemModules).isExeReady()),...);
-		
-		
-		//std::get<gg.>
-		
-		unpack(gg);
-
-		bool... res = isExeReady(gg);
-
-		//((std::get<gg>(itemModules).isExeReady()),...);
-
-		//((std::get<Is>(itemModules).isExeReady()),...);
-		
-		/*std::size_t... seq = std::make_index_sequence<std::tuple_size<items_t>::value>{}
-
-		
-
-		((std::get<seq>(itemModules).isExeReady()),...);
-
-		std::tuple<int, bool, char> t = std::make_tuple(1, true, 'a');
-
-    	int  n = std::get<0>(t); // ok
-   	 	bool b = std::get<1>(t); // ok
-    	char c = std::get<2>(t); // ok*/
-		
-		//std::get<0>(itemModules).isExeReady();
-		
-		
-		/*if(!std::get<0>(itemModules).isExeReady())
-		{ 
-			return false; 
-		}*/
-
-		
-		/*if(!std::get<1>(itemModules).isExeReady())
-		{ 
-			return false; 
-		}*/
-		
-/*
-		for(index_t i=0 ; i<std::tuple_size(itemModules) ; i++)
-		{
-			if(!std::get<i>(itemModules).isExeReady())
-			{ 
-				return false; 
-			}
-		}*/
-		
-		return true;
+		if constexpr (I+1 != std::tuple_size<items_t>::value)
+			return ( isExeReady<T, I+1>(t) && std::get<I>(itemModules).isExeReady(t) );
+		else 
+			return std::get<I>(itemModules).isExeReady(t);
 	}
 	
-	bool isDelReady()
-	{
-		/*bool ready[] = {
-			true, (ModuleCollection::isDelReady())...
-		};
-		for(index_t i=0 ; i<sizeof(ready) ; i++)
-		{
-			if(!ready[i]){ return false; }
-		}*/
-		return true;
+	template<typename T, size_t I = 0>
+	bool isDelReady(T *t) {
+		if constexpr (I+1 != std::tuple_size<items_t>::value)
+			return ( isDelReady<T, I+1>(t) && std::get<I>(itemModules).isDelReady(t) );
+		else 
+			return std::get<I>(itemModules).isDelReady(t);
 	}
 
-	void makePreExe()
-	{
-		//uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePreExe(), (uint8_t)0)...};
-		//static_cast<void>(d); // avoid warning for unused variable
+	template<typename T, size_t I = 0>
+	void makePreExe(T *t) {
+		std::get<I>(itemModules).makePreExe(t);
+		if constexpr(I+1 != std::tuple_size<items_t>::value)
+		    makePreExe<T, I+1>(t);
 	}
 
-	void makePostExe()
-	{
-		//uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePostExe(), (uint8_t)0)...};
-		//static_cast<void>(d); // avoid warning for unused variable
+	template<typename T, size_t I = 0>
+	void makePostExe(T *t) {
+		std::get<I>(itemModules).makePostExe(t);
+		if constexpr(I+1 != std::tuple_size<items_t>::value)
+		    makePostExe<T, I+1>(t);
 	}
-	 
-	void makePreDel()
-	{
-		/*uint8_t d[] = {
-			(uint8_t)0, (ModuleCollection::makePreDel(), (uint8_t)0)...
-		};
-		static_cast<void>(d); // avoid warning for unused variable
-		*/
-	}
-
- 	
-private:
-
 	
-	template<std::size_t... Is>
-	void unpack(std::index_sequence<Is...>){
-		((std::get<Is>(itemModules).isExeReady()),...);
+	template<typename T, size_t I = 0>
+	void makePreDel(T *t) {
+		std::get<I>(itemModules).makePreDel(t);
+		if constexpr(I+1 != std::tuple_size<items_t>::value)
+		    makePreDel<T, I+1>(t);
 	}
-
-	template<std::size_t... Is>
-	auto isExeReady(std::index_sequence<Is...>){
-  		return ((std::get<Is>(itemModules).isExeReady()),...);
-	}
-	 
-	items_t itemModules;
-	 
 };
 
 
-using no_module = Modules<>;
+
+
+struct no_module
+{
+	template<typename T>
+	void init(T *t){}
+	template<typename T>
+    bool isExeReady(T *t) const {return true;}
+	template<typename T>
+	bool isDelReady(T *t) const {return true;}
+	template<typename T>
+	void makePreExe(T *t){}
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t){}
+};
+
+
+
 
 
 
@@ -226,10 +159,6 @@ namespace ucosm_modules
 
 
 
-
-
-
-	
 
 // Allows to add basic task priority management :
 // the priority goes from 1 to 255
@@ -245,13 +174,14 @@ struct Prio // 1 byte
 		mPriority = (inPrio)?inPrio:1; 
 	}
 
-	template<typename derived_t>
-	 void init()
+	template<typename T>
+	void init(T *t)
 	{
 		mPriority = 1;
 	}
-	 
-    bool isExeReady() const 
+
+	template<typename T>
+    bool isExeReady(T *t)
 	{   
 		if(SysKernelData::sCnt)
 		{
@@ -260,14 +190,18 @@ struct Prio // 1 byte
 			return (!((SysKernelData::sCnt+1)%mPriority));
 		}
 	}
-	 
-	bool isDelReady() const {return true;}
-	void makePreExe(){}
-	void makePreDel(){}
-	void makePostExe(){}
+
+	template<typename T>
+	bool isDelReady(T *t) const {return true;}
+	template<typename T>
+	void makePreExe(T *t){}
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t){}
 	
 private:
-	 
+
     uint8_t mPriority;
 };
 
@@ -294,7 +228,7 @@ struct Status // 1 byte
 
 		
 	bool isStatus(uint8_t s){ return ((mStatus&s) == s);}
-		
+	
 	void setStatus(uint8_t s, bool state)
 	{
 		// task is locked : cancel operation
@@ -318,13 +252,18 @@ struct Status // 1 byte
 		return (mStatus&eStarted);
 	}
 	
-	template<typename derived_t>
-	void init()	{ mStatus = 0; }
-	bool isExeReady() const { return !(mStatus&eSuspended) ;}
-	bool isDelReady() const { return !(mStatus&eLocked);}
-	void makePreExe(){  mStatus |= eRunning; }
-	void makePreDel(){}
-	void makePostExe()
+	template<typename T>
+	void init(T *t)	{ mStatus = 0; }
+	template<typename T>
+	bool isExeReady(T *t) const { return !(mStatus&eSuspended) ;}
+	template<typename T>
+	bool isDelReady(T *t) const { return !(mStatus&eLocked);}
+	template<typename T>
+	void makePreExe(T *t){  mStatus |= eRunning; }
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t)
 	{
 		mStatus &= ~eRunning; 
 		mStatus |= eStarted;
@@ -383,24 +322,25 @@ struct StatusNotify : private Status // 1 byte
 	}
 	
 
-	template<typename derived_t>
-	void init()	{ mStatus = 0; }
-	
-	bool isExeReady() const { return !(mStatus&Status::eSuspended) ;}
-	bool isDelReady() const { return !(mStatus&Status::eLocked);}
-
-	void makePreExe()
+	template<typename T>
+	void init(T *t)	{ mStatus = 0; }
+	template<typename T>
+	bool isExeReady(T *t) const { return !(mStatus&Status::eSuspended) ;}
+	template<typename T>
+	bool isDelReady(T *t) const { return !(mStatus&Status::eLocked);}
+	template<typename T>
+	void makePreExe(T *t)
 	{  
 		setStatus(Status::eRunning, true); 
 	}
-	
-	void makePostExe()
+	template<typename T>
+	void makePostExe(T *t)
 	{
 		setStatus(Status::eRunning, false); 
 		setStatus(Status::eStarted, true);
 	}
-	
-	void makePreDel()
+	template<typename T>
+	void makePreDel(T *t)
 	{
 		if( isStatus(eNotifyDeleted) )
 		{
@@ -439,23 +379,24 @@ struct Delay // 4 bytes
 	}
 
 
-	template<typename derived_t>
-	void init()
+	template<typename T>
+	void init(T *t)
 	{
 		mExecution_time_stamp = SysKernelData::sGetTick();
 	}
-	
-    bool isExeReady() const 
+	template<typename T>
+    bool isExeReady(T *t) const 
 	{
 		return (SysKernelData::sGetTick() >= mExecution_time_stamp);
 	}
-	
-	bool isDelReady() const { return true; }
-
-	void makePreExe(){}
-	
-	void makePreDel(){}
-	void makePostExe(){}	
+	template<typename T>
+	bool isDelReady(T *t) const { return true; }
+	template<typename T>
+	void makePreExe(T *t){}
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t){}	
 	
 private:
 	
@@ -499,22 +440,26 @@ struct Periodic // 6 bytes
 		}
 	}
 
-	template<typename derived_t>
-	void init()
+	template<typename T>
+	void init(T *t)
 	{
 		mExecution_time_stamp = SysKernelData::sGetTick();
 	}
-	
-	bool isExeReady() const {
+	template<typename T>
+	bool isExeReady(T *t) const {
 		return (SysKernelData::sGetTick() >= mExecution_time_stamp);
 	}
-	bool isDelReady() { return true; }
-	void makePreExe()
+	template<typename T>
+	bool isDelReady(T *t) { return true; }
+	template<typename T>
+	void makePreExe(T *t)
 	{
 		mExecution_time_stamp += mPeriod;
 	}
-	void makePreDel(){}
-	void makePostExe(){}
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t){}
 		
 private:
 	
@@ -528,23 +473,65 @@ private:
 
 
 
+struct Conditional // 4 bytes
+{	
+	void setCondition(bool (*inCondition)())
+	{
+		mCondition = inCondition;
+	}
+	
+	template<typename T>
+	void init(T *t)
+	{
+		mCondition = nullptr;
+	}
+	template<typename T>
+    bool isExeReady(T *t)
+	{
+		if(!mCondition){
+			return true;
+		}
+		return mCondition();
+	}
+	template<typename T>
+	bool isDelReady(T *t) const { return true; }
+	template<typename T>
+	void makePreExe(T *t){}
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t){}	
+	
+private:
+
+	bool (*mCondition)();
+	
+};
+
+
+
+
+
+
+
+
 
 // Allow to send data to a specific task
 // Data is unaccessible if the owner task is not currently running
-template<typename T, uint16_t fifo_size>
+template<typename data_t, uint16_t fifo_size>
 struct Signal
 {
 	
-	bool send(Signal *inReceiver, T inData)
+	bool send(Signal *inReceiver, data_t inData)
 	{
 		if(!inReceiver){return false;}
 		return (inReceiver->mRxData.push(inData));
 	}
 
-	T receive()
+	data_t receive()
 	{
 		if(!reinterpret_cast<Status *>(this)->isRunning()){
-			return T();
+			return data_t();
 		}
 
 		return mRxData.pop();
@@ -555,20 +542,25 @@ struct Signal
 		return !mRxData.isEmpty();
 	}
 
-	template<typename derived_t>
-	void init()
+	template<typename T>
+	void init(T *t)
 	{ 
-		static_assert(std::is_base_of<Status, derived_t>::value, "Signal must implement Status");
+		static_assert(std::is_base_of<Status, T>::value, "Signal must implement Status");
 	}
-	bool isExeReady() { return true; }
-	bool isDelReady() { return mRxData.isEmpty(); }
-	void makePreExe() {}
-	void makePreDel() {}
-	void makePostExe(){}
+	template<typename T>
+	bool isExeReady(T *t) { return true; }
+	template<typename T>
+	bool isDelReady(T *t) { return mRxData.isEmpty(); }
+	template<typename T>
+	void makePreExe(T *t) {}
+	template<typename T>
+	void makePreDel(T *t) {}
+	template<typename T>
+	void makePostExe(T *t){}
 
 private:
 	
-	Fifo<T, fifo_size> mRxData;
+	Fifo<data_t, fifo_size> mRxData;
 };
 
 
@@ -610,13 +602,18 @@ struct Buffer
 		return mBuffer;
 	}
 
-	template<typename derived_t>
-	void init() {}
-	bool isExeReady() const { return true; }
-	bool isDelReady() const { return true; } 
-	void makePreExe(){}
-	void makePreDel(){}
-	void makePostExe(){}
+	template<typename T>
+	void init(T *t) {}
+	template<typename T>
+	bool isExeReady(T *t) const { return true; }
+	template<typename T>
+	bool isDelReady(T *t) const { return true; } 
+	template<typename T>
+	void makePreExe(T *t){}
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t){}
 
 	buffer_t mBuffer[size];
 };
@@ -661,16 +658,19 @@ struct LinkedList : public ListItem // 9 bytes
 	ListItem *getNext() { return mNext; }
 	ListItem *getPrev() { return mPrev; }
 
-	template<typename derived_t>
-	void init()
+	template<typename T>
+	void init(T *t)
 	{   
-		static_assert(std::is_base_of<Status, derived_t>::value, "LinkedList must implement Status");
+		//static_assert(std::is_base_of<Status, T>::value, "LinkedList must implement Status");
+		//t->get<Status>().setStatus(0);
 		mPrev = mNext = nullptr;
 	}
-
-	bool isExeReady() const { return true; }
-	bool isDelReady() const { return true; } 
-	void makePreExe()
+	template<typename T>
+	bool isExeReady(T *t) const { return true; }
+	template<typename T>
+	bool isDelReady(T *t) const { return true; } 
+	template<typename T>
+	void makePreExe(T *t)
 	{
 		if(reinterpret_cast<Status *>(this)->isStarted()){return;}
 
@@ -681,7 +681,8 @@ struct LinkedList : public ListItem // 9 bytes
 		}
 		sTopHandle = this;
 	}
-	void makePreDel()
+	template<typename T>
+	void makePreDel(T *t)
 	{
 		if(sTopHandle == this)
 		{
@@ -701,7 +702,8 @@ struct LinkedList : public ListItem // 9 bytes
 			mNext->mPrev = nullptr;
 		}
 	}
-	void makePostExe(){}
+	template<typename T>
+	void makePostExe(T *t){}
 
 private:
 
@@ -758,8 +760,9 @@ ListItem *LinkedList<listIndex>::sTopHandle = nullptr;
 //  - Allows to allocate and release a buffer of sizeof(elem_t) bytes
 //  - Forbids task deletion if a buffer is allocated to avoid memory leakage
 //  - The number of buffer per task types has a maximum value of 32
+//	- If auto_release is "true", the module will automatically release allocated memory on deletion 
 
-template<typename elem_t, uint16_t elem_count>
+template<typename elem_t, uint16_t elem_count, bool auto_release = true>
 struct MemPool32
 {
 	static_assert(elem_count <= 32, "size of pool must not exceed 32");
@@ -846,15 +849,30 @@ struct MemPool32
 		return &mElems[mAllocIndex&(~kAllocBoolMask)];
 	}
 
-	template<typename derived_t>
-	void init() { mAllocIndex = 0; }
-	bool isExeReady() const { return true; }
+	template<typename T>
+	void init(T *t) { mAllocIndex = 0; }
+	template<typename T>
+	bool isExeReady(T *t) const { return true; }
 	
 	// decide if deletion forbidden if allocated memory or auto release?
-	bool isDelReady() const { return !mAllocIndex; } 
-	void makePreExe(){}
-	void makePreDel(){}
-	void makePostExe(){}
+	template<typename T>
+	bool isDelReady(T *t) 
+	{ 
+		if(mAllocIndex) // memory is allocated
+		{
+			if constexpr (auto_release)
+				return release();
+			else
+				return false;
+		}
+		return true;
+	} 
+	template<typename T>
+	void makePreExe(T *t){}
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t){}
 	
 private:
 
@@ -866,11 +884,11 @@ private:
 
 };
 
-template <typename elem_t, uint16_t elem_count>
-elem_t MemPool32<elem_t, elem_count>::mElems[elem_count];
+template <typename elem_t, uint16_t elem_count, bool auto_release>
+elem_t MemPool32<elem_t, elem_count, auto_release>::mElems[elem_count];
 
-template <typename elem_t, uint16_t elem_count>
-uint32_t MemPool32<elem_t, elem_count>::mMemoryMap = 0;
+template <typename elem_t, uint16_t elem_count, bool auto_release>
+uint32_t MemPool32<elem_t, elem_count, auto_release>::mMemoryMap = 0;
 
 
 
@@ -896,14 +914,16 @@ struct Parent
 		mIsParent = true;
 	}
 
-	template<typename derived_t>
-	void init()
+	template<typename T>
+	void init(T *t)
 	{ 
 		mIsParent = false;
 		mChild = nullptr; 
 	}
-	bool isExeReady() const { return true; }
-	bool isDelReady()
+	template<typename T>
+	bool isExeReady(T *t) const { return true; }
+	template<typename T>
+	bool isDelReady(T *t)
 	{
 		if(!mIsParent) { return true; }
 		
@@ -911,15 +931,18 @@ struct Parent
 	
 		return false; 
 	} 
-	void makePreExe(){}
-	void makePreDel()
+	template<typename T>
+	void makePreExe(T *t){}
+	template<typename T>
+	void makePreDel(T *t)
 	{
 		if(!mIsParent && mParent)
 		{
 			mParent->mChild = nullptr;
 		}
 	}
-	void makePostExe(){}
+	template<typename T>
+	void makePostExe(T *t){}
 
 private:
 
@@ -954,25 +977,24 @@ struct Coroutine
 		}
 	}
 						
-	template<typename derived_t>
-	void init()
+	template<typename T>
+	void init(T *t)
 	{ 
-		static_assert(std::is_base_of<Status, derived_t>::value, "Coroutine must implement Status");
+		static_assert(std::is_base_of<Status, T>::value, "Coroutine must implement Status");
 	}
-	
-	bool isExeReady() 
+	template<typename T>
+	bool isExeReady(T *t) 
 	{ 
 		return !(reinterpret_cast<Status *>(this)->isRunning());
 	}
-	
-	bool isDelReady()
-	{
-		return true; 
-	}
-	
-	void makePreExe(){}
-	void makePreDel(){}
-	void makePostExe(){}
+	template<typename T>
+	bool isDelReady(T *t){return true;}
+	template<typename T>
+	void makePreExe(T *t){}
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t){}
 
 private:
 	
@@ -994,12 +1016,18 @@ struct Coroutine2
 
 #define CTX_END(label)			};Ctx_def *label = thisTaskHandle()->getContext<Ctx_def>();
 
-#define CR_START(label)			switch(thisTaskHandle()->mLine){case 0:
+#define CR_START				switch(thisTaskHandle()->mLine){case 0:
 
-#define CR_YIELD(label)			thisTaskHandle()->mLine = __LINE__;return;case  __LINE__  :
+#define CR_YIELD				thisTaskHandle()->mLine = __LINE__;return;case  __LINE__  :
 
-#define CR_WAIT_UNTIL(cond)		thisTaskHandle()->mLine = __LINE__;case __LINE__ :  if(!cond){return;}
+#define CR_WAIT_UNTIL(cond)		thisTaskHandle()->mLine = __LINE__;case __LINE__ :  if(!(cond)){return;}
 
+#define CR_WAIT_FOR(delay)		thisTaskHandle()->setDelay(delay);CR_YIELD // set delay and YIELD
+
+#define CR_LOOP(cond)			for(;(cond);CR_YIELD)
+
+#define CR_RESET				thisTaskHandle()->mLine = 0;return;
+	
 #define CR_END         			}deleteTask(thisTaskHandle());
 
 
@@ -1012,25 +1040,225 @@ struct Coroutine2
 
 	uint16_t mLine;
 
-	template<typename derived_t>
-	void init() { mLine = 0;}
-	bool isExeReady() const { return true; }
-	bool isDelReady() const { return true; } 
-	void makePreExe(){}
-	void makePreDel(){}
-	void makePostExe(){}
+	template<typename T>
+	void init(T *t) { mLine = 0;}
+	template<typename T>
+	bool isExeReady(T *t) const { return true; }
+	template<typename T>
+	bool isDelReady(T *t) const { return true; } 
+	template<typename T>
+	void makePreExe(T *t){}
+	template<typename T>
+	void makePreDel(T *t){}
+	template<typename T>
+	void makePostExe(T *t){}
 
 private:
 	
 	uint8_t mContext[max_context_size];
-	
-	
 };
 
 
 
+template<uint16_t max_stack_usage, uint8_t data_filter_coefficient = 3> 
+struct TaskAnalizer
+{
 
+	static_assert(max_stack_usage >= sizeof(uint32_t), "max_stack_usage must >= 4");
+	
+	using cycle_t = uint16_t;
 
+	enum eAnalizeType{
+		eEnd,
+		eStackUsage,
+		eExecTime,
+		eCPUMeasure,
+		eTypeCount
+	};
+
+	enum eResult{
+		eNone,
+		ePassed,
+		eErrorMemoryLeak,
+		eUserTerminated
+	};
+
+	void start(cycle_t inExeCount)
+	{
+		if(!isAnalizerAvailable()){
+			return;
+		}
+		sExeCount = inExeCount;
+		sCurAnalyzer = this;
+		sType = eStackUsage;
+		sResult = eNone;
+		sTotalTime = getTime();
+	}
+
+	void stop()
+	{
+		terminate(eUserTerminated);
+	}
+
+	bool isAnalizerAvailable()
+	{
+		return (sCurAnalyzer != nullptr);
+	}
+
+	bool isAnalizerRunning()
+	{
+		return (sCurAnalyzer == this);
+	}
+
+	void setTimeBase(tick_t (*inGetTick)())
+	{
+		sGetTick = inGetTick;
+	}
+	
+	template<typename T>
+	void init(T *t) {}
+	template<typename T>
+	bool isExeReady(T *t) const { return true; }
+	template<typename T>
+	bool isDelReady(T *t) { return !isAnalizerRunning(); } 
+	template<typename T>
+	void makePreExe(T *t)
+	{
+		if(!isAnalizerRunning())
+		{
+			return;
+		}
+
+		switch(sType){
+			case eStackUsage:
+			{
+				const auto size=max_stack_usage/sizeof(uint32_t);
+				volatile uint32_t s[size];
+				sSp = s;
+				uint16_t i=0;
+				while(i < size){
+					s[i] = kStackPattern;
+				}
+			}
+				break;
+			case eExecTime:
+				 sCurrExeTime = getTime();
+				break;
+			case eCPUMeasure:
+				break;
+		}
+		
+	}
+	template<typename T>
+	void makePostExe(T *t)
+	{
+		if(!isAnalizerRunning())
+		{
+			return;
+		}
+
+		switch(sType){
+			case eStackUsage:
+			{
+				uint32_t dummy;
+				if(sSp != &dummy){
+					//stack overflow or memory leakage	
+					terminate(eErrorMemoryLeak);
+				}
+
+				const auto size=max_stack_usage/sizeof(uint32_t);
+				uint32_t s[size];
+				uint16_t i=0;
+				uint16_t currStackUsage = 0;
+				while(i < size){
+					if(s[i] == kStackPattern){
+						// stack usage
+						currStackUsage = i*sizeof(uint32_t);
+						break;
+					}
+					i++;
+				}
+			
+				sAverageStackUsage = smooth(sAverageStackUsage, currStackUsage);
+				if( currStackUsage > sMaxStackUsage){
+				 	sMaxStackUsage =  currStackUsage;
+				}
+				}
+				break;
+			case eExecTime:
+				sCurrExeTime = getTime() - sCurrExeTime;
+				sAverageExeTime  = smooth(sAverageExeTime, sCurrExeTime);
+				if(sCurrExeTime > sMaxExeTime){
+					sMaxExeTime =  sCurrExeTime;
+				}
+				break;
+			case eCPUMeasure:
+				break;
+		}
+
+		if(sExeCounter++ == sExeCount)
+		{
+			sType = (sType+1)%eTypeCount;
+			sExeCounter = 0;
+			if(sType == eEnd)
+			{	// terminate analize
+				terminate(ePassed);
+			}			
+		}
+	}
+
+	template<typename T>
+	void makePreDel(T *t){}
+
+	// stack
+	static uint16_t sAverageStackUsage;
+	static uint16_t sMaxStackUsage;
+
+	// exe time
+	static tick_t sAverageExeTime;
+	static tick_t sMaxExeTime;
+
+	// global
+	static tick_t sTotalTime;
+
+	static eResult sResult;
+	
+private:
+
+	void terminate(eResult inResult)
+	{
+		sCurAnalyzer = nullptr;
+		sTotalTime = getTime() - sTotalTime;
+	}
+	
+	template<typename T>
+	T smooth(T inPrev, T inNew)
+	{
+		(inPrev*(1<<(data_filter_coefficient-1)) + inNew)/(1<<data_filter_coefficient);
+	}
+
+	tick_t getTime()
+	{
+		return sGetTick();
+	}
+	
+	static TaskAnalizer *sCurAnalyzer;
+
+	static cycle_t sExeCounter;
+	static cycle_t sExeCount;
+
+	static eAnalizeType sType;
+
+	// stack usage
+	static uint32_t *sSp;
+	
+
+	// exe time
+	static tick_t sCurrExeTime;
+	static tick_t (*sGetTick)();
+	
+	static const uint32_t kStackPattern = 0xAACCBBDD;
+};
 
 
 
