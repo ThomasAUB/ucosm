@@ -1,9 +1,8 @@
 #pragma once
 
-/*
- *	template<uint16_t max_stack_usage>
- *	uint32_t *Stack_Usage_M<max_stack_usage>::sSp; 
- */
+// debug tool : when started, this module will calculate the approximative
+// stack usage of the process
+// it shouldn't be always running as the cpu usage of this module can be high
 
 
 template<uint16_t max_stack_usage>

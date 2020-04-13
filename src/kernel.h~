@@ -36,13 +36,15 @@
 #include "modules/ucosm-sys-data.h"
 uint8_t SysKernelData::sCnt = 0;
 
-using index_t = uint8_t;
 
 
-template<typename handler_t, index_t max_handler_count> 
+
+template<typename handler_t, size_t max_handler_count> 
 class Kernel : public IScheduler
 {
 
+	using handler_index_t = uint8_t;
+	 
 public:
 
 	Kernel() : mHandlerCount(0), mIdleTask(nullptr)
@@ -71,12 +73,12 @@ public:
 		index_t i;
 		if(getHandlerIndex(inHandler, i)){
 
-			if(!mHandlerTraits[i].isDelReady(&mHandlerTraits[i]))
+			if(!mHandlerTraits[i].isDelReady())
 			{
 				return;
 			}
 
-			mHandlerTraits[i].makePreDel(&mHandlerTraits[i]);
+			mHandlerTraits[i].makePreDel();
 			
 			// shift handlers for contiguous array
 			while(i<mHandlerCount-1)
@@ -102,11 +104,11 @@ public:
 		while(i < mHandlerCount)
 		{
 							
-			if(mHandlers[i] && mHandlerTraits[i].isExeReady(&mHandlerTraits[i]))
+			if(mHandlers[i] && mHandlerTraits[i].isExeReady())
 			{
-				mHandlerTraits[i].makePreExe(&mHandlerTraits[i]);
+				mHandlerTraits[i].makePreExe();
 				hasExe |= mHandlers[i]->schedule();
-				mHandlerTraits[i].makePostExe(&mHandlerTraits[i]);
+				mHandlerTraits[i].makePostExe();
 			}
 			i++;
 		}

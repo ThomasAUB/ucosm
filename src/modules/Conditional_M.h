@@ -1,20 +1,20 @@
 #pragma once
 
+// contains a free function pointer "mCondition"
+// the execution will if the function attributed with "setCondition" returns true
+// or if the task has no attributed condition
 
-struct Conditional_M // 4 bytes
+struct Conditional_M
 {	
-	void setCondition(bool (*inCondition)())
-	{
+	void setCondition(bool (*inCondition)()){
 		mCondition = inCondition;
 	}
 	
-	void init()
-	{
+	void init(){
 		mCondition = nullptr;
 	}
 
-    	bool isExeReady()
-	{
+	bool isExeReady(){
 		if(!mCondition)	return true;
 		return mCondition();
 	}

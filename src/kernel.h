@@ -36,13 +36,15 @@
 #include "modules/ucosm-sys-data.h"
 uint8_t SysKernelData::sCnt = 0;
 
-using index_t = uint8_t;
 
 
-template<typename handler_t, index_t max_handler_count> 
+
+template<typename handler_t, size_t max_handler_count> 
 class Kernel : public IScheduler
 {
 
+	using handler_index_t = uint8_t;
+	 
 public:
 
 	Kernel() : mHandlerCount(0), mIdleTask(nullptr)
@@ -59,7 +61,7 @@ public:
 	
 	handler_t *getHandle(IScheduler *inHandler)
 	{
-		index_t i;
+		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 			return &mHandlerTraits[i];
 		}
@@ -68,7 +70,7 @@ public:
 
 	void removeHandler(IScheduler *inHandler)
 	{
-		index_t i;
+		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 
 			if(!mHandlerTraits[i].isDelReady())
@@ -95,7 +97,7 @@ public:
 		
 		bool hasExe = false;	
 				
-		index_t i = 0;
+		handler_index_t i = 0;
 		
 		SysKernelData::sCnt++;
 
@@ -132,7 +134,7 @@ public:
 private:
 
 
-	bool getHandlerIndex(IScheduler *inScheduler, index_t& ioIndex)
+	bool getHandlerIndex(IScheduler *inScheduler, handler_index_t& ioIndex)
  	{
 		if(!mHandlerCount)
 		{
@@ -152,7 +154,7 @@ private:
 
 	handler_t mHandlerTraits[max_handler_count];
 	
-	index_t mHandlerCount;
+	handler_index_t mHandlerCount;
 
 	void (*mIdleTask)();
 

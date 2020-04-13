@@ -10,6 +10,9 @@
 
 #include "Coroutine_M.h" // requires delay but in macro
 
+// 
+#include "Status_M.h"
+
 // containers
 #include "ModuleKit_M.h"
 #include "Content_M.h"
@@ -21,9 +24,6 @@
 #include "Parent_M.h"
 #include "LinkedList_M.h" // requires status (cbypassable)
 
-// 
-#include "Status_M.h"
-#include "StatusNotify_M.h"	// requires status (could be merged?)
 
 // analyzers
 #include "Stack_Usage_M.h"

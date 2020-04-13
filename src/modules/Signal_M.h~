@@ -1,31 +1,27 @@
 #pragma once
 
+#include "utils/Fifo.h"
+
 // Allow to send data to a specific task
-// Data is unaccessible if the owner task is not currently running
+
 template<typename data_t, uint16_t fifo_size>
 struct Signal_M
 {
 	
-	bool send(Signal_M<data_t, fifo_size> *inReceiver, data_t inData)
-	{
+	bool send(Signal_M<data_t, fifo_size> *inReceiver, data_t inData){
 		if(!inReceiver){return false;}
 		return (inReceiver->mRxData.push(inData));
 	}
 
-	data_t receive()
-	{
+	data_t receive(){
 		return mRxData.pop();
 	}
 
-	bool hasData()
-	{
+	bool hasData(){
 		return !mRxData.isEmpty();
 	}
 
-	void init()
-	{ 
-
-	}
+	void init(){}
 
 	bool isExeReady() { return true; }
 

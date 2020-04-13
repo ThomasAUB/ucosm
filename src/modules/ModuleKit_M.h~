@@ -1,8 +1,6 @@
 #pragma once
 
 
-
-
 #include <tuple>
 
 
@@ -17,25 +15,22 @@ class ModuleKit_M
 public:
 
 	template<typename T>
-	T* get()
-	{
+	T* get() {
 		return &std::get<T>(mItemModules);
 	}
 
 	template<size_t I = 0>
-	void init()
-	{
+	void init() {
 		std::get<I>(mItemModules).init();
 		if constexpr(I+1 != std::tuple_size<items_t>::value)
 		    init<I+1>();
 	}
 
 	template<size_t I = 0>
-	bool isExeReady()
-	{
+	bool isExeReady() {
 		if constexpr (I+1 != std::tuple_size<items_t>::value){
 			if(std::get<I>(mItemModules).isExeReady()){
-				return isExeReady<T, I+1>();
+				return isExeReady<I+1>();
 			}else{
 				return false;
 			}
@@ -48,7 +43,7 @@ public:
 	bool isDelReady() {
 		if constexpr (I+1 != std::tuple_size<items_t>::value){
 			if(std::get<I>(mItemModules).isDelReady()){
-				return isDelReady<T, I+1>();
+				return isDelReady<I+1>();
 			}else{
 				return false;
 			}
@@ -61,20 +56,20 @@ public:
 	void makePreExe() {
 		std::get<I>(mItemModules).makePreExe();
 		if constexpr(I+1 != std::tuple_size<items_t>::value)
-		    makePreExe<T, I+1>();
+		    makePreExe<I+1>();
 	}
 
 	template<size_t I = 0>
 	void makePostExe() {
 		std::get<I>(mItemModules).makePostExe();
 		if constexpr(I+1 != std::tuple_size<items_t>::value)
-		    makePostExe<T, I+1>();
+		    makePostExe<I+1>();
 	}
 	
 	template<size_t I = 0>
 	void makePreDel() {
 		std::get<I>(mItemModules).makePreDel();
 		if constexpr(I+1 != std::tuple_size<items_t>::value)
-		    makePreDel<T, I+1>();
+		    makePreDel<I+1>();
 	}
 };

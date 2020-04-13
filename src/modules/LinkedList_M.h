@@ -19,23 +19,21 @@ struct LinkedList_M : public ListItem // 9 bytes
 	ListItem *getNext() { return mNext; }
 	ListItem *getPrev() { return mPrev; }
 
-	void init()
-	{   		
+	void init(){   		
 		mPrev = mNext = nullptr;
+		mIsStarted = false;
 	}
 
 	bool isExeReady() const { return true; }
 
 	bool isDelReady() const { return true; } 
 
-	void makePreExe()
-	{
+	void makePreExe(){
 
-		Status_M *st;
-		//st = t->get<Status_M>();
-		//if(t->get<Status_M>()->isStarted()){return;}
+		if(mIsStarted){ return; }
 
-	
+		mIsStarted = true;
+		
 		if(sTopHandle)
 		{
 			sTopHandle->mNext = this;
@@ -44,8 +42,8 @@ struct LinkedList_M : public ListItem // 9 bytes
 		sTopHandle = this;
 	}
 
-	void makePreDel()
-	{
+	void makePreDel(){
+		
 		if(sTopHandle == this)
 		{
 			if(mPrev){
@@ -70,6 +68,7 @@ struct LinkedList_M : public ListItem // 9 bytes
 private:
 
 	static ListItem *sTopHandle;
+	bool mIsStarted;
 	
 };
 

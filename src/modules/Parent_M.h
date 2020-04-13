@@ -3,28 +3,25 @@
 
 
 
-// allows to set a Parent/Child relation between two tasks,
+// allows to set a Parent/Child relation between two process,
 // it forbids the deletion of the parent task if the child is alive
 struct Parent_M
 {
 
-	void setChild(Parent_M *inChild)
-	{
+	void setChild(Parent_M *inChild) {
 		inChild->mParent = this;
 		mChild = inChild;
 		mIsParent = true;
 	}
 
-	void init()
-	{ 
+	void init() { 
 		mIsParent = false;
 		mChild = nullptr; 
 	}
 
 	bool isExeReady() const { return true; }
 
-	bool isDelReady()
-	{
+	bool isDelReady() {
 		if(!mIsParent) { return true; }
 		
 		if(!mChild)	{ return true; }
@@ -34,8 +31,7 @@ struct Parent_M
 
 	void makePreExe(){}
 
-	void makePreDel()
-	{
+	void makePreDel() {
 		if(!mIsParent && mParent)
 		{
 			mParent->mChild = nullptr;

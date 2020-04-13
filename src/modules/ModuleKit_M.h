@@ -1,11 +1,9 @@
 #pragma once
 
 
-
-
 #include <tuple>
 
-
+// provides a module container
 
 template<class ...ModuleCollection> 
 class ModuleKit_M
@@ -17,22 +15,19 @@ class ModuleKit_M
 public:
 
 	template<typename T>
-	T* get()
-	{
+	T* get() {
 		return &std::get<T>(mItemModules);
 	}
 
 	template<size_t I = 0>
-	void init()
-	{
+	void init() {
 		std::get<I>(mItemModules).init();
 		if constexpr(I+1 != std::tuple_size<items_t>::value)
 		    init<I+1>();
 	}
 
 	template<size_t I = 0>
-	bool isExeReady()
-	{
+	bool isExeReady() {
 		if constexpr (I+1 != std::tuple_size<items_t>::value){
 			if(std::get<I>(mItemModules).isExeReady()){
 				return isExeReady<I+1>();

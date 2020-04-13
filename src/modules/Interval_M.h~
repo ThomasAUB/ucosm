@@ -2,8 +2,7 @@
 
 #include "ucosm-sys-data.h"
 
-// allow to specify a time period of execution of the process or postpone 
-// its execution
+// allow to specify a time period of execution of the process or postpone its execution
 
 struct Interval_M
 {

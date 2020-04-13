@@ -1,8 +1,8 @@
 #pragma once
 
 
-// contains an element of the specified type
 
+// contains an element of the specified type
 template<typename content_t> 
 struct Content_M
 {	
@@ -11,6 +11,7 @@ struct Content_M
 		return mContent;
 	}
 	
+
 	void init() {}
 
 	bool isExeReady() const { return true; }

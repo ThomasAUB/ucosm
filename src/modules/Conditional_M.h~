@@ -1,34 +1,31 @@
 #pragma once
 
+// contains a free function pointer "mCondition"
+// the execution if the function attributed with "setCondition" returns true
+// or if the task has no attributed condition
 
-struct Conditional_M // 4 bytes
+struct Conditional_M
 {	
-	void setCondition(bool (*inCondition)())
-	{
+	void setCondition(bool (*inCondition)()){
 		mCondition = inCondition;
 	}
 	
-	template<typename T>
-	void init(T *t)
-	{
+	void init(){
 		mCondition = nullptr;
 	}
-	template<typename T>
-    bool isExeReady(T *t)
-	{
-		if(!mCondition){
-			return true;
-		}
+
+	bool isExeReady(){
+		if(!mCondition)	return true;
 		return mCondition();
 	}
-	template<typename T>
-	bool isDelReady(T *t) const { return true; }
-	template<typename T>
-	void makePreExe(T *t){}
-	template<typename T>
-	void makePreDel(T *t){}
-	template<typename T>
-	void makePostExe(T *t){}	
+
+	bool isDelReady() const { return true; }
+
+	void makePreExe(){}
+
+	void makePreDel(){}
+
+	void makePostExe(){}	
 	
 private:
 

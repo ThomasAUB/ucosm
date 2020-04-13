@@ -9,7 +9,7 @@ struct CPU_Usage_M
 {
 
 	fine_tick_t getCPU_UsagePercent(){
-		if(mLoopTime == 0){ return 100;}
+		if(mLoopTime == 0){ return 100; }
 		return ( ( mExeTime * 100 )/ mLoopTime );
 	}
 
@@ -25,8 +25,7 @@ struct CPU_Usage_M
 		return mLoopTime;
 	}
 
-	template<typename T>
-	void init(T *t) {
+	void init() {
 		mStartExeTS = 0;
 		mExeTime = 0;
 		mMaxExeTime = 0;
@@ -34,18 +33,16 @@ struct CPU_Usage_M
 		mLoopTime = 1;
 	}
 
-	template<typename T>
-	bool isExeReady(T *t) const { return true; }
-	template<typename T>
-	bool isDelReady(T *t) const { return true; } 
 
-	template<typename T>
-	void makePreExe(T *t){
+	bool isExeReady() const { return true; }
+
+	bool isDelReady() const { return true; } 
+
+	void makePreExe(){
 		mStartExeTS = SysKernelData::sGetFineTick();
 	}
 
-	template<typename T>
-	void makePostExe(T *t){
+	void makePostExe(){
 		fine_tick_t curTS = SysKernelData::sGetFineTick();
 
 		mExeTime = curTS - mStartExeTS;
@@ -58,8 +55,7 @@ struct CPU_Usage_M
 		mStartLoopTS = curTS;
 	}
 
-	template<typename T>
-	void makePreDel(T *t){}
+	void makePreDel(){}
 	
 private:
 

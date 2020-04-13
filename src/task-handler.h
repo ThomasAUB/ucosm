@@ -31,14 +31,16 @@
 
 #include "IScheduler.h"
 
-using index_t = uint8_t;
 
 
-template<typename Caller_t, typename task_module, index_t task_count>
+
+template<typename Caller_t, typename task_module, size_t task_count>
 class TaskHandler : public IScheduler
 {
+
+	using task_index_t = uint8_t;
 	 
-	static const index_t max_index = std::numeric_limits<index_t>::max();
+	static const task_index_t max_index = std::numeric_limits<task_index_t>::max();
 	
 	static_assert(task_count < max_index-1 , "Task count too high");	
 	
@@ -47,9 +49,9 @@ class TaskHandler : public IScheduler
 	struct TaskItem : public task_module
 	{
 		constexpr TaskItem(): index(sCounterIndex++) {}
-		const index_t index;
+		const task_index_t index;
 		private:
-		static index_t sCounterIndex;
+		static size_t sCounterIndex;
 	};
 
 	using task_t = TaskItem;
@@ -61,7 +63,7 @@ public:
 	TaskHandler() : mCurrHandleIndex(max_index)
  	{
 		// safety check
-		for(index_t i=0 ; i<task_count ; i++)
+		for(task_index_t i=0 ; i<task_count ; i++)
 		{
 			if(mTasks[i].index != i)
 			{
@@ -76,7 +78,7 @@ public:
 
 		bool hasExe = false;
 		
-		index_t i=0;
+		task_index_t i=0;
 		
 		do{
 			if( mFunctions[i] && mTasks[i].isExeReady() )
@@ -108,7 +110,7 @@ public:
 	{
 				
 		// allocation
-		index_t i=0;
+		task_index_t i=0;
 		do
 		{
 			if(!mFunctions[i])
@@ -135,9 +137,9 @@ public:
 	{
 		if(!inHandle){ return false; }
 		
-		index_t i = inHandle->index;
+		task_index_t i = inHandle->index;
 
-		if(mTasks[i].isDelReady(&mTasks[i]))
+		if(mTasks[i].isDelReady())
 		{
 			
 			mTasks[i].makePreDel();
@@ -162,11 +164,11 @@ private:
 	task_function_t mFunctions[task_count];
 	TaskHandle *mHandlePtr[task_count];
 
-	index_t mCurrHandleIndex;
+	task_index_t mCurrHandleIndex;
 	
 };
 
 
-template<typename Caller_t, typename task_traits, index_t task_count>
-index_t TaskHandler<Caller_t, task_traits, task_count>::TaskItem::sCounterIndex = 0;
+template<typename Caller_t, typename task_traits, size_t task_count>
+size_t TaskHandler<Caller_t, task_traits, task_count>::TaskItem::sCounterIndex = 0;
 

@@ -2,6 +2,7 @@
 
 
 // contains a buffer of the specified type and size
+
 template<typename buffer_t, size_t size> 
 struct Buffer_M
 {
@@ -39,7 +40,7 @@ struct Buffer_M
 
 	void makePreDel(){}
 
-	void makePostExe(T *t){}
+	void makePostExe(){}
 
 private:
 

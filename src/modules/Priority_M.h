@@ -1,20 +1,17 @@
 #pragma once
 
 
-// get tick
 #include "ucosm-sys-data.h"
 
 struct Priority_M
 {
 
-	void setPriority(const uint8_t inPrio)
-	{
+	void setPriority(const uint8_t inPrio){
 		// priority can't be inferior to 1
 		mPriority = (inPrio)?inPrio:1; 
 	}
 
-	void init()
-	{
+	void init(){
 		mPriority = 1;	
 	}
 	

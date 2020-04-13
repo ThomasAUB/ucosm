@@ -5,6 +5,9 @@
 #include <limits>
 
 
+// provides a debug tool to measure the cpu usage of the process associated with
+// this module
+
 struct CPU_Usage_M
 {
 
