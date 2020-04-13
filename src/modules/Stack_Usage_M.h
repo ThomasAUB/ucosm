@@ -31,22 +31,21 @@ struct Stack_Usage_M
 		return mMaxStackUsage;
 	}
 
-	template<typename T>
-	void init(T *t) {
+	void init() {
 		mStackUsage = 0;
 		mMaxStackUsage = 0;
 		mIsRunning = false;
 	}
-	template<typename T>
-	bool isExeReady(T *t) const { return true; }
-	template<typename T>
-	bool isDelReady(T *t) const { return true; } 
-	template<typename T>
-	void makePreExe(T *t){
+
+	bool isExeReady() const { return true; }
+
+	bool isDelReady() const { return true; } 
+
+	void makePreExe(){
 
 		if(!mIsRunning){
 			return;
-		}	
+		}
 	
 		const auto size=max_stack_usage/sizeof(uint32_t);
 		uint32_t s[size];
@@ -59,8 +58,8 @@ struct Stack_Usage_M
 		}
 
 	}
-	template<typename T>
-	void makePostExe(T *t){
+
+	void makePostExe(){
 		volatile uint8_t k=5;
 		if(!mIsRunning){
 			return;
@@ -93,8 +92,7 @@ struct Stack_Usage_M
 		stop();
 	}
 
-	template<typename T>
-	void makePreDel(T *t){}
+	void makePreDel(){}
 	
 private:
 

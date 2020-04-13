@@ -22,59 +22,59 @@ public:
 		return &std::get<T>(mItemModules);
 	}
 
-	template<typename T, size_t I = 0>
-	void init(T *t)
+	template<size_t I = 0>
+	void init()
 	{
-		std::get<I>(mItemModules).init(t);
+		std::get<I>(mItemModules).init();
 		if constexpr(I+1 != std::tuple_size<items_t>::value)
-		    init<T, I+1>(t);
+		    init<I+1>();
 	}
 
-	template<typename T, size_t I = 0>
-	bool isExeReady(T *t)
+	template<size_t I = 0>
+	bool isExeReady()
 	{
 		if constexpr (I+1 != std::tuple_size<items_t>::value){
-			if(std::get<I>(mItemModules).isExeReady(t)){
-				return isExeReady<T, I+1>(t);
+			if(std::get<I>(mItemModules).isExeReady()){
+				return isExeReady<I+1>();
 			}else{
 				return false;
 			}
 		}else{
-			return std::get<I>(mItemModules).isExeReady(t);
+			return std::get<I>(mItemModules).isExeReady();
 		}
 	}
 	
-	template<typename T, size_t I = 0>
-	bool isDelReady(T *t) {
+	template<size_t I = 0>
+	bool isDelReady() {
 		if constexpr (I+1 != std::tuple_size<items_t>::value){
-			if(std::get<I>(mItemModules).isDelReady(t)){
-				return isDelReady<T, I+1>(t);
+			if(std::get<I>(mItemModules).isDelReady()){
+				return isDelReady<I+1>();
 			}else{
 				return false;
 			}
 		}else{ 
-			return std::get<I>(mItemModules).isDelReady(t);
+			return std::get<I>(mItemModules).isDelReady();
 		}
 	}
 
-	template<typename T, size_t I = 0>
-	void makePreExe(T *t) {
-		std::get<I>(mItemModules).makePreExe(t);
+	template<size_t I = 0>
+	void makePreExe() {
+		std::get<I>(mItemModules).makePreExe();
 		if constexpr(I+1 != std::tuple_size<items_t>::value)
-		    makePreExe<T, I+1>(t);
+		    makePreExe<I+1>();
 	}
 
-	template<typename T, size_t I = 0>
-	void makePostExe(T *t) {
-		std::get<I>(mItemModules).makePostExe(t);
+	template<size_t I = 0>
+	void makePostExe() {
+		std::get<I>(mItemModules).makePostExe();
 		if constexpr(I+1 != std::tuple_size<items_t>::value)
-		    makePostExe<T, I+1>(t);
+		    makePostExe<I+1>();
 	}
 	
-	template<typename T, size_t I = 0>
-	void makePreDel(T *t) {
-		std::get<I>(mItemModules).makePreDel(t);
+	template<size_t I = 0>
+	void makePreDel() {
+		std::get<I>(mItemModules).makePreDel();
 		if constexpr(I+1 != std::tuple_size<items_t>::value)
-		    makePreDel<T, I+1>(t);
+		    makePreDel<I+1>();
 	}
 };

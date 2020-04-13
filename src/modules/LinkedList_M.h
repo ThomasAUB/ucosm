@@ -19,17 +19,16 @@ struct LinkedList_M : public ListItem // 9 bytes
 	ListItem *getNext() { return mNext; }
 	ListItem *getPrev() { return mPrev; }
 
-	template<typename T>
-	void init(T *t)
+	void init()
 	{   		
 		mPrev = mNext = nullptr;
 	}
-	template<typename T>
-	bool isExeReady(T *t) const { return true; }
-	template<typename T>
-	bool isDelReady(T *t) const { return true; } 
-	template<typename T>
-	void makePreExe(T *t)
+
+	bool isExeReady() const { return true; }
+
+	bool isDelReady() const { return true; } 
+
+	void makePreExe()
 	{
 
 		Status_M *st;
@@ -44,8 +43,8 @@ struct LinkedList_M : public ListItem // 9 bytes
 		}
 		sTopHandle = this;
 	}
-	template<typename T>
-	void makePreDel(T *t)
+
+	void makePreDel()
 	{
 		if(sTopHandle == this)
 		{
@@ -65,13 +64,16 @@ struct LinkedList_M : public ListItem // 9 bytes
 			mNext->mPrev = nullptr;
 		}
 	}
-	template<typename T>
-	void makePostExe(T *t){}
+
+	void makePostExe(){}
 
 private:
 
 	static ListItem *sTopHandle;
 	
 };
+
+template<int listIndex>
+ListItem *LinkedList_M<listIndex>::sTopHandle = nullptr;
 
 

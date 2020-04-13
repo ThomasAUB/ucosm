@@ -1,7 +1,5 @@
 #pragma once
 
-#include "utils/Fifo.h"
-
 // Allow to send data to a specific task
 // Data is unaccessible if the owner task is not currently running
 template<typename data_t, uint16_t fifo_size>

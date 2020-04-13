@@ -34,7 +34,6 @@
 
 // sCnt
 #include "modules/ucosm-sys-data.h"
-
 uint8_t SysKernelData::sCnt = 0;
 
 using index_t = uint8_t;
@@ -53,7 +52,7 @@ public:
 	bool addHandler(T *inHandler){
 		if(mHandlerCount == max_handler_count){ return false; }
 		mHandlers[mHandlerCount] = static_cast<IScheduler *>(inHandler);
-		mHandlerTraits[mHandlerCount].init(&mHandlerTraits[mHandlerCount]);		
+		mHandlerTraits[mHandlerCount].init();		
 		mHandlerCount++;
 		return true;
 	}

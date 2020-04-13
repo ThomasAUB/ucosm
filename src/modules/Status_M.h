@@ -36,18 +36,17 @@ struct Status_M // 1 byte
 		return !(mStatus&eStarted);
 	}
 	
-	template<typename T>
-	void init(T *t)	{ mStatus = 0; }
-	template<typename T>
-	bool isExeReady(T *t) const { return !(mStatus&eSuspended) ;}
-	template<typename T>
-	bool isDelReady(T *t) const { return !(mStatus&eLocked);}
-	template<typename T>
-	void makePreExe(T *t){  mStatus |= eRunning; }
-	template<typename T>
-	void makePreDel(T *t){}
-	template<typename T>
-	void makePostExe(T *t)
+	void init()	{ mStatus = 0; }
+
+	bool isExeReady() const { return !(mStatus&eSuspended) ;}
+
+	bool isDelReady() const { return !(mStatus&eLocked);}
+
+	void makePreExe(){  mStatus |= eRunning; }
+
+	void makePreDel(){}
+
+	void makePostExe()
 	{
 		mStatus &= ~eRunning; 
 		mStatus |= eStarted;

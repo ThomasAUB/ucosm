@@ -15,16 +15,15 @@ struct Parent_M
 		mIsParent = true;
 	}
 
-	template<typename T>
-	void init(T *t)
+	void init()
 	{ 
 		mIsParent = false;
 		mChild = nullptr; 
 	}
-	template<typename T>
-	bool isExeReady(T *t) const { return true; }
-	template<typename T>
-	bool isDelReady(T *t)
+
+	bool isExeReady() const { return true; }
+
+	bool isDelReady()
 	{
 		if(!mIsParent) { return true; }
 		
@@ -32,18 +31,18 @@ struct Parent_M
 	
 		return false; 
 	} 
-	template<typename T>
-	void makePreExe(T *t){}
-	template<typename T>
-	void makePreDel(T *t)
+
+	void makePreExe(){}
+
+	void makePreDel()
 	{
 		if(!mIsParent && mParent)
 		{
 			mParent->mChild = nullptr;
 		}
 	}
-	template<typename T>
-	void makePostExe(T *t){}
+
+	void makePostExe(){}
 
 private:
 

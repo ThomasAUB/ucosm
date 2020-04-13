@@ -52,26 +52,24 @@ struct StatusNotify_M : private Status_M // 1 byte
 		setStatus(static_cast<uint8_t>(s), state);
 	}
 	
+	void init()	{ mStatus = 0; }
 
-	template<typename T>
-	void init(T *t)	{ mStatus = 0; }
-	template<typename T>
-	bool isExeReady(T *t) const { return !(mStatus&Status_M::eSuspended) ;}
-	template<typename T>
-	bool isDelReady(T *t) const { return !(mStatus&Status_M::eLocked);}
-	template<typename T>
-	void makePreExe(T *t)
+	bool isExeReady() const { return !(mStatus&Status_M::eSuspended) ;}
+
+	bool isDelReady() const { return !(mStatus&Status_M::eLocked);}
+
+	void makePreExe()
 	{  
 		setStatus(Status_M::eRunning, true); 
 	}
-	template<typename T>
-	void makePostExe(T *t)
+
+	void makePostExe()
 	{
 		setStatus(Status_M::eRunning, false); 
 		setStatus(Status_M::eStarted, true);
 	}
-	template<typename T>
-	void makePreDel(T *t)
+
+	void makePreDel()
 	{
 		if( isStatus(eNotifyDeleted) )
 		{

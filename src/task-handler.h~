@@ -127,6 +127,7 @@ public:
 		}while(++i < task_count);
 
 		HandlerException("No more slots available");
+		
 		return false;
 	}
 

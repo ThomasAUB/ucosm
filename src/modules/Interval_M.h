@@ -29,27 +29,26 @@ struct Interval_M
 		}
 	}
 
-	template<typename T>
-	void init(T *t)
+	void init()
 	{
 		mPeriod = 0;
 		mExecution_time_stamp = SysKernelData::sGetTick();
 	}
-	template<typename T>
-	bool isExeReady(T *t) const {
+
+	bool isExeReady() const {
 		return (SysKernelData::sGetTick() >= mExecution_time_stamp);
 	}
-	template<typename T>
-	bool isDelReady(T *t) { return true; }
-	template<typename T>
-	void makePreExe(T *t)
+
+	bool isDelReady() { return true; }
+
+	void makePreExe()
 	{
 		mExecution_time_stamp += mPeriod;
 	}
-	template<typename T>
-	void makePreDel(T *t){}
-	template<typename T>
-	void makePostExe(T *t){}
+
+	void makePreDel(){}
+
+	void makePostExe(){}
 		
 private:
 	

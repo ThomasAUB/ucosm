@@ -79,13 +79,13 @@ public:
 		index_t i=0;
 		
 		do{
-			if( mFunctions[i] && mTasks[i].isExeReady(&mTasks[i]) )
+			if( mFunctions[i] && mTasks[i].isExeReady() )
 			{
 				
 				mCurrHandleIndex = i;
-				mTasks[i].makePreExe(&mTasks[i]);
+				mTasks[i].makePreExe();
 				(static_cast<Caller_t *>(this)->*mFunctions[i])();
-				mTasks[i].makePostExe(&mTasks[i]);
+				mTasks[i].makePostExe();
 				mCurrHandleIndex = max_index;
 				hasExe = true;
 			}
@@ -121,7 +121,7 @@ public:
 				}else{
 					mHandlePtr[i] = nullptr;
 				}
-				mTasks[i].init(&mTasks[i]);
+				mTasks[i].init();
 				return true;
 			}
 		}while(++i < task_count);
@@ -140,7 +140,7 @@ public:
 		if(mTasks[i].isDelReady(&mTasks[i]))
 		{
 			
-			mTasks[i].makePreDel(&mTasks[i]);
+			mTasks[i].makePreDel();
 			mFunctions[i] = nullptr;
 			
 			if(&mHandlePtr[i] && ( *mHandlePtr[i] == &mTasks[i] ))

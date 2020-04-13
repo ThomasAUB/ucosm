@@ -39,7 +39,7 @@ struct Buffer_M
 
 	void makePreDel(){}
 
-	void makePostExe(){}
+	void makePostExe(T *t){}
 
 private:
 

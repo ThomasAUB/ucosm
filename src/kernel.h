@@ -52,7 +52,7 @@ public:
 	bool addHandler(T *inHandler){
 		if(mHandlerCount == max_handler_count){ return false; }
 		mHandlers[mHandlerCount] = static_cast<IScheduler *>(inHandler);
-		mHandlerTraits[mHandlerCount].init(&mHandlerTraits[mHandlerCount]);		
+		mHandlerTraits[mHandlerCount].init();		
 		mHandlerCount++;
 		return true;
 	}
@@ -71,12 +71,12 @@ public:
 		index_t i;
 		if(getHandlerIndex(inHandler, i)){
 
-			if(!mHandlerTraits[i].isDelReady(&mHandlerTraits[i]))
+			if(!mHandlerTraits[i].isDelReady())
 			{
 				return;
 			}
 
-			mHandlerTraits[i].makePreDel(&mHandlerTraits[i]);
+			mHandlerTraits[i].makePreDel();
 			
 			// shift handlers for contiguous array
 			while(i<mHandlerCount-1)
@@ -102,11 +102,11 @@ public:
 		while(i < mHandlerCount)
 		{
 							
-			if(mHandlers[i] && mHandlerTraits[i].isExeReady(&mHandlerTraits[i]))
+			if(mHandlers[i] && mHandlerTraits[i].isExeReady())
 			{
-				mHandlerTraits[i].makePreExe(&mHandlerTraits[i]);
+				mHandlerTraits[i].makePreExe();
 				hasExe |= mHandlers[i]->schedule();
-				mHandlerTraits[i].makePostExe(&mHandlerTraits[i]);
+				mHandlerTraits[i].makePostExe();
 			}
 			i++;
 		}
