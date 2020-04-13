@@ -25,7 +25,7 @@ struct StatusNotify_M : private Status_M // 1 byte
 		eNotifySuspended	= Status_M::eSuspended<<3,	// 0b00100000
 		eNotifyLocked		= Status_M::eLocked<<3,	// 0b01000000
 		eNotifyDeleted		= 0b10000000,				// 0b10000000
-		eNotifyMask		= ~Status_M::eStatusMask
+		eNotifyMask			= ~Status_M::eStatusMask
     };
 	
 	bool isStatus(uint8_t s){ return ((mStatus&s) == s); }

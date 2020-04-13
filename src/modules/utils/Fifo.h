@@ -28,19 +28,47 @@
 
 #pragma once
 
-#include "stdint.h"
 
 
 
-using tick_t = uint32_t;
-using fine_tick_t = uint32_t;
 
-
-
-struct SysKernelData
+template<typename T, uint16_t Size>
+struct Fifo
 {
-	static uint8_t sCnt;
-	static tick_t (*sGetTick)();
-	static fine_tick_t (*sGetFineTick)();
+
+	Fifo() : mIndex(0)
+	{}
+
+	bool push(T data)
+	{
+		if(isFull()){return false;}
+		mElems[mIndex++] = data;
+		return true;
+	}
+
+	T pop()
+	{
+		if(!mIndex){return T();}
+		return mElems[--mIndex];
+	}
+
+	bool isEmpty()
+	{
+		return !mIndex;
+	}
+
+	bool isFull()
+	{
+		return (mIndex==Size);
+	}
+	
+private :
+
+	uint16_t mIndex;
+
+	T mElems[Size];
+
 };
+
+
 

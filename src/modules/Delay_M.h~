@@ -5,19 +5,19 @@
 struct Delay_M
 {
 
-	void setDelay(tick_t inDelay)
+	void setDelay(tick_t inDelay);/*
 	{
 		mExecution_time_stamp = SysKernelData::sGetTick()+inDelay;
-	}
+	}*/
 	
-	tick_t getDelay()
+	tick_t getDelay();/*
 	{	
 		if(mExecution_time_stamp > SysKernelData::sGetTick()){
 			return mExecution_time_stamp - SysKernelData::sGetTick(); 
 		}else{
 			return 0;
 		}
-	}
+	}*/
 
 
 	template<typename T>
@@ -28,7 +28,7 @@ struct Delay_M
 	template<typename T>
     bool isExeReady(T *t) const 
 	{
-		return false ; //(SysKernelData::sGetTick() >= mExecution_time_stamp);
+		return (SysKernelData::sGetTick() >= mExecution_time_stamp);
 	}
 	template<typename T>
 	bool isDelReady(T *t) const { return true; }

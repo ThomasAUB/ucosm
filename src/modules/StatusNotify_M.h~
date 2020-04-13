@@ -9,11 +9,23 @@ struct StatusNotify_M : private Status_M // 1 byte
  
 	enum eNotifyStatus
 	{
-		eNotifyStarted		= Status_M::eStarted	<<3,	// 0b00010000
+		/*
+		eRunning		= 0b00000001,
+		eStarted		= 0b00000010
+		eSuspended		= 0b00000100,
+		eLocked			= 0b00001000,
+		eStatusMask		= 0b00001111
+		eNotifyStarted		= 0b00001000,
+		eNotifySuspended	= 0b00100000,
+		eNotifyLocked		= 0b01000000,
+		eNotifyDeleted		= 0b10000000,
+		eNotifyMask		= ~Status_M::eStatusMask
+	*/
+		eNotifyStarted		= Status_M::eStarted<<3,	// 0b00010000
 		eNotifySuspended	= Status_M::eSuspended<<3,	// 0b00100000
-		eNotifyLocked		= Status_M::eLocked	<<3,	// 0b01000000
+		eNotifyLocked		= Status_M::eLocked<<3,	// 0b01000000
 		eNotifyDeleted		= 0b10000000,				// 0b10000000
-		eNotifyMask			= ~Status_M::eStatusMask
+		eNotifyMask		= ~Status_M::eStatusMask
     };
 	
 	bool isStatus(uint8_t s){ return ((mStatus&s) == s); }
@@ -44,9 +56,9 @@ struct StatusNotify_M : private Status_M // 1 byte
 	template<typename T>
 	void init(T *t)	{ mStatus = 0; }
 	template<typename T>
-	bool isExeReady(T *t) const { return !(mStatus&Status::eSuspended) ;}
+	bool isExeReady(T *t) const { return !(mStatus&Status_M::eSuspended) ;}
 	template<typename T>
-	bool isDelReady(T *t) const { return !(mStatus&Status::eLocked);}
+	bool isDelReady(T *t) const { return !(mStatus&Status_M::eLocked);}
 	template<typename T>
 	void makePreExe(T *t)
 	{  

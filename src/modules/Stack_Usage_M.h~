@@ -1,5 +1,10 @@
 #pragma once
 
+/*
+ *	template<uint16_t max_stack_usage>
+uint32_t *Stack_Usage_M<max_stack_usage>::sSp; 
+ */
+
 
 template<uint16_t max_stack_usage>
 struct Stack_Usage_M
@@ -12,6 +17,18 @@ struct Stack_Usage_M
 
 	void stop(){
 		mIsRunning = false;
+	}
+
+	bool isRunning(){
+		return mIsRunning;
+	}
+
+	uint16_t getStackUsage(){
+		return mStackUsage;
+	}
+
+	uint16_t getMaxStackUsage(){
+		return mMaxStackUsage;
 	}
 
 	template<typename T>
@@ -32,19 +49,19 @@ struct Stack_Usage_M
 		}	
 	
 		const auto size=max_stack_usage/sizeof(uint32_t);
-		volatile uint32_t s[size];
+		uint32_t s[size];
 
 		sSp = s;
 
 		uint16_t i=0;
 		while(i < size){
-			s[i] = kStackPattern;
+			s[i++] = kStackPattern;
 		}
 
 	}
 	template<typename T>
 	void makePostExe(T *t){
-
+		volatile uint8_t k=5;
 		if(!mIsRunning){
 			return;
 		}	
@@ -66,14 +83,14 @@ struct Stack_Usage_M
 				// stack usage
 				mStackUsage = i*sizeof(uint32_t);
 				if(mStackUsage > mMaxStackUsage){
-					mStackUsage = mMaxStackUsage;
+					mMaxStackUsage = mStackUsage;
 				}
-				break;
+				return;
 			}
 			i++;
 		}
-	
-		
+		mStackUsage = 0xFFFF;
+		stop();
 	}
 
 	template<typename T>
@@ -83,12 +100,12 @@ private:
 
 	static uint32_t *sSp;
 
-	uint16_t mStackUsage, mMaxStackUsage;
+	uint16_t mStackUsage;
+	uint16_t mMaxStackUsage;
 	bool mIsRunning;
 
 	static const uint32_t kStackPattern = 0xAACCBBDD;
 };
 
-template<uint16_t max_stack_usage>
-uint32_t *Stack_Usage_M::sSp;
+
 

@@ -7,13 +7,10 @@ template<typename content_t>
 struct Content_M
 {	
 	
-	content_t& getContent()
-	{
-		return content;
+	content_t& getContent(){
+		return mContent;
 	}
 	
-protected:
-
 	template<typename T>
 	void init(T *t) {}
 	template<typename T>
@@ -27,5 +24,8 @@ protected:
 	template<typename T>
 	void makePostExe(T *t){}
 
-	content_t content;
+private:
+
+	content_t mContent;
+
 };

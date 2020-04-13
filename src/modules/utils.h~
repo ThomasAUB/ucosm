@@ -73,7 +73,7 @@ private :
 
 
 
-
+#include <limits>
 
 // Fixed size dynamic memory allocation
 // features :
@@ -82,92 +82,110 @@ private :
 //  - The number of buffer per task types has a maximum value of 32
 //	- If auto_release is "true", the module will automatically release allocated memory on deletion 
 
-struct MemPoolBase{
+
+struct IMemPoolBase{
+	
+
+	using blockID_t = uint8_t;
+
+	void initID(blockID_t& ioBlockID){
+		blockID_t = 0;
+	}
+	
+	virtual void *newBlock(blockID_t& ioBlockID) = 0;
+
+	virtual bool deleteBlock(blockID_t& ioBlockID) = 0;
+
+	virtual void *getBlock(blockID_t inBlockID) = 0;
+
+	virtual size_t getBlockSize() = 0;
+
+	virtual bool isAllocated(blockID_t inBlockID) = 0;
 	
 };
 
-template<typename elem_t, uint8_t elem_count>
-struct MemPool32_M : public MemPoolBase
+template<size_t block_size, uint8_t block_count>
+struct MemPool32_M : public IMemPoolBase
 {
-	static_assert(elem_count <= 32, "size of pool must not exceed 32");
 	
-	static_assert( (sizeof(elem_t) * sizeof(elem_count) ) > 4, 
+	static_assert(block_count <= 32, "size of pool must not exceed 32");
+	
+	static_assert( (block_size * block_count ) > 4, 
 	"Suboptimal implementation : Pool's size inferior to overhead's");
 
-	template<typename T>
-	T *new_block(uint8_t& ioIndex)
-	{
-		static_assert(sizeof(T) <= sizeof(elem_t), "Allocation error");
-		elem_t *e = new_block(ioIndex);
-		if(e == nullptr){ return nullptr; }
-		return reinterpret_cast<T *>(e);
-	}
-
-	elem_t *new_block(uint8_t& ioIndex)
+	void *newBlock(blockID_t& ioBlockID)
 	{
 		// pool is full
-		if(mMemoryMap == (1<<elem_count)-1){ return nullptr; }
+		if(mMemoryMap == (1<<block_count)-1){ return nullptr; }
 
 		// task already has allocated memory
-		if(ioIndex){ return nullptr; }
+		if(ioBlockID){ return nullptr; }
 		
 		uint8_t i=0;
-		ioIndex = 0;
-		
+
 		do{
 			if(!mMemoryMap&(1<<i)) // slot free
 			{
 				mMemoryMap |= (1<<i); // take slot
 
-				ioIndex = i+1; // stores the index
+				ioBlockID = i+1; // stores the index
 				
-				return &mElems[i];
+				return &mBlocks[i];
 			}
-		}while(++i<elem_count);
+		}while(++i<block_count);
 		
 		// allocation error : should not happen
 		return nullptr;
 	}
 		
-	bool delete_block(uint8_t& ioIndex)
+	bool deleteBlock(blockID_t& ioBlockID)
 	{
 
 		// pool is empty, nothing to free
 		if(!mMemoryMap){ return false; }
 
-		// no allocated memory
-		if(!ioIndex){ return false; }
 
-		ioIndex--;
-		
+		// security check : verify that the memory has been allocated
+		// and that ID and map coincide
+		if(!isAllocated(ioBlockID)){
+			//ioIndex = 0; // should we?
+			return false;
+		}
+			
 		// release memory
-		mMemoryMap &= ~(1<<ioIndex);
+		mMemoryMap &= ~(1<<(ioBlockID-1));
 
 		// delete index
-		ioIndex = 0;
+		ioBlockID = 0;
 		
 		return true;
 
 	}
 
-	template<typename T>
-	T *get_block(uint8_t inIndex)
+	void *getBlock(blockID_t inBlockID)
 	{
-		static_assert(sizeof(T) <= sizeof(elem_t), "Allocation error");
-		elem_t *e = get_block(inIndex);
-		if(e == nullptr){ return nullptr; }
-		return reinterpret_cast<T *>(e);
+		if(!inBlockID || inBlockID > block_count){
+			return nullptr; 
+		}
+		return &mBlocks[inBlockID-1];
 	}
 
-	elem_t *get_block(uint8_t inIndex)
-	{
-		if(!inIndex){ return nullptr; }
-		return &mElems[inIndex-1];
+	size_t getBlockSize(){
+		return block_size;
+	}
+
+	bool isAllocated(blockID_t inBlockID){
+		if(inBlockID && inBlockID <= block_count){
+			return (mMemoryMap&(1<<(inBlockID-1)));
+		}
+		return false;
 	}
 	
 private:
-	
-	elem_t mElems[elem_count];
+
+
+	uint8_t mBlocks[block_count][block_size];
+			
 	uint32_t mMemoryMap;
 
 };

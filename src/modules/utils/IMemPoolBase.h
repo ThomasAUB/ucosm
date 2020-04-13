@@ -28,19 +28,23 @@
 
 #pragma once
 
-#include "stdint.h"
 
+struct IMemPoolBase{
+	
 
+	using blockID_t = uint8_t;
 
-using tick_t = uint32_t;
-using fine_tick_t = uint32_t;
+	virtual void initID(blockID_t& ioBlockID) = 0;
 
+	virtual void *newBlock(blockID_t& ioBlockID) = 0;
 
+	virtual bool deleteBlock(blockID_t& ioBlockID) = 0;
 
-struct SysKernelData
-{
-	static uint8_t sCnt;
-	static tick_t (*sGetTick)();
-	static fine_tick_t (*sGetFineTick)();
+	virtual void *getBlock(blockID_t inBlockID) = 0;
+
+	virtual size_t getBlockSize() = 0;
+
+	virtual bool isAllocated(blockID_t inBlockID) = 0;
+	
 };
 

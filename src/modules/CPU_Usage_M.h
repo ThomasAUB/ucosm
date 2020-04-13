@@ -8,29 +8,20 @@
 struct CPU_Usage_M
 {
 
-	/*static void setTimeBase(tick_t (*inGetTick)(), tick_t inMaxValue){
-		sCPUGetTick = inGetTick;
-		sMaxTickValue = inMaxValue;
-	}*/
-	
-	static void setTimerOverFlow(){	
-		// to check ?
-		sTimerOverFlow++;
-	}
-
-	tick_t getCPU_UsagePercent(){
+	fine_tick_t getCPU_UsagePercent(){
+		if(mLoopTime == 0){ return 100; }
 		return ( ( mExeTime * 100 )/ mLoopTime );
 	}
 
-	tick_t getExecutionTime(){
+	fine_tick_t getExecutionTime(){
 		return mExeTime;
 	}
 
-	tick_t getMaxExecutionTime(){
+	fine_tick_t getMaxExecutionTime(){
 		return mMaxExeTime;
 	}
 
-	tick_t getCallPeriod(){
+	fine_tick_t getCallPeriod(){
 		return mLoopTime;
 	}
 
@@ -50,12 +41,12 @@ struct CPU_Usage_M
 
 	template<typename T>
 	void makePreExe(T *t){
-		mStartExeTS = sGetTick();
+		mStartExeTS = SysKernelData::sGetFineTick();
 	}
 
 	template<typename T>
 	void makePostExe(T *t){
-		tick_t curTS = sGetTick();
+		fine_tick_t curTS = SysKernelData::sGetFineTick();
 
 		mExeTime = curTS - mStartExeTS;
 
@@ -72,19 +63,12 @@ struct CPU_Usage_M
 	
 private:
 
-	static tick_t (*sGetTick)();
-	static tick_t sMaxTickValue;
-	static uint8_t sTimerOverFlow;
+	fine_tick_t mStartExeTS;
+	fine_tick_t mExeTime;
+	fine_tick_t mMaxExeTime;
 
-	tick_t mStartExeTS;
-	tick_t mExeTime;
-	tick_t mMaxExeTime;
-
-	tick_t mStartLoopTS;
-	tick_t mLoopTime;
+	fine_tick_t mStartLoopTS;
+	fine_tick_t mLoopTime;
 
 };
 
-tick_t (*CPU_Usage_M::sGetTick)() = SysKernelData::sGetTick;
-tick_t CPU_Usage_M::sMaxTickValue = std::numeric_limits<tick_t>::max();
-uint8_t CPU_Usage_M::sTimerOverFlow = 0;

@@ -17,9 +17,9 @@ class ModuleKit_M
 public:
 
 	template<typename T>
-	T& get()
+	T* get()
 	{
-		return std::get<T>(mItemModules);
+		return &std::get<T>(mItemModules);
 	}
 
 	template<typename T, size_t I = 0>

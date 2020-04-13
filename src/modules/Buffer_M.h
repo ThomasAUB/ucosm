@@ -2,23 +2,23 @@
 
 
 // contains a buffer of the specified type and size
-template<typename buffer_t, uint16_t size> 
+template<typename buffer_t, size_t size> 
 struct Buffer_M
 {
 
-	void setData(buffer_t *inData, uint16_t inByteSize)
+	void setData(buffer_t *inData, size_t inByteSize)
 	{
 		if(inByteSize > size*sizeof(buffer_t)) { return; }
 		memcpy(mBuffer, inData, inByteSize);
 	}
 
-	void setDataAt(uint16_t inIdx, buffer_t inData)
+	void setDataAt(size_t inIdx, buffer_t inData)
 	{
 		if(inIdx >= size) { return; }
 		mBuffer[inIdx] = inData;
 	}
 	
-	buffer_t getData(uint16_t inIdx)
+	buffer_t& getDataAt(size_t inIdx)
 	{
 		if(inIdx >= size) { return 0; }
 		return mBuffer[inIdx];
@@ -41,6 +41,8 @@ struct Buffer_M
 	void makePreDel(T *t){}
 	template<typename T>
 	void makePostExe(T *t){}
+
+private:
 
 	buffer_t mBuffer[size];
 };

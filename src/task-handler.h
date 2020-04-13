@@ -29,14 +29,13 @@
 
 #pragma once
 
-// iScheduler
-#include "modules/ucosm-sys-data.h"
+#include "IScheduler.h"
 
 using index_t = uint8_t;
 
 
 template<typename Caller_t, typename task_module, index_t task_count>
-class TaskHandler : public iScheduler
+class TaskHandler : public IScheduler
 {
 	 
 	static const index_t max_index = std::numeric_limits<index_t>::max();
@@ -59,7 +58,7 @@ public:
 	
 	using TaskHandle = task_t*;
 	 
-	TaskHandler()
+	TaskHandler() : mCurrHandleIndex(max_index)
  	{
 		// safety check
 		for(index_t i=0 ; i<task_count ; i++)
@@ -72,7 +71,7 @@ public:
 		}
 	}
 	
-	bool schedule(tick_t t) final
+	bool schedule() final
 	{
 
 		bool hasExe = false;
@@ -127,6 +126,8 @@ public:
 			}
 		}while(++i < task_count);
 
+		HandlerException("No more slots available");
+		
 		return false;
 	}
 
@@ -150,10 +151,12 @@ public:
 			mHandlePtr[i] = nullptr;
 		}
 	}
- 
-private:
+
+protected:
 
 	virtual void HandlerException(const char *inErrMsg){}
+ 
+private:
 
 	task_t mTasks[task_count];
 	task_function_t mFunctions[task_count];

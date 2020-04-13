@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ModuleKit_M.h"
 #include "Status_M.h"
 
 struct ListItem
@@ -20,9 +21,7 @@ struct LinkedList_M : public ListItem // 9 bytes
 
 	template<typename T>
 	void init(T *t)
-	{   
-		//static_assert(std::is_base_of<Status, T>::value, "LinkedList must implement Status");
-		//t->get<Status>().setStatus(0);
+	{   		
 		mPrev = mNext = nullptr;
 	}
 	template<typename T>
@@ -32,8 +31,12 @@ struct LinkedList_M : public ListItem // 9 bytes
 	template<typename T>
 	void makePreExe(T *t)
 	{
-		if(reinterpret_cast<Status_M *>(this)->isStarted()){return;}
 
+		Status_M *st;
+		//st = t->get<Status_M>();
+		//if(t->get<Status_M>()->isStarted()){return;}
+
+	
 		if(sTopHandle)
 		{
 			sTopHandle->mNext = this;
@@ -71,5 +74,4 @@ private:
 	
 };
 
-template<int listIndex>
-ListItem *LinkedList_M<listIndex>::sTopHandle = nullptr;
+

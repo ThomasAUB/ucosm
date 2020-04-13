@@ -74,7 +74,7 @@
 
 // set delay and YIELD
 #define CR_WAIT_FOR(delay)														\
-	thisTaskHandle()->get<Interval_M>()->setDelay(delay);							\
+	thisTaskHandle()->get<Delay_M>()->setDelay(delay);							\
 	CR_YIELD
 
 // loops while condition is true and yields on every iterations

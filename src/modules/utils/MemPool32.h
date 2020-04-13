@@ -30,69 +30,52 @@
 
 
 
+//#include "IMemPoolBase.h"
 
-template<typename T, uint16_t Size>
-struct Fifo
+#include <limits>
+
+// Fixed size dynamic memory allocation
+// features :
+//  - Allows to allocate and release a buffer of sizeof(elem_t) bytes
+//  - Forbids task deletion if a buffer is allocated to avoid memory leakage
+//  - The number of buffer per task types has a maximum value of 32
+//	- If auto_release is "true", the module will automatically release allocated memory on deletion 
+
+
+
+
+template<uint8_t block_count, size_t block_size>
+struct MemPool32
 {
 
-	Fifo() : mIndex(0)
-	{}
+	struct BlockID{
+		BlockID() : ID(0) {}
+		uint8_t ID;
+	};
 
-	bool push(T data)
-	{
-		if(isFull()){return false;}
-		mElems[mIndex++] = data;
-		return true;
-	}
+	using blockID_t = BlockID;
 
-	T pop()
-	{
-		if(!mIndex){return T();}
-		return mElems[--mIndex];
-	}
-
-	bool isEmpty()
-	{
-		return !mIndex;
-	}
-
-	bool isFull()
-	{
-		return (mIndex==Size);
-	}
+	static_assert(block_count <= 32, "size of pool must not exceed 32");
 	
-private :
+	template<typename T>
+	static bool newBlock(T *t, BlockID& ioBlockID);
 
-	uint16_t mIndex;
+	template<typename T>
+	static bool *getBlock(T *t, BlockID inBlockID);
+	
+	static bool deleteBlock(BlockID& ioBlockID);
 
-	T mElems[Size];
+	static size_t getBlockSize();
 
-};
+	static bool isAllocated(BlockID inBlockID);
 
-
-
-
-
-
-
-
-
-
-
-
-template<typename Derived>
-struct ObjectCounter
-{
-	ObjectCounter() : index(sCount++)
-	{}
-	const index_t index;
 private:
-	static index_t sCount;
+
+	static uint8_t mBlocks[block_count][block_size];
+	
+	static uint32_t mMemoryMap;
+
 };
-
-template<typename Derived>
-index_t ObjectCounter<Derived>::sCount = 0;
-
 
 
 

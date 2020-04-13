@@ -28,19 +28,24 @@
 
 #pragma once
 
-#include "stdint.h"
 
 
 
-using tick_t = uint32_t;
-using fine_tick_t = uint32_t;
 
 
-
-struct SysKernelData
+template<typename Derived>
+struct ObjectCounter
 {
-	static uint8_t sCnt;
-	static tick_t (*sGetTick)();
-	static fine_tick_t (*sGetFineTick)();
+	ObjectCounter() : index(sCount++)
+	{}
+	const index_t index;
+private:
+	static index_t sCount;
 };
+
+template<typename Derived>
+index_t ObjectCounter<Derived>::sCount = 0;
+
+
+
 

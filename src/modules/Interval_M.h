@@ -2,31 +2,27 @@
 
 #include "ucosm-sys-data.h"
 
-// periodic call of the function, guarantees a constant average execution rate
-struct Periodic_M // 6 bytes
+// periodic call of the function or delay
+struct Interval_M
 {
 
 	using period_t = uint16_t;
-
 	
-	void setPeriod(period_t inPeriod)
-	{
+	void setPeriod(period_t inPeriod){
 		mPeriod = inPeriod;
 		mExecution_time_stamp += mPeriod;
 	}
 
-	period_t getPeriod()
-	{
-		return mPeriod;
-	}
-
-	void setDelay(tick_t inDelay)
-	{	
+	void setDelay(tick_t inDelay){	
 		mExecution_time_stamp = SysKernelData::sGetTick()+inDelay; 
 	}
+
+	period_t getPeriod(){
+		return mPeriod;
+	}
 	
-	tick_t getDelay()
-	{	if(mExecution_time_stamp > SysKernelData::sGetTick()){
+	tick_t getDelay(){
+		if(mExecution_time_stamp > SysKernelData::sGetTick()){
 			return mExecution_time_stamp - SysKernelData::sGetTick(); 
 		}else{
 			return 0;
@@ -36,6 +32,7 @@ struct Periodic_M // 6 bytes
 	template<typename T>
 	void init(T *t)
 	{
+		mPeriod = 0;
 		mExecution_time_stamp = SysKernelData::sGetTick();
 	}
 	template<typename T>

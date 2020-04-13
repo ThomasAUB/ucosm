@@ -16,7 +16,9 @@ struct Conditional_M // 4 bytes
 	template<typename T>
     bool isExeReady(T *t)
 	{
-		if(!mCondition)	return true;
+		if(!mCondition){
+			return true;
+		}
 		return mCondition();
 	}
 	template<typename T>
