@@ -46,8 +46,7 @@ class TaskHandler : public IScheduler
 	
 	using task_function_t = void (Caller_t::*)();
 
-	struct TaskItem : public task_module
-	{
+	struct TaskItem : public task_module{
 		constexpr TaskItem(): index(sCounterIndex++) {}
 		const task_index_t index;
 		private:
@@ -63,8 +62,7 @@ public:
 	TaskHandler() : mCurrHandleIndex(max_index)
  	{
 		// safety check
-		for(task_index_t i=0 ; i<task_count ; i++)
-		{
+		for(task_index_t i=0 ; i<task_count ; i++){
 			if(mTasks[i].index != i)
 			{
 				HandlerException("Critical declaration error");
@@ -73,17 +71,14 @@ public:
 		}
 	}
 	
-	bool schedule() final
-	{
+	bool schedule() final {
 
 		bool hasExe = false;
 		
 		task_index_t i=0;
 		
 		do{
-			if( mFunctions[i] && mTasks[i].isExeReady() )
-			{
-				
+			if( mFunctions[i] && mTasks[i].isExeReady() ){
 				mCurrHandleIndex = i;
 				mTasks[i].makePreExe();
 				(static_cast<Caller_t *>(this)->*mFunctions[i])();
@@ -96,28 +91,24 @@ public:
 		return hasExe;
 	}
 	
-	TaskHandle thisTaskHandle()
-	{
-		if(mCurrHandleIndex == max_index)
-		{
+	TaskHandle thisTaskHandle(){
+		if(mCurrHandleIndex == max_index){
 			HandlerException("thisTask() not allowed in this context");
 			return 0;
 		}
 		return &mTasks[mCurrHandleIndex];
 	}
 	
-	bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr)
-	{
+	bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr){
 				
 		// allocation
 		task_index_t i=0;
-		do
-		{
-			if(!mFunctions[i])
-			{
+		do{
+			if(!mFunctions[i]){
+				
 				mFunctions[i] = inFunc;
-				if(ioHandle != nullptr)
-				{
+				
+				if(ioHandle != nullptr){
 					*ioHandle = &mTasks[i];
 					mHandlePtr[i] = ioHandle;
 				}else{
@@ -133,20 +124,17 @@ public:
 		return false;
 	}
 
-	bool deleteTask(TaskHandle inHandle)
-	{
+	bool deleteTask(TaskHandle inHandle){
 		if(!inHandle){ return false; }
 		
 		task_index_t i = inHandle->index;
 
-		if(mTasks[i].isDelReady())
-		{
+		if(mTasks[i].isDelReady()){
 			
 			mTasks[i].makePreDel();
 			mFunctions[i] = nullptr;
 			
-			if(&mHandlePtr[i] && ( *mHandlePtr[i] == &mTasks[i] ))
-			{
+			if(&mHandlePtr[i] && ( *mHandlePtr[i] == &mTasks[i] )){
 				*mHandlePtr[i] = nullptr;
 			}
 			
