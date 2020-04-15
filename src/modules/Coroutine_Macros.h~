@@ -9,17 +9,7 @@ const uint16_t kFirst_CR_Execution = std::numeric_limits<cr_line_t>::max();
 
 
 
-void task () {
-	struct cr {
 
-		uint8_t k=5;
-		uint16_t p=10;
-
-
-
-	}
-
-}
 
 
 #define COROUTINE_MAX_CONTEXT_SIZE(size)										\

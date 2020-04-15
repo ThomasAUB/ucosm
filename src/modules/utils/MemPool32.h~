@@ -29,14 +29,9 @@
 #pragma once
 
 
-
-//#include "IMemPoolBase.h"
-
-#include <limits>
-
 // Fixed size dynamic memory allocation
 // features :
-//  - Allows to allocate and release a buffer of sizeof(elem_t) bytes
+//  - Allows to allocate and release a buffer of block_size) bytes
 //  - Forbids task deletion if a buffer is allocated to avoid memory leakage
 //  - The number of buffer per task types has a maximum value of 32
 //	- If auto_release is "true", the module will automatically release allocated memory on deletion 
@@ -45,7 +40,7 @@
 
 
 template<uint8_t block_count, size_t block_size>
-struct MemPool32
+struct MemBlock32
 {
 
 	struct BlockID{
@@ -55,7 +50,7 @@ struct MemPool32
 
 	using blockID_t = BlockID;
 
-	static_assert(block_count <= 32, "size of pool must not exceed 32");
+	static_assert(block_count <= 32, "block_count must not exceed 32");
 	
 	template<typename T>
 	static bool newBlock(T *t, BlockID& ioBlockID);

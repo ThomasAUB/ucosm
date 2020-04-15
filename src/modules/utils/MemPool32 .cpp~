@@ -32,7 +32,6 @@
 
 #include "MemPool32.h"
 
-#include <limits>
 
 // Fixed size dynamic memory allocation
 // features :
@@ -126,7 +125,7 @@ size_t MemPool32<block_count, block_size>::getBlockSize(){
 template<uint8_t block_count, size_t block_size>
 bool MemPool32<block_count, block_size>::isAllocated(blockID_t inBlockID){
 	if(inBlockID.ID && inBlockID.ID <= block_count){
-		return (mMemoryMap&(1<<(inBlockID-1)));
+		return (mMemoryMap&(1<<(inBlockID.ID-1)));
 	}
 	return false;
 }

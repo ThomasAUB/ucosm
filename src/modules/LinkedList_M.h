@@ -1,23 +1,15 @@
 #pragma once
 
 #include "ModuleKit_M.h"
-#include "Status_M.h"
-
-struct ListItem
-{
-	ListItem* mPrev;
-	ListItem* mNext;
-};
-
 
 
 // automatically updated linked list of tasks by chronology of execution
-template<int listIndex>
-struct LinkedList_M : public ListItem // 9 bytes
+template<int listIndex = 0>
+struct LinkedList_M //: public ListItem // 9 bytes
 {
 
-	ListItem *getNext() { return mNext; }
-	ListItem *getPrev() { return mPrev; }
+	LinkedList_M<listIndex> *getNext() { return mNext; }
+	LinkedList_M<listIndex> *getPrev() { return mPrev; }
 
 	void init(){   		
 		mPrev = mNext = nullptr;
@@ -67,12 +59,15 @@ struct LinkedList_M : public ListItem // 9 bytes
 
 private:
 
-	static ListItem *sTopHandle;
+	static LinkedList_M<listIndex> *sTopHandle;
+ 	LinkedList_M<listIndex> *mNext;
+	LinkedList_M<listIndex> *mPrev;
+	
 	bool mIsStarted;
 	
 };
 
 template<int listIndex>
-ListItem *LinkedList_M<listIndex>::sTopHandle = nullptr;
+LinkedList_M<listIndex> *LinkedList_M<listIndex>::sTopHandle = nullptr;
 
 

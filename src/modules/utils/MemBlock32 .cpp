@@ -32,14 +32,8 @@
 
 #include "MemPool32.h"
 
-#include <limits>
 
-// Fixed size dynamic memory allocation
-// features :
-//  - Allows to allocate and release a buffer of sizeof(elem_t) bytes
-//  - Forbids task deletion if a buffer is allocated to avoid memory leakage
-//  - The number of buffer per task types has a maximum value of 32
-//	- If auto_release is "true", the module will automatically release allocated memory on deletion 
+
 
 
 uint8_t MemPool32<block_count, block_size>::mBlocks[block_count][block_size];

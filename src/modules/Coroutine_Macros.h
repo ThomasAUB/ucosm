@@ -11,7 +11,6 @@ const uint16_t kFirst_CR_Execution = std::numeric_limits<cr_line_t>::max();
 
 
 
-
 #define COROUTINE_MAX_CONTEXT_SIZE(size)										\
 	using cr_internal_t = Coroutine_M<size>;
 

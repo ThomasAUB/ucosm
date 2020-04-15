@@ -31,40 +31,53 @@
 
 #include "IScheduler.h"
 
+template<typename caller_t, typename attributes>
+struct Task{
+
+	using task_function_t = void (caller_t::*)();
+	 
+	attributes mAttributes;
+	 
+	task_function_t mFunction;
+	 
+};
 
 
 
-template<typename Caller_t, typename task_module, size_t task_count>
+template<typename caller_t, typename task_module, size_t task_count>
 class TaskHandler : public IScheduler
 {
 
 	using task_index_t = uint8_t;
-	 
+	
 	static const task_index_t max_index = std::numeric_limits<task_index_t>::max();
 	
 	static_assert(task_count < max_index-1 , "Task count too high");	
 	
-	using task_function_t = void (Caller_t::*)();
 
 	struct TaskItem : public task_module{
+		
 		constexpr TaskItem(): index(sCounterIndex++) {}
 		const task_index_t index;
+		
 		private:
+			
 		static size_t sCounterIndex;
 	};
 
-	using task_t = TaskItem;
+	using task_t = Task<caller_t, TaskItem>;
 
+	using task_function_t = void (caller_t::*)();
+	 
 public:
 	
-	using TaskHandle = task_t*;
+	using TaskHandle = TaskItem*;
 	 
 	TaskHandler() : mCurrHandleIndex(max_index)
  	{
 		// safety check
 		for(task_index_t i=0 ; i<task_count ; i++){
-			if(mTasks[i].index != i)
-			{
+			if(mTasks[i].mAttributes.index != i){
 				HandlerException("Critical declaration error");
 				while(1){}
 			}
@@ -78,11 +91,11 @@ public:
 		task_index_t i=0;
 		
 		do{
-			if( mFunctions[i] && mTasks[i].isExeReady() ){
+			if( mTasks[i].mFunction && mTasks[i].mAttributes.isExeReady() ){
 				mCurrHandleIndex = i;
-				mTasks[i].makePreExe();
-				(static_cast<Caller_t *>(this)->*mFunctions[i])();
-				mTasks[i].makePostExe();
+				mTasks[i].mAttributes.makePreExe();
+				(static_cast<caller_t *>(this)->*mTasks[i].mFunction)();
+				mTasks[i].mAttributes.makePostExe();
 				mCurrHandleIndex = max_index;
 				hasExe = true;
 			}
@@ -96,7 +109,7 @@ public:
 			HandlerException("thisTask() not allowed in this context");
 			return 0;
 		}
-		return &mTasks[mCurrHandleIndex];
+		return &mTasks[mCurrHandleIndex].mAttributes;
 	}
 	
 	bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr){
@@ -104,17 +117,17 @@ public:
 		// allocation
 		task_index_t i=0;
 		do{
-			if(!mFunctions[i]){
+			if(!mTasks[i].mFunction){
 				
-				mFunctions[i] = inFunc;
+				mTasks[i].mFunction = inFunc;
 				
 				if(ioHandle != nullptr){
-					*ioHandle = &mTasks[i];
+					*ioHandle = &mTasks[i].mAttributes;
 					mHandlePtr[i] = ioHandle;
 				}else{
 					mHandlePtr[i] = nullptr;
 				}
-				mTasks[i].init();
+				mTasks[i].mAttributes.init();
 				return true;
 			}
 		}while(++i < task_count);
@@ -129,12 +142,12 @@ public:
 		
 		task_index_t i = inHandle->index;
 
-		if(mTasks[i].isDelReady()){
+		if(mTasks[i].mAttributes.isDelReady()){
 			
-			mTasks[i].makePreDel();
-			mFunctions[i] = nullptr;
+			mTasks[i].mAttributes.makePreDel();
+			mTasks[i].mFunction = nullptr;
 			
-			if(&mHandlePtr[i] && ( *mHandlePtr[i] == &mTasks[i] )){
+			if(&mHandlePtr[i] && ( *mHandlePtr[i] == &mTasks[i].mAttributes )){
 				*mHandlePtr[i] = nullptr;
 			}
 			
@@ -149,7 +162,10 @@ protected:
 private:
 
 	task_t mTasks[task_count];
-	task_function_t mFunctions[task_count];
+
+	//task_t mTasks[task_count];
+	//task_function_t mFunctions[task_count];
+	
 	TaskHandle *mHandlePtr[task_count];
 
 	task_index_t mCurrHandleIndex;
