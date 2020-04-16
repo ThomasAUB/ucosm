@@ -37,8 +37,6 @@
 uint8_t SysKernelData::sCnt = 0;
 
 
-
-
 template<typename handler_t, size_t max_handler_count> 
 class Kernel : public IScheduler
 {
@@ -59,18 +57,16 @@ public:
 		return true;
 	}
 	
-	handler_t *getHandle(IScheduler *inHandler)
-	{
-		index_t i;
+	handler_t *getHandle(IScheduler *inHandler){
+		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 			return &mHandlerTraits[i];
 		}
 		return nullptr;
 	}
 
-	void removeHandler(IScheduler *inHandler)
-	{
-		index_t i;
+	void removeHandler(IScheduler *inHandler){
+		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 
 			if(!mHandlerTraits[i].isDelReady())
@@ -92,38 +88,37 @@ public:
 	}
 	
 
-	bool schedule () final
+	bool schedule () final {
+	
+	bool hasExe = false;	
+			
+	handler_index_t i = 0;
+	
+	SysKernelData::sCnt++;
+
+	while(i < mHandlerCount)
 	{
-		
-		bool hasExe = false;	
-				
-		index_t i = 0;
-		
-		SysKernelData::sCnt++;
-
-		while(i < mHandlerCount)
+						
+		if(mHandlers[i] && mHandlerTraits[i].isExeReady())
 		{
-							
-			if(mHandlers[i] && mHandlerTraits[i].isExeReady())
-			{
-				mHandlerTraits[i].makePreExe();
-				hasExe |= mHandlers[i]->schedule();
-				mHandlerTraits[i].makePostExe();
-			}
-			i++;
+			mHandlerTraits[i].makePreExe();
+			hasExe |= mHandlers[i]->schedule();
+			mHandlerTraits[i].makePostExe();
 		}
-
-		if(!hasExe) 
-		{
-			if(mIdleTask)
-			{
-				// idle task if exists
-				mIdleTask();
-			}
-		}			
-
-		return hasExe;
+		i++;
 	}
+
+	if(!hasExe) 
+	{
+		if(mIdleTask)
+		{
+			// idle task if exists
+			mIdleTask();
+		}
+	}			
+
+	return hasExe;
+}
 
 	void setIdleTask(void (*inIdleTask)())
  	{
@@ -134,7 +129,7 @@ public:
 private:
 
 
-	bool getHandlerIndex(IScheduler *inScheduler, index_t& ioIndex)
+	bool getHandlerIndex(IScheduler *inScheduler, handler_index_t& ioIndex)
  	{
 		if(!mHandlerCount)
 		{
@@ -154,7 +149,7 @@ private:
 
 	handler_t mHandlerTraits[max_handler_count];
 	
-	index_t mHandlerCount;
+	handler_index_t mHandlerCount;
 
 	void (*mIdleTask)();
 

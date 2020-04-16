@@ -32,6 +32,10 @@
 
 #include "IScheduler.h"
 
+// sCnt
+#include "modules/ucosm-sys-data.h"
+uint8_t SysKernelData::sCnt = 0;
+
 
 template<typename handler_t, size_t max_handler_count> 
 class Kernel : public IScheduler
@@ -53,8 +57,7 @@ public:
 		return true;
 	}
 	
-	handler_t *getHandle(IScheduler *inHandler)
-	{
+	handler_t *getHandle(IScheduler *inHandler){
 		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 			return &mHandlerTraits[i];
@@ -62,8 +65,7 @@ public:
 		return nullptr;
 	}
 
-	void removeHandler(IScheduler *inHandler)
-	{
+	void removeHandler(IScheduler *inHandler){
 		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 
@@ -86,7 +88,37 @@ public:
 	}
 	
 
-	bool schedule ();
+	bool schedule () final {
+	
+		bool hasExe = false;	
+				
+		handler_index_t i = 0;
+		
+		SysKernelData::sCnt++;
+
+		while(i < mHandlerCount)
+		{
+							
+			if(mHandlers[i] && mHandlerTraits[i].isExeReady())
+			{
+				mHandlerTraits[i].makePreExe();
+				hasExe |= mHandlers[i]->schedule();
+				mHandlerTraits[i].makePostExe();
+			}
+			i++;
+		}
+
+		if(!hasExe) 
+		{
+			if(mIdleTask)
+			{
+				// idle task if exists
+				mIdleTask();
+			}
+		}			
+
+		return hasExe;
+	}
 
 	void setIdleTask(void (*inIdleTask)())
  	{

@@ -64,10 +64,14 @@
  *
  */
 
-	//void mysTask() CR_CTX(10) {
+//		void mysTask() CR_CTX(10) {
+
+//or	CR_CTX(myTask, 10) { 
+
+#define ggg __COUNTER__
 
 // coroutine definition
-#define CR_CTX_(name, max_size)													\
+#define CR_CTX(name, max_size)													\
 	void name(){																\
 	using crctx_t = Coroutine_ctx_M<max_size>;									\
 	crctx_t *handle = thisTaskHandle()->get<crctx_t>();							\
