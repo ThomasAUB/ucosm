@@ -13,7 +13,7 @@
 
  * 
  * 
- * ///////		Coroutine_M	without context		///////////
+ * ///////		Coroutine_M		///////////
  * 
  *  // ModuleKit<Coroutine_M>
  * 
@@ -23,21 +23,20 @@
  *
  *	void myTask(){
  *
- * 		COROUTINE_MAX_CONTEXT_SIZE(0)
  * 
- * 		CR_START
- * 
- * 		// do stuff
- * 
- * 		CR_YIELD
+ * 		__CR_START__
  * 
  * 		// do stuff
  * 
- * 		WAIT_UNTIL(isReady())
+ * 		__CR_YIELD__
  * 
  * 		// do stuff
  * 
- *		CR_END
+ * 		__WAIT_UNTIL(isReady())
+ * 
+ * 		// do stuff
+ * 
+ *		__CR_END__
  * 	}
  *
  *
@@ -51,20 +50,20 @@
 #define CR_GET_HANDLE	thisTaskHandle()->get<Coroutine_M>()
 
 // mandatory statement
-#define CR_START																\
+#define __CR_START__															\
 	switch(CR_GET_HANDLE->mLine){												\
 	case 0:{
 
 
 // stores the current line and return, will restart at this point
-#define CR_YIELD																\
+#define __CR_YIELD__															\
 	}CR_GET_HANDLE->mLine = __LINE__;											\
 	return;																		\
 	case __LINE__:{
 
 
 // yields until the condition is true, then stores the new line
-#define CR_WAIT_UNTIL(condition)												\
+#define __CR_WAIT_UNTIL(condition)												\
 	}CR_GET_HANDLE->mLine = __LINE__;											\
 	case __LINE__:																\
 	if(!(condition)){															\
@@ -73,20 +72,16 @@
 	CR_GET_HANDLE->mLine = __LINE__+1;case __LINE__+1:{
 
 
-// set delay and YIELD
-#define CR_WAIT_FOR(delay)														\
-	thisTaskHandle()->get<Interval_M>()->setDelay(delay);						\
-	CR_YIELD
 	
 
 // restarts the coroutine
-#define CR_RESET																\
+#define __CR_RESET__															\
 	CR_GET_HANDLE->mLine = 0;													\
 	return;
 
 
 // mandatory statement
-#define CR_END         															\
+#define __CR_END__         														\
 	break;}																		\
 	default:/* error case : should not happen */								\
 	break;}																		\

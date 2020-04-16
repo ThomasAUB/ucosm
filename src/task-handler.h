@@ -162,9 +162,6 @@ protected:
 private:
 
 	task_t mTasks[task_count];
-
-	//task_t mTasks[task_count];
-	//task_function_t mFunctions[task_count];
 	
 	TaskHandle *mHandlePtr[task_count];
 

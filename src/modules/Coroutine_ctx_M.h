@@ -23,13 +23,13 @@
  *		uint8_t k = 5;
  * 		int32_t p = 100;
  * 		 
- * 	__CR_CTX_START__ // start point
+ * 		__CR_CTX_START__ // start point
  * 
  * 		// do stuff
  * 
  * 		k++;
  * 
- * 	__CR_CTX_YIELD__ // returns and restarts at this point
+ * 		__CR_CTX_YIELD__ // returns and restarts at this point
  * 
  * 		// do stuff
  * 	
@@ -39,7 +39,7 @@
  *	// if isReady() returns false, returns and restarts at this point
  * 	// else continue and returns after the condition 
  * 
- * 	__CR_CTX_WAIT_UNTIL(isReady()) // 
+ * 		__CR_CTX_WAIT_UNTIL(isReady()) // 
  * 
  * 		// do stuff
  * 
@@ -51,11 +51,11 @@
  * 		p = 0;
  * 		
  * // restarts the function from the beginning 
- * 	__CR_CTX_RESET__
+ * 		__CR_CTX_RESET__
  * 
  * 
  * // deletes the task
- *	__CR_CTX_END__
+ *		__CR_CTX_END__
  * 	}
  *
  *

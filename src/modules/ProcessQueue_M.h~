@@ -5,7 +5,7 @@
 struct SimpleQueue_M
 {
 
-	void executeAfter(Order_M *inPrev){
+	void executeAfter(SimpleQueue_M *inPrev){
 		mPrev = inPrev;
 	}
 
@@ -34,7 +34,7 @@ struct SimpleQueue_M
 
 private:
 
-	Order_M *mPrev;
+	SimpleQueue_M *mPrev;
 	bool mIsStarted;
 
 };
@@ -45,11 +45,28 @@ private:
 struct AutoQueue_M
 {
 
-	void executeAfter(Order_M *inPrev){
-		mPrev = inPrev;
-		if(inPrev){
-			inPrev->mNext = this;
+	void executeAfter(AutoQueue_M *inPrev){
+		if(!inPrev){
+			return;
 		}
+		if(mPrev){
+			inPrev->mPrev = mPrev;
+			mPrev->mNext = inPrev;
+		}
+		inPrev->mNext = this;
+		mPrev = inPrev;
+	}
+
+	void executeBefore(AutoQueue_M *inNext){
+		if(!inNext){
+			return;
+		}
+		if(mNext){
+			inNext->mNext = mNext;
+			mNext->mPrev = inNext;
+		}
+		inNext->mPrev = this;
+		mNext = inNext;
 	}
 
 	void init(){
@@ -87,7 +104,7 @@ struct AutoQueue_M
 
 private:
 
-	Order_M *mPrev, mNext;
+	AutoQueue_M *mPrev, mNext;
 	bool mIsStarted;
 
 };

@@ -111,10 +111,6 @@ public:
 		}
 		return &mTasks[mCurrHandleIndex].mAttributes;
 	}
-
-	bool addTask(task_t& inTask, TaskHandle *ioHandle = nullptr){
-		return createTask(inTask.mFunction, ioHandle);
-	}
 	
 	bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr){
 				
