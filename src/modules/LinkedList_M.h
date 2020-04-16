@@ -1,7 +1,5 @@
 #pragma once
 
-#include "ModuleKit_M.h"
-
 
 // automatically updated linked list of tasks by chronology of execution
 template<int listIndex = 0>
@@ -20,46 +18,16 @@ struct LinkedList_M //: public ListItem // 9 bytes
 
 	bool isDelReady() const { return true; } 
 
-	void makePreExe(){
+	void makePreExe();
 
-		if(mIsStarted){ return; }
-
-		mIsStarted = true;
-		
-		if(sTopHandle)
-		{
-			sTopHandle->mNext = this;
-			mPrev = sTopHandle;
-		}
-		sTopHandle = this;
-	}
-
-	void makePreDel(){
-		
-		if(sTopHandle == this)
-		{
-			if(mPrev){
-				sTopHandle = mPrev;
-			}else{
-				sTopHandle = nullptr;
-			}
-		}
-		if(mPrev && mNext)
-		{
-			mPrev->mNext = mNext;
-			mNext->mPrev = mPrev;
-		}else if(mPrev){
-			mPrev->mNext = nullptr;
-		}else if(mNext){
-			mNext->mPrev = nullptr;
-		}
-	}
+	void makePreDel();
 
 	void makePostExe(){}
 
 private:
 
 	static LinkedList_M<listIndex> *sTopHandle;
+	
  	LinkedList_M<listIndex> *mNext;
 	LinkedList_M<listIndex> *mPrev;
 	
@@ -67,7 +35,6 @@ private:
 	
 };
 
-template<int listIndex>
-LinkedList_M<listIndex> *LinkedList_M<listIndex>::sTopHandle = nullptr;
+
 
 

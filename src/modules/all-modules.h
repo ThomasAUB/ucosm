@@ -14,7 +14,7 @@
 #include "Status_M.h"
 
 // containers
-#include "ModuleKit_M.h"
+#include "ModuleHub_M.h"
 #include "Content_M.h"
 #include "Buffer_M.h"
 #include "Signal_M.h"	// requires status (but discutable and bypassable)
@@ -22,7 +22,7 @@
 
 // linkers
 #include "Parent_M.h"
-#include "LinkedList_M.h" // requires status (cbypassable)
+//#include "LinkedList_M.h" // requires status (cbypassable)
 
 
 // analyzers

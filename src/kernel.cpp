@@ -30,97 +30,48 @@
 #pragma once
 
 
-#include "IScheduler.h"
+#include "kernel.h"
+
+// sCnt
+#include "modules/ucosm-sys-data.h"
+uint8_t SysKernelData::sCnt = 0;
 
 
-template<typename handler_t, size_t max_handler_count> 
-class Kernel : public IScheduler
+
+
+template<typename handler_t, size_t max_handler_count>
+bool Kernel<handler_t, max_handler_count>::schedule () final
 {
-
-	using handler_index_t = uint8_t;
-	 
-public:
-
-	Kernel() : mHandlerCount(0), mIdleTask(nullptr)
-	{}
-
-	template<typename T>
-	bool addHandler(T *inHandler){
-		if(mHandlerCount == max_handler_count){ return false; }
-		mHandlers[mHandlerCount] = static_cast<IScheduler *>(inHandler);
-		mHandlerTraits[mHandlerCount].init();		
-		mHandlerCount++;
-		return true;
-	}
 	
-	handler_t *getHandle(IScheduler *inHandler)
-	{
-		handler_index_t i;
-		if(getHandlerIndex(inHandler, i)){
-			return &mHandlerTraits[i];
-		}
-		return nullptr;
-	}
-
-	void removeHandler(IScheduler *inHandler)
-	{
-		handler_index_t i;
-		if(getHandlerIndex(inHandler, i)){
-
-			if(!mHandlerTraits[i].isDelReady())
-			{
-				return;
-			}
-
-			mHandlerTraits[i].makePreDel();
+	bool hasExe = false;	
 			
-			// shift handlers for contiguous array
-			while(i<mHandlerCount-1)
-			{
-				mHandlers[i] = mHandlers[i+1];
-				mHandlerTraits[i] = mHandlerTraits[i+1];
-				i++;
-			}
-			mHandlerCount--;
-		}
-	}
+	handler_index_t i = 0;
 	
+	SysKernelData::sCnt++;
 
-	bool schedule ();
-
-	void setIdleTask(void (*inIdleTask)())
- 	{
-		mIdleTask = inIdleTask;
-	}
-
-
-private:
-
-
-	bool getHandlerIndex(IScheduler *inScheduler, handler_index_t& ioIndex)
- 	{
-		if(!mHandlerCount)
+	while(i < mHandlerCount)
+	{
+						
+		if(mHandlers[i] && mHandlerTraits[i].isExeReady())
 		{
-			return false;
+			mHandlerTraits[i].makePreExe();
+			hasExe |= mHandlers[i]->schedule();
+			mHandlerTraits[i].makePostExe();
 		}
-		ioIndex = 0;	
-		do
-		{
-			if(mHandlers[ioIndex] == inScheduler){
-				return true;
-			}
-		}while(++ioIndex<mHandlerCount);
-		return false;
+		i++;
 	}
 
-	IScheduler *mHandlers[max_handler_count];
+	if(!hasExe) 
+	{
+		if(mIdleTask)
+		{
+			// idle task if exists
+			mIdleTask();
+		}
+	}			
 
-	handler_t mHandlerTraits[max_handler_count];
-	
-	handler_index_t mHandlerCount;
+	return hasExe;
+}
 
-	void (*mIdleTask)();
-
-};
 
 

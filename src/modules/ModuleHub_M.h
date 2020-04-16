@@ -6,7 +6,7 @@
 // provides a module container
 
 template<class ...ModuleCollection> 
-class ModuleKit_M
+class ModuleHub_M
 {
 
 	using items_t = std::tuple<ModuleCollection...>;

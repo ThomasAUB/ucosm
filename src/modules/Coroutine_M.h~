@@ -4,7 +4,7 @@
 // macro based coroutine inspired by protothread
 //
 // !!! INFO !!! 
-// the current implementation needs to be implemented in ModuleKit
+// the current implementation needs to be implemented in ModuleHub
 //
 
 // Example
@@ -50,13 +50,13 @@
 #define CR_GET_HANDLE	thisTaskHandle()->get<Coroutine_M>()
 
 // mandatory statement
-#define __CR_START																\
+#define __CR_START__															\
 	switch(CR_GET_HANDLE->mLine){												\
 	case 0:{
 
 
 // stores the current line and return, will restart at this point
-#define __CR_YIELD																\
+#define __CR_YIELD__															\
 	}CR_GET_HANDLE->mLine = __LINE__;											\
 	return;																		\
 	case __LINE__:{
@@ -75,13 +75,13 @@
 	
 
 // restarts the coroutine
-#define __CR_RESET																\
+#define __CR_RESET__															\
 	CR_GET_HANDLE->mLine = 0;													\
 	return;
 
 
 // mandatory statement
-#define __CR_END         														\
+#define __CR_END__         														\
 	break;}																		\
 	default:/* error case : should not happen */								\
 	break;}																		\

@@ -43,6 +43,12 @@ struct Task{
 };
 
 
+/*
+	add a dummy task throwing exceptions when called for empty handles instead of nullptr
+	add the ablility to also store task_ID instead of handles (uint8_t) and keep a pointer to this 		ID, set it to zero when task is inactive (oculd be a union on mHandlePtr[]  
+*/
+
+
 
 template<typename caller_t, typename task_module, size_t task_count>
 class TaskHandler : public IScheduler

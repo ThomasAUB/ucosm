@@ -3,10 +3,12 @@
 
 #include <tuple>
 
+// provides a module container
 
+// should it renamed ModuleHub<>
 
 template<class ...ModuleCollection> 
-class ModuleKit_M
+class ModuleHub_M
 {
 
 	using items_t = std::tuple<ModuleCollection...>;

@@ -4,7 +4,7 @@
 // macro based coroutine inspired by protothread with context saving
 //
 // !!! INFO !!! 
-// the current implementation needs to be implemented in ModuleKit
+// the current implementation needs to be implemented in ModuleHub
 //
 
 // Example
@@ -12,7 +12,7 @@
 /*	
  * 
  * 
- *  // ModuleKit<Coroutine_ctx_M<myMaxContextSize>>
+ *  // ModuleHub<Coroutine_ctx_M<myMaxContextSize>>
  * 
  *	bool isReady(){
  *		// ...
@@ -23,13 +23,13 @@
  *		uint8_t k = 5;
  * 		int32_t p = 100;
  * 		 
- * 	__CR_CTX_START__ // start point
+ * 		__CR_CTX_START__ // start point
  * 
  * 		// do stuff
  * 
  * 		k++;
  * 
- * 	__CR_CTX_YIELD__ // returns and restarts at this point
+ * 		__CR_CTX_YIELD__ // returns and restarts at this point
  * 
  * 		// do stuff
  * 	
@@ -39,7 +39,7 @@
  *	// if isReady() returns false, returns and restarts at this point
  * 	// else continue and returns after the condition 
  * 
- * 	__CR_CTX_WAIT_UNTIL(isReady()) // 
+ * 		__CR_CTX_WAIT_UNTIL(isReady()) // 
  * 
  * 		// do stuff
  * 
@@ -51,11 +51,11 @@
  * 		p = 0;
  * 		
  * // restarts the function from the beginning 
- * 	__CR_CTX_RESET__
+ * 		__CR_CTX_RESET__
  * 
  * 
  * // deletes the task
- *	__CR_CTX_END__
+ *		__CR_CTX_END__
  * 	}
  *
  *
@@ -63,6 +63,8 @@
  *
  *
  */
+
+	void mysTask() CR_CTX(10) {
 
 // coroutine definition
 #define CR_CTX_(name, max_size)													\
@@ -123,6 +125,8 @@
 template<size_t max_context_size>
 struct Coroutine_ctx_M
 {
+
+	static_assert(max_context_size >= 1 , "Context size must be >= 1");
 	
 	uint16_t mLine;
 

@@ -2,10 +2,12 @@
 
 
 // simple order process
+// not tested
+
 struct ProcessQ_M
 {
 
-	void executeAfter(SimpleQ_M *inPrev){
+	void executeAfter(ProcessQ_M *inPrev){
 		mPrev = inPrev;
 	}
 

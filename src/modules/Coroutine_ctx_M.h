@@ -4,7 +4,7 @@
 // macro based coroutine inspired by protothread with context saving
 //
 // !!! INFO !!! 
-// the current implementation needs to be implemented in ModuleKit
+// the current implementation needs to be implemented in ModuleHub
 //
 
 // Example
@@ -12,7 +12,7 @@
 /*	
  * 
  * 
- *  // ModuleKit<Coroutine_ctx_M<myMaxContextSize>>
+ *  // ModuleHub<Coroutine_ctx_M<myMaxContextSize>>
  * 
  *	bool isReady(){
  *		// ...
@@ -63,6 +63,8 @@
  *
  *
  */
+
+	//void mysTask() CR_CTX(10) {
 
 // coroutine definition
 #define CR_CTX_(name, max_size)													\
@@ -123,6 +125,8 @@
 template<size_t max_context_size>
 struct Coroutine_ctx_M
 {
+
+	static_assert(max_context_size >= 1 , "Context size must be >= 1");
 	
 	uint16_t mLine;
 

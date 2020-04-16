@@ -4,7 +4,7 @@
 // macro based coroutine inspired by protothread
 //
 // !!! INFO !!! 
-// the current implementation needs to be implemented in ModuleKit
+// the current implementation needs to be implemented in ModuleHub
 //
 
 // Example
@@ -15,7 +15,7 @@
  * 
  * ///////		Coroutine_M		///////////
  * 
- *  // ModuleKit<Coroutine_M>
+ *  // ModuleHub<Coroutine_M>
  * 
  *	bool isReady(){
  *		// ...

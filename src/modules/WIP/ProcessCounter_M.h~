@@ -1,14 +1,14 @@
 #pragma once
 
 
-struct Counter_M
+struct ProcessCounter_M
 {
 
 	void init(){
 		mActiveCount++;
 	}
 
-    	bool isExeReady() const {return true;}
+    bool isExeReady() const {return true;}
 
 	bool isDelReady() const {return true;}
 
@@ -19,6 +19,10 @@ struct Counter_M
 	}
 
 	void makePostExe(){}
+
+	size_t getCount(){
+		return mActiveCount;
+	}
 
 private:
 
