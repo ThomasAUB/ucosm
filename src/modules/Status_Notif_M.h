@@ -6,9 +6,8 @@
 
 enum eNotifStatus
 {
-	eNotifFirstExe		= 0b00010000,
-	eNotifExeStart		= 0b00100000,
-	eNotifSuspension	= 0b01000000,
+	eNotifFirstExe		= 0b00100000,
+	eNotifExeStart		= 0b01000000,
 	eNotifDeletion		= 0b10000000,
 	eNotifMask			= 0b11110000
 };
