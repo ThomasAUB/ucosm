@@ -61,7 +61,9 @@ bool MemPool32<block_count, block_size>::newBlock(T *t, blockID_t& ioBlockID)
 			ioBlockID.ID = i+1; // stores the index
 
 			//t = reinterpret_cast<T *>(&mBlocks[i]);
+
 			t = new(&mBlocks[i]) T();
+			Foo *f = new (buf) Foo(a,b,c,d,e,f);
 			
 			return true;
 		}

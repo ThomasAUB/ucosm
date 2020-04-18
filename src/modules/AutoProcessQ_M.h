@@ -115,7 +115,8 @@ struct AutoProcessQ_M
 
 private:
 
-	AutoProcessQ_M *mPrev, mNext;
+	AutoProcessQ_M *mPrev;
+	AutoProcessQ_M *mNext;
 	
 	bool mState;
 

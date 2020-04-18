@@ -1,5 +1,6 @@
 #pragma once
 
+/*
 
 template<typename allocator_t>
 struct MemAllocator_M
@@ -65,6 +66,6 @@ private:
 	bool mAutoRelease;
 	
 };
-
+*/
 
 

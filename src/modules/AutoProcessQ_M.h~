@@ -95,7 +95,7 @@ struct AutoProcessQ_M
 	bool isDelReady() const {return true;}
 
 	void makePreExe(){
-		mState = true; // should we let user only	
+		mState = true; // should we let user only set the state?	
 	}
 
 	void makePreDel(){
