@@ -1,6 +1,8 @@
 #pragma once
 
 
+
+
 // macro based coroutine inspired by protothread with context saving
 //
 // !!! INFO !!! 
@@ -68,7 +70,7 @@
 
 //or	CR_CTX(myTask, 10) { 
 
-#define ggg __COUNTER__
+
 
 // coroutine definition
 #define CR_CTX(name, max_size)													\
@@ -81,6 +83,7 @@
 	i->run(handle->mLine, endTask);												\
 	if(endTask){ deleteTask(thisTaskHandle()); }}								\
 	struct crctx_##name
+
 
 
 // mandatory statement
@@ -114,7 +117,10 @@
 	}default:while(1){}/* error case : should not happen */						\
 	break;}/*switch*/															\
 	end = true; return;															\
-	}};void dummy(){
+	}};void MAKE_UNIQUE(dummy)(){
+
+
+
 
 
 // TODO : 
@@ -164,5 +170,10 @@ private:
 	uint8_t mContext[max_context_size];
 		
 };
+
+
+#define CONCATENATE_DETAIL(x, y) x##y
+#define CONCATENATE(x, y) CONCATENATE_DETAIL(x, y)
+#define MAKE_UNIQUE(x) CONCATENATE(x, __COUNTER__)
 
 

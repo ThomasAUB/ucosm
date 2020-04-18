@@ -1,6 +1,8 @@
 #pragma once
 
 
+
+
 // macro based coroutine inspired by protothread with context saving
 //
 // !!! INFO !!! 
@@ -68,11 +70,11 @@
 
 //or	CR_CTX(myTask, 10) { 
 
-#define ggg __COUNTER__
+
 
 // coroutine definition
-#define CR_CTX(name, max_size)													\
-	void name(){															\
+/*#define CR_CTX(name, max_size)													\
+	void name(){																\
 	using crctx_t = Coroutine_ctx_M<max_size>;									\
 	crctx_t *handle = thisTaskHandle()->get<crctx_t>();							\
 	if(!handle->mLine){	handle->instantiate<crctx_##name>(); } 					\
@@ -80,7 +82,19 @@
 	bool endTask = false;														\
 	i->run(handle->mLine, endTask);												\
 	if(endTask){ deleteTask(thisTaskHandle()); }}								\
-	struct crctx_##name
+	struct crctx_##name*/
+
+
+#define CR_CTX(name, max_size)													\
+	void name(){																\
+	using crctx_t = Coroutine_ctx_M<max_size>;									\
+	crctx_t *handle = thisTaskHandle()->get<crctx_t>();							\
+	if(!handle->mLine){	handle->instantiate<CONCATENATE(crctx_o_, oi)>(); } 	\
+	CONCATENATE(crctx_o_, oi) *i = handle->getInstance<CONCATENATE(crctx_o_, oi)>();						\
+	bool endTask = false;														\
+	i->run(handle->mLine, endTask);												\
+	if(endTask){ deleteTask(thisTaskHandle()); }}								\
+	struct CONCATENATE(crctx_o_, oi)
 
 
 // mandatory statement
@@ -114,7 +128,10 @@
 	}default:while(1){}/* error case : should not happen */						\
 	break;}/*switch*/															\
 	end = true; return;															\
-	}};void dummy(){
+	}};void MAKE_UNIQUE(dummy)(){
+
+
+
 
 
 // TODO : 
@@ -164,5 +181,10 @@ private:
 	uint8_t mContext[max_context_size];
 		
 };
+
+
+#define CONCATENATE_DETAIL(x, y) x##y
+#define CONCATENATE(x, y) CONCATENATE_DETAIL(x, y)
+#define MAKE_UNIQUE(x) CONCATENATE(x, __COUNTER__)
 
 
