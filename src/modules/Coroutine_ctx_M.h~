@@ -73,7 +73,7 @@
 
 
 // coroutine definition
-/*#define CR_CTX(name, max_size)													\
+#define CR_CTX(name, max_size)													\
 	void name(){																\
 	using crctx_t = Coroutine_ctx_M<max_size>;									\
 	crctx_t *handle = thisTaskHandle()->get<crctx_t>();							\
@@ -82,19 +82,8 @@
 	bool endTask = false;														\
 	i->run(handle->mLine, endTask);												\
 	if(endTask){ deleteTask(thisTaskHandle()); }}								\
-	struct crctx_##name*/
+	struct crctx_##name
 
-
-#define CR_CTX(name, max_size)													\
-	void name(){																\
-	using crctx_t = Coroutine_ctx_M<max_size>;									\
-	crctx_t *handle = thisTaskHandle()->get<crctx_t>();							\
-	if(!handle->mLine){	handle->instantiate<CONCATENATE(crctx_o_, oi)>(); } 	\
-	CONCATENATE(crctx_o_, oi) *i = handle->getInstance<CONCATENATE(crctx_o_, oi)>();						\
-	bool endTask = false;														\
-	i->run(handle->mLine, endTask);												\
-	if(endTask){ deleteTask(thisTaskHandle()); }}								\
-	struct CONCATENATE(crctx_o_, oi)
 
 
 // mandatory statement

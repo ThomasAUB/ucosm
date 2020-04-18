@@ -66,10 +66,6 @@
  *
  */
 
-//		void mysTask() CR_CTX(10) {
-
-//or	CR_CTX(myTask, 10) { 
-
 
 
 // coroutine definition
