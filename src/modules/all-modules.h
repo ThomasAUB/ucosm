@@ -1,18 +1,22 @@
 #pragma once
 
 
-//16 modules
+//21 modules
 
 // executers
 #include "Interval_M.h"
 #include "Priority_M.h"
 #include "Conditional_M.h"
 
-#include "Coroutine_M.h" // requires delay but in macro
+#include "Coroutine_M.h"
 #include "Coroutine_ctx_M.h"
 
 // 
 #include "Status_M.h"
+//#include "Status_Notif_M.h" // static 
+#include "Lockable_M.h"
+#include "Suspendable_M.h"
+//#include "ProcessCOunter.h" // static
 
 // containers
 #include "ModuleHub_M.h"
@@ -37,8 +41,9 @@
 
 #include "void_M.h"
 
-#include "LinkedList_M.h" // static
+//#include "LinkedList_M.h" // static
 //#include "ProcessCounter_M.h" // static
 //#include "Stack_Usage_M.h" // static
+
 
 
