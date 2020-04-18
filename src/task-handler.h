@@ -164,6 +164,17 @@ public:
 protected:
 
 	virtual void HandlerException(const char *inErrMsg){}
+
+	template<typename T>
+	bool contains(T *t, TaskHandle h){
+		for(task_index_t i=0 ; i < task_count ; i++){
+			if(mTasks[i].mAttributes.contains(t)){
+				h = &mTasks[i].mAttributes;
+				return true;
+			}
+		}
+		return false;
+	}
  
 private:
 

@@ -9,7 +9,7 @@ struct LinkedList_M //: public ListItem // 9 bytes
 	LinkedList_M<listIndex> *getNext() { return mNext; }
 	LinkedList_M<listIndex> *getPrev() { return mPrev; }
 
-	void init(){   		
+	void init(){
 		mPrev = mNext = nullptr;
 		mIsStarted = false;
 	}
@@ -18,9 +18,40 @@ struct LinkedList_M //: public ListItem // 9 bytes
 
 	bool isDelReady() const { return true; } 
 
-	void makePreExe();
+	void makePreExe(){
 
-	void makePreDel();
+		if(mIsStarted){ return; }
+
+		mIsStarted = true;
+		
+		if(sTopHandle)
+		{
+			sTopHandle->mNext = this;
+			mPrev = sTopHandle;
+		}
+		sTopHandle = this;
+	}
+
+	void makePreDel(){
+	
+		if(sTopHandle == this)
+		{
+			if(mPrev){
+				sTopHandle = mPrev;
+			}else{
+				sTopHandle = nullptr;
+			}
+		}
+		if(mPrev && mNext)
+		{
+			mPrev->mNext = mNext;
+			mNext->mPrev = mPrev;
+		}else if(mPrev){
+			mPrev->mNext = nullptr;
+		}else if(mNext){
+			mNext->mPrev = nullptr;
+		}
+	}
 
 	void makePostExe(){}
 
@@ -34,6 +65,10 @@ private:
 	bool mIsStarted;
 	
 };
+
+
+template<int listIndex>
+LinkedList_M<listIndex> *LinkedList_M<listIndex>::sTopHandle = nullptr;
 
 
 

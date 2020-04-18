@@ -19,10 +19,9 @@ public:
 		return &std::get<T>(mItemModules);
 	}
 
+	
+	getHandle(){
 
-	template<typename T>
-	bool contains(T *t){
-		return (get<T>() == t);
 	}
 
 	template<size_t I = 0>

@@ -39,6 +39,6 @@
 
 //#include "LinkedList_M.h" // static
 //#include "ProcessCounter_M.h" // static
-//#include "Stack_Usage_M.h" // virtual
+//#include "Stack_Usage_M.h" // static
 
 
