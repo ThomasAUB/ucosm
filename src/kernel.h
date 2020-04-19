@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <cstddef>
 
 #include "IScheduler.h"
 

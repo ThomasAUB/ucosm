@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <limits>
+
 #include "IScheduler.h"
 
 template<typename caller_t, typename attributes>

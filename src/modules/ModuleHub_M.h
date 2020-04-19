@@ -28,7 +28,7 @@ public:
 	template<size_t I = 0>
 	void init() {
 		std::get<I>(mItemModules).init();
-		if constexpr(I+1 != std::tuple_size<items_t>::value)
+		if constexpr (I+1 != std::tuple_size<items_t>::value)
 		    init<I+1>();
 	}
 
@@ -61,21 +61,21 @@ public:
 	template<size_t I = 0>
 	void makePreExe() {
 		std::get<I>(mItemModules).makePreExe();
-		if constexpr(I+1 != std::tuple_size<items_t>::value)
+		if constexpr (I+1 != std::tuple_size<items_t>::value)
 		    makePreExe<I+1>();
 	}
 
 	template<size_t I = 0>
 	void makePostExe() {
 		std::get<I>(mItemModules).makePostExe();
-		if constexpr(I+1 != std::tuple_size<items_t>::value)
+		if constexpr (I+1 != std::tuple_size<items_t>::value)
 		    makePostExe<I+1>();
 	}
 	
 	template<size_t I = 0>
 	void makePreDel() {
 		std::get<I>(mItemModules).makePreDel();
-		if constexpr(I+1 != std::tuple_size<items_t>::value)
+		if constexpr (I+1 != std::tuple_size<items_t>::value)
 		    makePreDel<I+1>();
 	}
 };
