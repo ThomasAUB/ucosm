@@ -62,6 +62,10 @@ struct Fifo
 		return (mIndex==Size);
 	}
 	
+	void clear(){
+		mIndex = 0;
+	}
+
 private :
 
 	uint16_t mIndex;

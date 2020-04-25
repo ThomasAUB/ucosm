@@ -4,7 +4,7 @@
 
 // Allow to send data to a specific task
 
-template<typename data_t, uint16_t fifo_size>
+template<typename data_t, uint16_t fifo_size, bool auto_release = false>
 struct Signal_M
 {
 	
@@ -21,11 +21,19 @@ struct Signal_M
 		return !mRxData.isEmpty();
 	}
 
-	void init() {}
+	void init() {
+		mRxData.clear();
+	}
 
 	bool isExeReady() { return true; }
 
-	bool isDelReady() { return mRxData.isEmpty(); }
+	bool isDelReady() {
+		if(auto_release){
+			return true;
+		}else{
+			return mRxData.isEmpty();
+		}
+	}
 
 	void makePreExe() {}
 
