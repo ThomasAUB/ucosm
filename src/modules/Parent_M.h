@@ -5,6 +5,7 @@
 
 // allows to set a Parent/Child relation between two process,
 // it forbids the deletion of the parent task if the child is alive
+#pragma pack(2)
 struct Parent_M
 {
 
@@ -46,7 +47,7 @@ private:
 		Parent_M *mChild;
 		Parent_M *mParent;
 	};
-	
+
 	bool mIsParent;
 };
 

@@ -3,6 +3,7 @@
 
 #include "ucosm-sys-data.h"
 
+#pragma pack(2)
 struct Priority_M
 {
 

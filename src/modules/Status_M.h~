@@ -48,7 +48,6 @@ struct Status_M
 		mStatus = 0; 
 		mSuspended = 0;
 		mLocked = 0;
-		mExeCount = 0;
 	}
 
 	bool isExeReady() const { return (mSuspended == 0); }

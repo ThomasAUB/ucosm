@@ -114,7 +114,7 @@ struct ModuleHubI_M : public ModuleCollection...
 		bool ready[] = {
 			true, (ModuleCollection::isDelReady())...
 		};
-		for(size_t i=0 ; i<sizeof(ready) ; i++)
+		for(index_t i=0 ; i<sizeof(ready) ; i++)
 		{
 			if(!ready[i]){ return false; }
 		}
