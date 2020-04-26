@@ -39,26 +39,22 @@ struct Fifo
 	Fifo() : mIndex(0)
 	{}
 
-	bool push(T data)
-	{
+	bool push(T data){
 		if(isFull()){return false;}
 		mElems[mIndex++] = data;
 		return true;
 	}
 
-	T pop()
-	{
+	T pop(){
 		if(!mIndex){return T();}
 		return mElems[--mIndex];
 	}
 
-	bool isEmpty()
-	{
+	bool isEmpty(){
 		return !mIndex;
 	}
 
-	bool isFull()
-	{
+	bool isFull(){
 		return (mIndex==Size);
 	}
 	

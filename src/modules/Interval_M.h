@@ -4,7 +4,6 @@
 
 // allow to specify a time period of execution of the process or postpone 
 // its execution
-#pragma pack(2)
 struct Interval_M
 {
 

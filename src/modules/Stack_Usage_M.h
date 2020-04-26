@@ -49,7 +49,7 @@ struct Stack_Usage_M
 		const auto size=max_stack_usage/sizeof(uint32_t);
 		uint32_t s[size];
 
-		sSp = s;
+		mSp = s;
 
 		uint16_t i=0;
 		while(i < size){
@@ -59,7 +59,7 @@ struct Stack_Usage_M
 	}
 
 	void makePostExe(){
-		volatile uint8_t k=5;
+
 		if(!mIsRunning){
 			return;
 		}	
@@ -67,7 +67,7 @@ struct Stack_Usage_M
 		const auto size=max_stack_usage/sizeof(uint32_t);
 		uint32_t s[size];
 
-		if(sSp != s){
+		if(mSp != s){
 			//stack overflow or memory leakage	
 			mStackUsage = 0xFFFF;
 			stop();
@@ -95,7 +95,7 @@ struct Stack_Usage_M
 	
 private:
 
-	static uint32_t *sSp;
+	uint32_t *mSp;
 
 	uint16_t mStackUsage;
 	uint16_t mMaxStackUsage;
