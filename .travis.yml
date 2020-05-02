@@ -1,0 +1,13 @@
+language: cpp
+compiler: gcc
+os: linux
+
+
+
+addons:
+  apt:
+    packages:
+      - libcppunit-dev
+      - scons
+
+script: scons test
