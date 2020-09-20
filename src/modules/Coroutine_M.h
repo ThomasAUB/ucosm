@@ -3,9 +3,7 @@
 
 // macro based coroutine inspired by protothread
 //
-// !!! INFO !!! 
-// the current implementation needs to be implemented in ModuleHub
-//
+
 
 // Example
 
@@ -15,7 +13,6 @@
  * 
  * ///////		Coroutine_M		///////////
  * 
- *  // ModuleHub<Coroutine_M>
  * 
  *	bool isReady(){
  *		// ...
@@ -24,7 +21,7 @@
  *	void myTask(){
  *
  * 
- * 		__CR_START__
+ * 		__CR_START(thisTaskHandle())
  * 
  * 		// do stuff
  * 
@@ -45,9 +42,6 @@
  *
  */
  
-
-
-//#define CR_GET_HANDLE	thisTask()->get<Coroutine_M>()
 
 // mandatory statement
 #define __CR_START(inHandle)															\

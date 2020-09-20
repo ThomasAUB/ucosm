@@ -2,3 +2,5 @@ build/*
 .sconsign.dblite
 
 *.h~
+
+.buildconfig
