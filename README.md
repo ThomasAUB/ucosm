@@ -24,7 +24,7 @@ Module based cooperative scheduler for microcontroler(Beta)
   
     - Buffer_M          : Associates a buffer of specified type and size to each task of a handler.
     
-    - Conditional_M     : Associates a free function as "bool foo()" to each task telling if the function should be                
+    - Conditional_M     : Associates a free function as "bool foo()" to each task telling if the function should be
                           executed.
     
     - Content_M         : Associates an instance of the specified type to each task.
