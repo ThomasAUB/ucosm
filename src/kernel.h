@@ -116,9 +116,9 @@ public:
 				// idle task if exists
 				mIdleTask();
 			}
-		}			
-
-		return fullCycleExe;
+		}
+		
+		return hasExe;
 	}
 
 	void setIdleTask(void (*inIdleTask)())
