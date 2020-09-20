@@ -4,7 +4,13 @@
 struct ProcessCounter_M
 {
 
-	void init();
+	size_t getCount(){
+		return mActiveCount;
+	}
+
+	void init(){
+		mActiveCount++;
+	}
 
     bool isExeReady() const {return true;}
 
@@ -12,13 +18,14 @@ struct ProcessCounter_M
 
 	void makePreExe(){}
 
-	void makePreDel();
+	void makePreDel(){
+		mActiveCount--;	
+	}
 
 	void makePostExe(){}
-
-	size_t getCount();
 
 private:
 
 	static size_t mActiveCount;
 };
+
