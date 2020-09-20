@@ -29,57 +29,65 @@
 
 #pragma once
 
+#include <limits>
+#include "IScheduler.h"
 
-#include "modules.h"
 
 
 
-template<typename Caller_t, typename task_modules, index_t task_count>
-class TaskHandler : public iScheduler
+
+
+
+
+template<typename caller_t, typename task_module, size_t task_count>
+class TaskHandler : public IScheduler
 {
+
+	using task_index_t = uint8_t;
+	
+	static const task_index_t max_index = std::numeric_limits<task_index_t>::max();
 	
 	static_assert(task_count < max_index-1 , "Task count too high");	
 	
-	using task_function_t = void (Caller_t::*)();
 
-	struct TaskItem : public task_modules
-	{
+	struct TaskItem : public task_module{
+		
 		constexpr TaskItem(): index(sCounterIndex++) {}
-		const index_t index;
-		static index_t sCounterIndex;
+		const task_index_t index;
+		
+		private:
+			
+		static size_t sCounterIndex;
 	};
 
-	using task_t = TaskItem;
-
+	using task_function_t = void (caller_t::*)();
+	 
 public:
 	
-	using TaskHandle = task_t*;
-
-	TaskHandler()
+	using TaskHandle = TaskItem*;
+	 
+	TaskHandler() : mCurrHandleIndex(max_index)
  	{
-		for(index_t i=0 ; i<task_count ; i++)
-		{
-			if(mTasks[i].index != i)
-			{
-				catchException("Critical declaration error");
+		// safety check
+		for(task_index_t i=0 ; i<task_count ; i++){
+			if(mTasks[i].index != i){
+				HandlerException("Critical declaration error");
 				while(1){}
 			}
 		}
 	}
 	
-	bool schedule(tick_t t)
-	{
+	bool schedule() final {
 
 		bool hasExe = false;
 		
-		index_t i=0;
+		task_index_t i=0;
 		
 		do{
-			if(mFunctions[i] && mTasks[i].isExeReady())
-			{
+			if( mFunctions[i] && mTasks[i].isExeReady() ){
 				mCurrHandleIndex = i;
 				mTasks[i].makePreExe();
-				(static_cast<Caller_t *>(this)->*mFunctions[i])();
+				(static_cast<caller_t *>(this)->*mFunctions[i])();
 				mTasks[i].makePostExe();
 				mCurrHandleIndex = max_index;
 				hasExe = true;
@@ -89,28 +97,24 @@ public:
 		return hasExe;
 	}
 	
-	TaskHandle thisTaskHandle()
-	{
-		if(mCurrHandleIndex == max_index)
-		{
-			catchException("thisTask() not allowed in this context");
+	TaskHandle thisTaskHandle(){
+		if(mCurrHandleIndex == max_index){
+			HandlerException("thisTask() not allowed in this context");
 			return 0;
 		}
 		return &mTasks[mCurrHandleIndex];
 	}
 	
-	bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr)
-	{					
+	bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr){
 				
 		// allocation
-		index_t i=0;
-		do
-		{
-			if(!mFunctions[i])
-			{
+		task_index_t i=0;
+		do{
+			if(!mFunctions[i]){
+				
 				mFunctions[i] = inFunc;
-				if(ioHandle != nullptr)
-				{
+				
+				if(ioHandle != nullptr){
 					*ioHandle = &mTasks[i];
 					mHandlePtr[i] = ioHandle;
 				}else{
@@ -121,23 +125,22 @@ public:
 			}
 		}while(++i < task_count);
 
+		HandlerException("No more slots available");
+		
 		return false;
 	}
 
-	bool deleteTask(TaskHandle inHandle)
-	{
+	bool deleteTask(TaskHandle inHandle){
 		if(!inHandle){ return false; }
 		
-		index_t i = inHandle->index;
+		task_index_t i = inHandle->index;
 
-		if(mTasks[i].isDelReady())
-		{
+		if(mTasks[i].isDelReady()){
 			
 			mTasks[i].makePreDel();
 			mFunctions[i] = nullptr;
 			
-			if(mHandlePtr[i] && *mHandlePtr[i]==&mTasks[i])
-			{
+			if(&mHandlePtr[i] && ( *mHandlePtr[i] == &mTasks[i] )){
 				*mHandlePtr[i] = nullptr;
 			}
 			
@@ -145,37 +148,23 @@ public:
 		}
 	}
 
-	 // task tokenizer : can be called several times
-	bool getNextTaskHandle(task_function_t inFunc, TaskHandle *ioHandle)
- 	{
-		static index_t sI = 0;
-		for(index_t k=0 ; k<task_count ; k++){
-			sI = (sI+1)%task_count;
-			if(mFunctions[sI] == inFunc){
-				*ioHandle = &mTasks[sI];
-				mHandlePtr[sI] = ioHandle;
-				return true;
-			}
-		}
-		return false;
-	}
+protected:
 
- 
+	virtual void HandlerException(const char *inErrMsg){}
+
 private:
 
-	virtual void catchException(const char *inErrMsg){}
-	
-	task_function_t mFunctions[task_count];
+	TaskItem mTasks[task_count];
 
+	task_function_t mFunctions[task_count];
+	
 	TaskHandle *mHandlePtr[task_count];
 
-	task_t mTasks[task_count];
-
-	index_t mCurrHandleIndex;
-		
+	task_index_t mCurrHandleIndex;
+	
 };
 
 
-template<typename Caller_t, typename task_traits, index_t task_count>
-index_t TaskHandler<Caller_t, task_traits, task_count>::TaskItem::sCounterIndex = 0;
+template<typename Caller_t, typename task_traits, size_t task_count>
+size_t TaskHandler<Caller_t, task_traits, task_count>::TaskItem::sCounterIndex = 0;
 

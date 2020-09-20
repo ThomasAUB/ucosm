@@ -26,35 +26,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#include "ucosm-sys-data.h"
 
-#include "stdint.h"
-#include <limits>
+uint8_t SysKernelData::sCnt = 0;
+
+//
+
+#include "CPU_Usage_M.h"
+
+tick_t CPU_Usage_M::sMaxTickValue = std::numeric_limits<tick_t>::max();
+uint8_t CPU_Usage_M::sTimerOverFlow = 0;
+
+//
+
+#include "LinkedList_M.h"
+
+template<int listIndex>
+ListItem *LinkedList_M<listIndex>::sTopHandle = nullptr;
+
+//
+
+#include "MemPool32_M.h"
+
+template <typename elem_t, uint16_t elem_count, bool auto_release>
+elem_t MemPool32_M<elem_t, elem_count, auto_release>::mElems[elem_count];
+
+template <typename elem_t, uint16_t elem_count, bool auto_release>
+uint32_t MemPool32_M<elem_t, elem_count, auto_release>::mMemoryMap = 0;
+
+//
+
+#include "Stack_Usage_M.h"
+
+template<uint16_t max_stack_usage>
+uint32_t *Stack_Usage_M<max_stack_usage>::sSp;
 
 
-using tick_t = uint32_t;
 
-
-using index_t = uint8_t;
-
-
-const index_t max_index = std::numeric_limits<index_t>::max();
-
-
-struct iScheduler
-{
-	virtual bool schedule(tick_t t = 0) = 0;
-};
-
-
-struct SysKernelData
-{
-	static uint8_t sCnt;
-	static tick_t (*sGetTick)();
-	static iScheduler *sMaster;
-};
-
-
-uint8_t SysKernelData::sCnt;
 
 

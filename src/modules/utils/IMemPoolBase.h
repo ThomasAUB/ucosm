@@ -29,70 +29,22 @@
 #pragma once
 
 
-
-
-template<typename T, uint16_t Size>
-struct Fifo
-{
-
-	Fifo() : mIndex(0)
-	{}
-
-	bool push(T data)
-	{
-		if(isFull()){return false;}
-		mElems[mIndex++] = data;
-		return true;
-	}
-
-	T pop()
-	{
-		if(!mIndex){return T();}
-		return mElems[--mIndex];
-	}
-
-	bool isEmpty()
-	{
-		return !mIndex;
-	}
-
-	bool isFull()
-	{
-		return (mIndex==Size);
-	}
+struct IMemPoolBase{
 	
-private :
 
-	uint16_t mIndex;
+	using blockID_t = uint8_t;
 
-	T mElems[Size];
+	virtual void initID(blockID_t& ioBlockID) = 0;
 
+	virtual void *newBlock(blockID_t& ioBlockID) = 0;
+
+	virtual bool deleteBlock(blockID_t& ioBlockID) = 0;
+
+	virtual void *getBlock(blockID_t inBlockID) = 0;
+
+	virtual size_t getBlockSize() = 0;
+
+	virtual bool isAllocated(blockID_t inBlockID) = 0;
+	
 };
-
-
-
-
-
-
-
-
-
-
-
-
-template<typename Derived>
-struct ObjectCounter
-{
-	ObjectCounter() : index(sCount++)
-	{}
-	const index_t index;
-private:
-	static index_t sCount;
-};
-
-template<typename Derived>
-index_t ObjectCounter<Derived>::sCount = 0;
-
-
-
 

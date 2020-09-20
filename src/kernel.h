@@ -29,44 +29,45 @@
 
 #pragma once
 
-#include "task-handler.h"
+#include <cstddef>
 
-#include "uscosm-sys-data.h"
+#include "IScheduler.h"
+
+// sCnt
+#include "modules/ucosm-sys-data.h"
+uint8_t SysKernelData::sCnt = 0;
 
 
-
-
-template<typename handler_t, index_t max_handler_count> 
-class Kernel : public iScheduler
+template<typename handler_t, size_t max_handler_count> 
+class Kernel : public IScheduler
 {
 
-
+	using handler_index_t = uint8_t;
+	 
 public:
 
 	Kernel() : mHandlerCount(0), mIdleTask(nullptr)
 	{}
 
-	bool addHandler(iScheduler *inHandler)
-	{
+	template<typename T>
+	bool addHandler(T *inHandler){
 		if(mHandlerCount == max_handler_count){ return false; }
-		mHandlers[mHandlerCount] = inHandler;
+		mHandlers[mHandlerCount] = static_cast<IScheduler *>(inHandler);
 		mHandlerTraits[mHandlerCount].init();		
 		mHandlerCount++;
 		return true;
 	}
-
-	handler_t *getHandle(iScheduler *inHandler)
-	{
-		index_t i;
+	
+	handler_t *getHandle(IScheduler *inHandler){
+		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 			return &mHandlerTraits[i];
 		}
 		return nullptr;
 	}
 
-	void removeHandler(iScheduler *inHandler)
-	{
-		index_t i;
+	void removeHandler(IScheduler *inHandler){
+		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 
 			if(!mHandlerTraits[i].isDelReady())
@@ -88,44 +89,34 @@ public:
 	}
 	
 
-	bool schedule(tick_t inMinDuration = 0)
-	{
+	bool schedule () final {
+	
+		bool hasExe = false;	
+				
+		handler_index_t i = 0;
 		
-		bool fullCycleExe = false;
-		tick_t startTick = SysKernelData::sGetTick();
-		
-		do
+		SysKernelData::sCnt++;
+
+		while(i < mHandlerCount)
 		{
-			index_t i = 0;
-			SysKernelData::sCnt++;
-
-			bool singleCycleExe = false;
-			
-			while(i < mHandlerCount)
-			{	
-				if(mHandlers[i] && mHandlerTraits[i].isExeReady())
-				{
-					mHandlerTraits[i].makePreExe();
-					singleCycleExe |= mHandlers[i]->schedule();
-					mHandlerTraits[i].makePostExe();
-				}
-				i++;
-			}
-
-			// no execution occured during this cycle
-			if(!singleCycleExe) 
+							
+			if(mHandlers[i] && mHandlerTraits[i].isExeReady())
 			{
-				if(mIdleTask)
-				{
-					// idle task if exists
-					mIdleTask();
-				}
-			}else{
-				// at least one execution occured
-				fullCycleExe = true;
+				mHandlerTraits[i].makePreExe();
+				hasExe |= mHandlers[i]->schedule();
+				mHandlerTraits[i].makePostExe();
 			}
-			
-		}while( ( SysKernelData::sGetTick() - startTick ) < inMinDuration );
+			i++;
+		}
+
+		if(!hasExe) 
+		{
+			if(mIdleTask)
+			{
+				// idle task if exists
+				mIdleTask();
+			}
+		}			
 
 		return fullCycleExe;
 	}
@@ -139,7 +130,7 @@ public:
 private:
 
 
-	bool getHandlerIndex(iScheduler *inScheduler, index_t& ioIndex)
+	bool getHandlerIndex(IScheduler *inScheduler, handler_index_t& ioIndex)
  	{
 		if(!mHandlerCount)
 		{
@@ -155,15 +146,14 @@ private:
 		return false;
 	}
 
-	iScheduler *mHandlers[max_handler_count];
+	IScheduler *mHandlers[max_handler_count];
 
 	handler_t mHandlerTraits[max_handler_count];
 	
-	index_t mHandlerCount;
+	handler_index_t mHandlerCount;
 
 	void (*mIdleTask)();
 
 };
-
 
 
