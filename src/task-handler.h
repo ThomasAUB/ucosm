@@ -40,7 +40,7 @@
 
 
 template<typename caller_t, typename task_module, size_t task_count>
-class TaskHandler1 : public IScheduler
+class TaskHandler : public IScheduler
 {
 
 	using task_index_t = uint8_t;
@@ -66,7 +66,7 @@ public:
 	
 	using TaskHandle = TaskItem*;
 	 
-	TaskHandler1() : mCurrHandleIndex(max_index)
+	TaskHandler() : mCurrHandleIndex(max_index)
  	{
 		// safety check
 		for(task_index_t i=0 ; i<task_count ; i++){
@@ -152,17 +152,6 @@ protected:
 
 	virtual void HandlerException(const char *inErrMsg){}
 
-	template<typename T>
-	bool contains(T *t, TaskHandle h){
-		for(task_index_t i=0 ; i < task_count ; i++){
-			if(mTasks[i].mAttributes.contains(t)){
-				h = &mTasks[i].mAttributes;
-				return true;
-			}
-		}
-		return false;
-	}
- 
 private:
 
 	TaskItem mTasks[task_count];
@@ -177,130 +166,5 @@ private:
 
 
 template<typename Caller_t, typename task_traits, size_t task_count>
-size_t TaskHandler1<Caller_t, task_traits, task_count>::TaskItem::sCounterIndex = 0;
-
-
-
-
-
-
-
-template<typename caller_t, typename task_module, size_t task_count>
-class TaskHandler2 : public IScheduler
-{
-
-	using task_index_t = uint8_t;
-	
-	static_assert(task_count < std::numeric_limits<task_index_t>::max()-1 , "Task count too high");	
-	
-	using task_function_t = void (caller_t::*)();
-	
-public:
-
-	using TaskID = uint8_t;
-	
-	TaskHandler2() : mCurrTaskID(0)
- 	{}
-	
-	bool schedule() final {
-
-		bool hasExe = false;
-		
-		task_index_t i=0;
-		
-		do{
-			if( mFunctions[i] && mModules[i].isExeReady() ){
-				mCurrTaskID = i+1;
-				mModules[i].makePreExe();
-				(static_cast<caller_t *>(this)->*mFunctions[i])();
-				mModules[i].makePostExe();
-				mCurrTaskID = 0;
-				hasExe = true;
-			}
-		}while(++i < task_count);
-		
-		return hasExe;
-	}
-	
-	task_module* thisTask(){
-		if(!mCurrTaskID){
-			HandlerException("illegal call");
-			return nullptr;
-		}
-		return &mModules[mCurrTaskID-1];
-	}
-
-	TaskID thisTaskID(){
-		if(!mCurrTaskID){
-			HandlerException("illegal call");
-			return 0;
-		}
-		return mCurrTaskID;
-	}
-
-	task_module* getTask(TaskID inID){
-		if(!inID || inID > task_count){
-			HandlerException("Task does not exist");
-			return nullptr;
-		}
-		return &mModules[inID-1];
-	}
-	
-	bool createTask(task_function_t inFunc, TaskID *ioID = nullptr){
-		
-		// allocation
-		task_index_t i=0;
-		do{
-			if(!mFunctions[i]){
-				
-				mFunctions[i] = inFunc;
-				
-				if(ioID){
-					*ioID = i+1;
-					mIDPtr[i] = ioID;
-				}else{
-					mIDPtr[i] = nullptr;
-				}
-				mModules[i].init();
-				return true;
-			}
-		}while(++i < task_count);
-
-		HandlerException("No more slots available");
-		
-		return false;
-	}
-
-	bool deleteTask(TaskID inID){
-		if(!inID){ return false; }
-		
-		task_index_t i = inID-1;
-
-		if(mModules[i].isDelReady()){
-			
-			mModules[i].makePreDel();
-			mFunctions[i] = nullptr;
-			
-			if(mIDPtr[i] && ( *mIDPtr[i] == inID )){
-				*mIDPtr[i] = 0;
-			}
-			
-			mIDPtr[i] = nullptr;
-		}
-	}
-
-protected:
-
-	virtual void HandlerException(const char *inErrMsg){}
- 
-private:
-
-	task_function_t mFunctions[task_count];
-	task_module mModules[task_count];
-	
-	TaskID *mIDPtr[task_count];
-
-	TaskID mCurrTaskID;
-	
-};
+size_t TaskHandler<Caller_t, task_traits, task_count>::TaskItem::sCounterIndex = 0;
 

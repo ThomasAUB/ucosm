@@ -20,7 +20,7 @@
  *		// ...
  *	}
  *
- *	CR_CTX_(myTask, myMaxContextSize) {
+ *	CR_CTX_(myTask, thisTaskHandle())) {
  *	
  *		uint8_t k = 5;
  * 		int32_t p = 100;
@@ -69,17 +69,14 @@
 
 
 // coroutine definition
-#define CR_CTX(name, max_size)													\
+#define CR_CTX(name, task_handle)												\
 	void name(){																\
-	using crctx_t = Coroutine_ctx_M<max_size>;									\
-	crctx_t *handle = thisTask()->get<crctx_t>();								\
-	if(!handle->mLine){	handle->instantiate<crctx_##name>(); } 					\
-	crctx_##name *i = handle->getInstance<crctx_##name>();						\
+	if(!task_handle->mCtxLine){	task_handle->instantiate<crctx_##name>(); } 	\
+	crctx_##name *i = task_handle->getInstance<crctx_##name>();					\
 	bool endTask = false;														\
-	i->run(handle->mLine, endTask);												\
-	if(endTask){ deleteTask(thisTaskID()); }}									\
+	i->run(task_handle->mCtxLine, endTask);										\
+	if(endTask){ deleteTask(task_handle); }}									\
 	struct crctx_##name
-
 
 
 // mandatory statement
@@ -90,11 +87,10 @@
 	case 0 : line = __LINE__ ; case __LINE__ : {
 
 
-// stores the current line and return, will restart at this point
+// stores the current line and returns, will restart at this point
 #define __CR_CTX_YIELD__														\
 	} line = __LINE__ ; return ; case __LINE__ : {
 												
-
 
 // yields until the condition is true, then stores the new line
 #define __CR_CTX_WAIT_UNTIL(condition)											\
@@ -110,10 +106,11 @@
 
 // mandatory statement
 #define __CR_CTX_END__     														\
-	}default:while(1){}/* error case : should not happen */						\
-	break;}/*switch*/															\
+	}break;																		\
+	default:while(1){}/* error case : should not happen */						\
+	}/*switch*/																	\
 	end = true; return;															\
-	}};void MAKE_UNIQUE(dummy)(){
+	}};void MAKE_UNIQUE(dummy)(){/* dummy function only used for syntax purpose*/
 
 
 
@@ -121,10 +118,9 @@
 
 // TODO : 
 //	CR_WHILE(condition) : loops and yield on every iterations
-//	CR_DO and CR_WHILE(condition) : loops and yield on every iterations
 
 
-#include <string.h>
+//#include <string.h>
 
 
 
@@ -134,9 +130,9 @@ struct Coroutine_ctx_M
 
 	static_assert(max_context_size >= 1 , "Context size must be >= 1");
 	
-	uint16_t mLine;
+	uint16_t mCtxLine;
 
-	void init() { mLine = 0; }
+	void init() { mCtxLine = 0; }
 
 	bool isExeReady() const { return true; }
 
@@ -151,8 +147,10 @@ struct Coroutine_ctx_M
 	template<typename T>
 	void instantiate(){
 		static_assert(sizeof(T) <= sizeof(mContext), "Context Size Error");
-		T t;
-		memcpy(mContext, &t, sizeof(t));
+		//T t;
+		//memcpy(mContext, &t, sizeof(t));
+		//T* t = new(mContext) T;
+		new(mContext) T;
 	}
 	
 	template<typename T>

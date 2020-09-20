@@ -47,24 +47,25 @@
  
 
 
-#define CR_GET_HANDLE	thisTask()->get<Coroutine_M>()
+//#define CR_GET_HANDLE	thisTask()->get<Coroutine_M>()
 
 // mandatory statement
-#define __CR_START__															\
-	switch(CR_GET_HANDLE->mLine){												\
+#define __CR_START(inHandle)															\
+	Coroutine_M *handle = inHandle;														\
+	switch(handle->mLine){												\
 	case 0:{
 
 
 // stores the current line and return, will restart at this point
 #define __CR_YIELD__															\
-	}CR_GET_HANDLE->mLine = __LINE__;											\
+	}handle->mLine = __LINE__;											\
 	return;																		\
 	case __LINE__:{
 
 
 // yields until the condition is true, then stores the new line
 #define __CR_WAIT_UNTIL(condition)												\
-	}CR_GET_HANDLE->mLine = __LINE__;											\
+	}handle->mLine = __LINE__;											\
 	case __LINE__:																\
 	if(!(condition)){															\
 		return;																	\
@@ -76,7 +77,7 @@
 
 // restarts the coroutine
 #define __CR_RESET__															\
-	CR_GET_HANDLE->mLine = 0;													\
+	handle->mLine = 0;													\
 	return;
 
 
