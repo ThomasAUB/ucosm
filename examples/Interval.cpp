@@ -1,14 +1,9 @@
 #include <iostream>
 
-#include "/uCoSM/kernel.h"
-
-#include "/uCoSM/modules.h"
-
-
-
-
-
-
+#include "kernel.h"
+#include "task-handler.h"
+#include "modules/Interval_M.h"
+#include "modules/void_M.h"
 
 
 
@@ -27,29 +22,13 @@ tick_t (*SysKernelData::sGetTick)() = &getTick;
 
 
 
-
-
-using namespace ucosm_modules;
-
-
-
-
-
-
-
-
-
-// defines the type of task properties, i.e. delay handling
-using task_module_t = Modules< Delay >; 
-
-
 // PeriodicProcess is an example of class containing the tasks
 // TaskHandler's arguments : 
 //	  - PeriodicProcess : the container itself using CRTP technique.
-//	  - task_trait_t : the type of task handled by PeriodicProcess.
+//	  - Module : the type of task handled by PeriodicProcess.
 //	  - 2 : the max number of simultaneous tasks. 
 
-class PeriodicProcess : public TaskHandler< PeriodicProcess, task_module_t, 2 >
+class PeriodicProcess : public TaskHandler< PeriodicProcess, Interval_M, 2 >
 {
 	public:
 
@@ -85,15 +64,11 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, task_module_t, 2 >
 
 
 
-
-
-
-
 // instantiation of the master scheduler
 //  Kernel's argument :
-//	  - Traits<> : defines the handler's properties, i.e. no properties
+//	  - void_M : defines the handler's properties, i.e. no properties
 //	  - 1 : the max number of simultaneous handlers.
-Kernel<Modules<>, 1> kernel;
+Kernel<void_M, 1> kernel;
 
 
 PeriodicProcess periodicProcess;
@@ -111,4 +86,3 @@ int main()
 	
 	return 0;
 }
-

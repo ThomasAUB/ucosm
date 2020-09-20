@@ -1,13 +1,15 @@
 #include <iostream>
 
-#include "/uCoSM/kernel.h"
+#include "kernel.h"
+#include "task-handler.h"
+#include "modules/Interval_M.h"
+#include "modules/Content_M.h"
+#include "modules/ModuleHub_M.h"
+#include "modules/void_M.h"
 
-#include "/uCoSM/modules.h"
 
 
-
-
-
+#include <string.h>
 
 
 
@@ -24,23 +26,16 @@ tick_t (*SysKernelData::sGetTick)() = &getTick;
 ////////////////////////////////////////
 
 
-
-
-
-
-
-using namespace ucosm_modules;
-
-
-
-
-
-
+struct task_content{
+	task_content():mCounter(0){}
+	uint8_t mCounter;
+	char mText[10];
+};
 
 
 
 // defines the type of task properties, i.e. delay handling and buffer
-using task_module_t = Modules< Delay, Buffer<uint8_t, 1> >; 
+using Modules = ModuleHub_M< Interval_M, Content_M<task_content>>; 
 
 
 // PeriodicProcess is an example of class containing the tasks
@@ -49,28 +44,31 @@ using task_module_t = Modules< Delay, Buffer<uint8_t, 1> >;
 //	  - task_trait_t : the type of task handled by PeriodicProcess.
 //	  - 2 : the max number of simultaneous tasks. 
 
-class PeriodicProcess : public TaskHandler< PeriodicProcess, task_module_t, 2 >
+class PeriodicProcess : public TaskHandler< PeriodicProcess, Modules, 2 >
 {
 	public:
 
 		PeriodicProcess()
 		{
 
+			TaskHandle fastHandle;
+
 			// create tasks
-			createTask(&PeriodicProcess::fastProcess);
+			if(createTask(&PeriodicProcess::fastProcess, &fastHandle)){
+				strcpy(fastHandle->getContent().mText, "fast");
+			}
 
-			createTask(&PeriodicProcess::slowProcess, &slowHandle);
-
-			slowExeCount = &slowHandle->getBuffer()[0];
-			*slowExeCount = 0; // initialize buffer value
+			if(createTask(&PeriodicProcess::slowProcess, &slowHandle)){
+				strcpy(slowHandle->getContent().mText, "slow");
+			}
 			
 		}
 
 		void fastProcess()
 		{
 			// do stuff
-			std::cout << "fast" << std::endl;
-
+			std::cout << thisTaskHandle()->getContent().mText << std::endl;
+			
 			// if the task slowProcess is not alive anymore : delete fastProcess
 			if(!slowHandle){
 				std::cout << "delete fastProcess" << std::endl;
@@ -81,11 +79,11 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, task_module_t, 2 >
 		void slowProcess()
 		{
 			// do stuff
-			std::cout << "slow" << std::endl;
+			std::cout << thisTaskHandle()->getContent().mText << std::endl;
 			thisTaskHandle()->setDelay(1000); // will restart in 1 s
 
 			// if the task has been executed 5 times : delete slowProcess
-			if(*slowExeCount++ >= 5)
+			if(thisTaskHandle()->getContent().mCounter++ >= 5)
 			{
 				std::cout << "delete slowProcess" << std::endl;
 				deleteTask(thisTaskHandle());
@@ -106,15 +104,11 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, task_module_t, 2 >
 
 
 
-
-
-
-
 // instantiation of the master scheduler
 //  Kernel's argument :
 //	  - Traits<> : defines the handler's properties, i.e. no properties
 //	  - 1 : the max number of simultaneous handlers.
-Kernel<Modules<>, 1> kernel;
+Kernel<void_M, 1> kernel;
 
 
 PeriodicProcess periodicProcess;
@@ -132,4 +126,3 @@ int main()
 	
 	return 0;
 }
-
