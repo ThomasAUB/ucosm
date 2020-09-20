@@ -22,22 +22,45 @@ Module based cooperative scheduler for microcontroler(Beta)
   
   The modules are :
   
-    - Prio          : Simple priority handling, the highest priority is 1 and the lowest is 255.
-    - Status        : Contains the status of the task (Running, Started, Suspended, Locked).
-    - StatusNotify  : Callback notification when a specified status has changed. 
-    - Delay         : Allows to delay the execution of a task.
-    - Periodic      : Allows a task to be called periodically at constant rate.
-    - Signal        : Allows to send data from one task to another.
-    - Buffer        : Associates a buffer of specified type and size to each tasks of a handler
-    - LinkedList    : Automatically updated linked list of chronologically executed active tasks.
-    - MemPool32     : Allows a fast buffer dynamic allocation of specified size and type, the max buffer
-                    count is 32.
-    - Parent        : Allows to set a Parent/Child relationship between two tasks, will forbid the
-                    deletion of the parent task if the child task is alive. 
-    - Coroutine     : Implementation of coroutine allowing non-blocking delay.
-    - Coroutine2    : Implementation of coroutine allowing to yield and saving context (Inspired by
-                    protothread).
+    - Buffer_M          : Associates a buffer of specified type and size to each task of a handler.
     
+    - Conditional_M     : Associates a free function as "bool foo()" to each task telling if the function should be
+                          executed.
+    
+    - Content_M         : Associates an instance of the specified type to each task.
+    
+    - Coroutine_M       : Implementation of coroutine allowing to yield and loop (Inspired by protothread).
+    
+    - Coroutine_ctx_M   : Implementation of coroutine allowing to yield ,loop and save context (Inspired by protothread).
+    
+    - CPU_Usage_M       : Measures the CPU usage of tasks.
+    
+    - Interval_M        : Allows to delay and set an execution period of a task.
+    
+    - Module_Hub_M      : Allows to define several modules for per tasks.
+    
+    - Parent_M          : Allows to set a Parent/Child relationship between two tasks, will forbid the
+                          deletion of the parent task if the child task is alive. 
+                          
+    - Priority_M        : Simple priority handling, the highest priority is 1 and the lowest is 255.
+    
+    - ProcessCounter_M  : Counts the number of currently active tasks.
+    
+    - ProcessQ_M        : Allows to define an order of execution of active tasks.
+    
+    - Signal_M          : Allows to send data from one task to another.
+    
+    - Stack_Usage       : Measures the count of bytes written on the stack after the execution of a task.
+    
+    - Status_M        : Contains the status of the task (Running, Started, Suspended, Locked).
+    
+    - Status_Notif_M  : Callback notification when a specified status has changed. 
+        
+    - LinkedList_M    : Automatically updated linked list of chronologically executed active tasks.
+    
+    - void_M          : Empty module, useful when no task properties are needed.
+   
+   
   
 
   uCoSM is divided into three entities which are :
@@ -45,21 +68,11 @@ Module based cooperative scheduler for microcontroler(Beta)
     - Modules     : The properties of a schedulable item ( Tasks and TaskHandlers ).
     - TaskHandler : The class scheduler, contains the tasks and their specified modules.
     - Kernel      : The master scheduler, contains the TaskHandlers and their specified modules.
-    
-    
-Modules definition
-    
-      Here are some examples of modules definition:
-      
-        Modules<>
-        Modules< Prio >
-        Modules< Prio, Delay, LinkedList<0> >
-        Modules< MemPool32<std::array<uint8_t, 16>, 32>, Parent, Signal<uint32_t, 8> >
-        
+          
         
 TaskHandler definition example
 
-      using myTaskModules = Modules< Prio >;
+      using myTaskModules = ModuleHub_M< Priority_M, Interval_M >;
       const uint8_t maxSimultaneousTaskCount = 1;
 
       class MyClass : public TaskHandler<MyClass, myTaskModules, maxSimultaneousTaskCount>
@@ -72,7 +85,7 @@ TaskHandler definition example
     
 Kernel definition example
   
-    using myHandlerModules = Modules<>;
+    using myHandlerModules = void_M;
     const uint8_t maxSimultaneousHandlerCount = 1;
     
     Kernel kernel<myHandlerModules, maxSimultaneousHandlerCount>

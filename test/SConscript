@@ -1,0 +1,29 @@
+#!python
+import glob
+import os
+
+#get all the build variables we need
+Import('env', 'buildroot', 'project', 'profile', 'debugcflags', 'releasecflags', 'libraries')
+localenv = env.Clone()
+
+
+builddir = os.path.join(buildroot, profile, project)   #holds the build directory for this project
+targetpath = os.path.join(builddir, project)  #holds the path to the executable in the build directory
+
+#append the user's additional compile flags
+#assume debugcflags and releasecflags are defined
+if profile == 'debug':
+   localenv.Append(CCFLAGS=debugcflags)
+else:
+   localenv.Append(CCFLAGS=releasecflags)
+
+#specify the build directory
+localenv.VariantDir(builddir, ".", duplicate=0)
+
+srclst = list(map(lambda x: builddir + '/' + x, glob.glob('*.cpp')))
+
+program = localenv.Program(targetpath, source=srclst, LIBS=libraries)
+
+execution = localenv.Command('test.out', None, targetpath) #create the execution target (No input)
+
+Depends(execution, program) #tell scons that execution depends on program
