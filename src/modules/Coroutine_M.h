@@ -91,9 +91,6 @@
 
 // TODO : 
 //	CR_WHILE(condition) : loops and yield on every iterations
-//	CR_DO and CR_WHILE(condition) : loops and yield on every iterations
-
-
 
 
 
@@ -113,7 +110,7 @@ struct Coroutine_M
 	void makePreDel(){}
 
 	void makePostExe(){}
-		
+
 };
 
 
