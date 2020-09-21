@@ -1,19 +1,20 @@
 #pragma once
 
-#include "utils/Fifo.h"
+#include "utils/uFifo.h"
 
 // Allow to send data to a specific task
 
 template<typename data_t, uint16_t fifo_size, bool auto_release = false>
 struct Signal_M
 {
-	
-	bool send(Signal_M<data_t, fifo_size> *inReceiver, data_t inData){
+
+	template<typename inData_t, uint16_t inFifo_size, bool inAuto_release>
+	bool sendSignal(Signal_M<inData_t, inFifo_size, inAuto_release> *inReceiver, data_t inData){
 		if(!inReceiver){return false;}
 		return (inReceiver->mRxData.push(inData));
 	}
 
-	data_t receive(){
+	data_t receiveSignal(){
 		return mRxData.pop();
 	}
 
@@ -22,7 +23,7 @@ struct Signal_M
 	}
 
 	void init() {
-		mRxData.clear();
+		mRxData.flush();
 	}
 
 	bool isExeReady() { return true; }
@@ -43,6 +44,6 @@ struct Signal_M
 
 private:
 	
-	Fifo<data_t, fifo_size> mRxData;
+	uFifo<data_t, fifo_size> mRxData;
 };
 

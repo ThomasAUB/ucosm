@@ -2,7 +2,7 @@
 
 
 // automatically updated linked list of tasks by chronology of execution
-template<int listIndex = 0>
+template<size_t listIndex = 0>
 struct LinkedList_M //: public ListItem // 9 bytes
 {
 
@@ -67,7 +67,7 @@ private:
 };
 
 
-template<int listIndex>
+template<size_t listIndex>
 LinkedList_M<listIndex> *LinkedList_M<listIndex>::sTopHandle = nullptr;
 
 

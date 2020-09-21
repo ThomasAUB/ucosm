@@ -30,42 +30,60 @@
 
 
 
-
-
-template<typename T, uint16_t Size>
-struct Fifo
+template<typename T, size_t Size>
+struct uFifo
 {
 
-	Fifo() : mIndex(0)
+	uFifo() : mOldV(0), mNewV(0), mIsEmpty(true), mIsFull(false)
 	{}
 
 	bool push(T data){
-		if(isFull()){return false;}
-		mElems[mIndex++] = data;
+		if(mIsFull){
+			return false;
+		}
+		size_t n = (mNewV+1)%Size;
+		if(n == mOldV){
+			mIsFull = true;
+		}
+		mElems[mNewV] = data;
+		mNewV = n;
+		mIsEmpty = false;
 		return true;
 	}
 
 	T pop(){
-		if(!mIndex){return T();}
-		return mElems[--mIndex];
+		if(mIsEmpty){
+			return T();
+		}
+		size_t n = mOldV;
+		mOldV = (mOldV+1)%Size;
+		if(mOldV == mNewV){
+			mIsEmpty = true;
+		}
+		mIsFull = false;
+		return mElems[n];
 	}
 
 	bool isEmpty(){
-		return !mIndex;
+		return mIsEmpty;
 	}
 
 	bool isFull(){
-		return (mIndex==Size);
+		return mIsFull;
 	}
 	
-	void clear(){
-		mIndex = 0;
+	void flush(){
+		mOldV = 0;
+		mNewV = 0;
+		mIsEmpty = true;
+		mIsFull = false;
 	}
 
 private :
 
-	uint16_t mIndex;
-
+	size_t mOldV, mNewV;
+	bool mIsEmpty:1;
+	bool mIsFull:1;
 	T mElems[Size];
 
 };
