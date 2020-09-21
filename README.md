@@ -1,5 +1,5 @@
 # uCoSM
-Module based cooperative scheduler for microcontroler(Beta)
+Module based cooperative scheduler for microcontroler (Beta)
 
   uCoSM is a lightweight and modular embedded scheduler designed in C++ (c++14 or above). 
   
@@ -22,43 +22,43 @@ Module based cooperative scheduler for microcontroler(Beta)
   
   The modules are :
   
-    - Buffer_M          : Associates a buffer of specified type and size to each task of a handler.
+    - Buffer_M         : Associates a buffer of specified type and size to each task of a handler.
     
-    - Conditional_M     : Associates a free function as "bool foo()" to each task telling if the function should be
+    - Conditional_M    : Associates a free function as "bool foo()" to each task telling if the function should be
                           executed.
     
-    - Content_M         : Associates an instance of the specified type to each task.
+    - Content_M        : Associates an instance of the specified type to each task.
     
-    - Coroutine_M       : Implementation of coroutine allowing to yield and loop (Inspired by protothread).
+    - Coroutine_M      : Implementation of coroutine allowing to yield and loop (Inspired by protothread).
     
-    - Coroutine_ctx_M   : Implementation of coroutine allowing to yield ,loop and save context (Inspired by protothread).
+    - Coroutine_ctx_M  : Implementation of coroutine allowing to yield, loop and save context (Inspired by protothread).
     
-    - CPU_Usage_M       : Measures the CPU usage of tasks.
+    - CPU_Usage_M      : Measures the CPU usage of tasks.
     
-    - Interval_M        : Allows to delay and set an execution period of a task.
+    - Interval_M       : Allows to delay and set an execution period of a task.
     
-    - Module_Hub_M      : Allows to define several modules for per tasks.
+    - Module_Hub_M     : Allows to define several modules per tasks.
     
-    - Parent_M          : Allows to set a Parent/Child relationship between two tasks, will forbid the
+    - Parent_M         : Allows to set a Parent/Child relationship between two tasks, will forbid the
                           deletion of the parent task if the child task is alive. 
                           
-    - Priority_M        : Simple priority handling, the highest priority is 1 and the lowest is 255.
+    - Priority_M       : Simple priority handling, the highest priority is 1 and the lowest is 255.
     
-    - ProcessCounter_M  : Counts the number of currently active tasks.
+    - ProcessCounter_M : Counts the number of currently active tasks.
     
-    - ProcessQ_M        : Allows to define an order of execution of active tasks.
+    - ProcessQ_M       : Allows to define an order of execution of active tasks.
     
-    - Signal_M          : Allows to send data from one task to another.
+    - Signal_M         : Allows to send data from one task to another.
     
-    - Stack_Usage       : Measures the count of bytes written on the stack after the execution of a task.
+    - Stack_Usage      : Measures the count of bytes written on the stack after the execution of a task.
     
-    - Status_M        : Contains the status of the task (Running, Started, Suspended, Locked).
+    - Status_M         : Contains the status of the task (Running, Started, Suspended, Locked).
     
-    - Status_Notif_M  : Callback notification when a specified status has changed. 
+    - Status_Notif_M   : Callback notification when a specified status has changed. 
         
-    - LinkedList_M    : Automatically updated linked list of chronologically executed active tasks.
+    - LinkedList_M     : Automatically updated linked list of chronologically executed active tasks.
     
-    - void_M          : Empty module, useful when no task properties are needed.
+    - void_M           : Empty module, useful when no task properties are needed.
    
    
   
