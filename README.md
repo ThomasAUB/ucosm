@@ -39,7 +39,7 @@ Module based cooperative scheduler for microcontroler (Beta)
     - Module_Hub_M     : Allows to define several modules per tasks.
     
     - Parent_M         : Allows to set a Parent/Child relationship between two tasks, will forbid the
-                          deletion of the parent task if the child task is alive. 
+                         deletion of the parent task if the child task is alive. 
                           
     - Priority_M       : Simple priority handling, the highest priority is 1 and the lowest is 255.
     
