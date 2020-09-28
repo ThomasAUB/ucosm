@@ -69,13 +69,13 @@
 
 
 // coroutine definition
-#define CR_CTX(name, task_handle)												\
-	void name(){																\
-	if(!task_handle->mCtxLine){	task_handle->instantiate<crctx_##name>(); } 	\
-	crctx_##name *i = task_handle->getInstance<crctx_##name>();					\
+#define CR_CTX(name, cr_task_handle)												\
+	void name(TaskHandle inHandle){																\
+	if(!cr_task_handle->mCtxLine){	cr_task_handle->instantiate<crctx_##name>(); } 	\
+	crctx_##name *i = cr_task_handle->getInstance<crctx_##name>();					\
 	bool endTask = false;														\
-	i->run(task_handle->mCtxLine, endTask);										\
-	if(endTask){ deleteTask(task_handle); }}									\
+	i->run(cr_task_handle->mCtxLine, endTask);										\
+	if(endTask){ deleteTask(inHandle); }}									\
 	struct crctx_##name
 
 

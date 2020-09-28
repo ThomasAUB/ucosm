@@ -49,29 +49,29 @@ class TaskHandler : public IScheduler
 	
 	static_assert(task_count < max_index-1 , "Task count too high");	
 	
-
 	struct TaskItem : public task_module{
-		
+
 		constexpr TaskItem(): index(sCounterIndex++) {}
 		const task_index_t index;
-		
-		private:
-			
-		static size_t sCounterIndex;
-	};
 
-	using task_function_t = void (caller_t::*)();
-	 
+		private:
+
+		static size_t sCounterIndex;
+
+	};
 public:
-	
 	using TaskHandle = TaskItem*;
+	using task_function_t = void (caller_t::*)(TaskHandle);
+	 
+
+	
+
 	 
 	TaskHandler() : mCurrHandleIndex(max_index)
  	{
 		// safety check
 		for(task_index_t i=0 ; i<task_count ; i++){
 			if(mTasks[i].index != i){
-				HandlerException("Critical declaration error");
 				while(1){}
 			}
 		}
@@ -87,7 +87,7 @@ public:
 			if( mFunctions[i] && mTasks[i].isExeReady() ){
 				mCurrHandleIndex = i;
 				mTasks[i].makePreExe();
-				(static_cast<caller_t *>(this)->*mFunctions[i])();
+				(static_cast<caller_t *>(this)->*mFunctions[i])(&mTasks[i]);
 				mTasks[i].makePostExe();
 				mCurrHandleIndex = max_index;
 				hasExe = true;
@@ -96,15 +96,7 @@ public:
 		
 		return hasExe;
 	}
-	
-	TaskHandle thisTaskHandle(){
-		if(mCurrHandleIndex == max_index){
-			HandlerException("thisTask() not allowed in this context");
-			return 0;
-		}
-		return &mTasks[mCurrHandleIndex];
-	}
-	
+		
 	bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr){
 				
 		// allocation
@@ -124,13 +116,12 @@ public:
 				return true;
 			}
 		}while(++i < task_count);
-
-		HandlerException("No more slots available");
 		
 		return false;
 	}
 
 	bool deleteTask(TaskHandle inHandle){
+		
 		if(!inHandle){ return false; }
 		
 		task_index_t i = inHandle->index;
@@ -146,11 +137,8 @@ public:
 			
 			mHandlePtr[i] = nullptr;
 		}
+		
 	}
-
-protected:
-
-	virtual void HandlerException(const char *inErrMsg){}
 
 private:
 

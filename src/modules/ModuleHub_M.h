@@ -8,65 +8,97 @@
 
 
 
-
-
-
-template<class ...ModuleCollection> 
-struct ModuleHub_M : public ModuleCollection...
+template<class...ModuleCollection> 
+class ModuleHub_M
 {
 
-	ModuleHub_M()
-	{}
+	using modules_t = std::tuple<ModuleCollection...>;
 
-	void init()
-	{
-		uint8_t d[] = {(uint8_t)0, (ModuleCollection::init(), (uint8_t)0)...};
-		static_cast<void>(d); // avoid warning for unused variable
-	}
+	static constexpr size_t kModuleCount = std::tuple_size<modules_t>::value;
 
-	bool isExeReady()
-	{
-		bool ready[] = {
-			true, (ModuleCollection::isExeReady())...
-		};
-		for(size_t i=0 ; i<sizeof(ready) ; i++)
-		{
-			if(!ready[i]){ return false; }
-		}
-		return true;
-	}
+	modules_t mModules;
+
+public:
 	
-	bool isDelReady()
-	{
-		bool ready[] = {
-			true, (ModuleCollection::isDelReady())...
-		};
-		for(size_t i=0 ; i<sizeof(ready) ; i++)
-		{
-			if(!ready[i]){ return false; }
-		}
-		return true;
-	}
+	ModuleHub_M(){}
 
-	void makePreExe()
-	{
-		uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePreExe(), (uint8_t)0)...};
-		static_cast<void>(d); // avoid warning for unused variable
-	}
-
-	void makePostExe()
-	{
-		uint8_t d[] = {(uint8_t)0, (ModuleCollection::makePostExe(), (uint8_t)0)...};
-		static_cast<void>(d); // avoid warning for unused variable
-	}
-	 
-	void makePreDel()
-	{
-		uint8_t d[] = {
-			(uint8_t)0, (ModuleCollection::makePreDel(), (uint8_t)0)...
-		};
-		static_cast<void>(d); // avoid warning for unused variable
+	template<typename module_t>
+	module_t* get(){
+		return &std::get<module_t>(mModules);
 	}
 		
+	//////////////////// init
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, void>::type 
+	init(){}
+	
+	template<size_t I=0>
+	typename std::enable_if<I < kModuleCount, void>::type 
+	init(){
+		std::get<I>(mModules).init();
+		init<I+1>();
+	}
+	//////////////////// exe readdy
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, bool>::type 
+	isExeReady(){ return true;	}
+	
+	template<size_t I=0>
+	typename std::enable_if<I < kModuleCount, bool>::type 
+	isExeReady(){
+		if(std::get<I>(mModules).isExeReady()){
+			return isExeReady<I+1>();
+		}
+		return false;
+	}
+	//////////////////// del ready
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, bool>::type 
+	isDelReady(){ return true; }
+	
+	template<size_t I=0>
+	typename std::enable_if<I < kModuleCount, bool>::type 
+	isDelReady(){
+		if(std::get<I>(mModules).isDelReady()){
+			return isDelReady<I+1>();
+		}
+		return false;
+	}
+	//////////////////// pre del
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, void>::type 
+	makePreDel(){}
+	
+	template<size_t I=0>
+	typename std::enable_if<I < kModuleCount, void>::type 
+	makePreDel(){
+		std::get<I>(mModules).makePreDel();
+		makePreDel<I+1>();
+	}
+	//////////////////// pre exe
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, void>::type 
+	makePreExe(){}
+	
+	template<size_t I=0>
+	typename std::enable_if<I < kModuleCount, void>::type 
+	makePreExe(){
+		std::get<I>(mModules).makePreExe();
+		makePreExe<I+1>();
+	}
+	//////////////////// post exe
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, void>::type 
+	makePostExe(){}
+	
+	template<size_t I=0>
+	typename std::enable_if<I < kModuleCount, void>::type 
+	makePostExe(){
+		std::get<I>(mModules).makePostExe();
+		makePostExe<I+1>();
+	}
+	////////////////////
+	
+
 };
 

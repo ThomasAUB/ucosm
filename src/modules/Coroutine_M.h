@@ -44,7 +44,7 @@
  
 
 // mandatory statement
-#define __CR_START(inHandle)															\
+#define __CR_START(inHandle)													\
 	Coroutine_M *handle = inHandle;														\
 	switch(handle->mLine){												\
 	case 0:{
@@ -76,11 +76,11 @@
 
 
 // mandatory statement
-#define __CR_END__         														\
+#define __CR_END(inHandle)         														\
 	break;}																		\
 	default:/* error case : should not happen */								\
 	break;}																		\
-	deleteTask(thisTaskHandle());
+	deleteTask(inHandle);
 
 
 // TODO : 
