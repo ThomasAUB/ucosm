@@ -50,29 +50,24 @@ class TaskHandler : public IScheduler
 	static_assert(task_count < max_index-1 , "Task count too high");	
 	
 	struct TaskItem : public task_module{
-
-		constexpr TaskItem(): index(sCounterIndex++) {}
+		constexpr TaskItem():index(sCounterIndex++){}
 		const task_index_t index;
-
-		private:
-
+	private:
 		static size_t sCounterIndex;
-
 	};
+	 
 public:
+	 
 	using TaskHandle = TaskItem*;
+	 
 	using task_function_t = void (caller_t::*)(TaskHandle);
-	 
-
-	
-
-	 
+		 
 	TaskHandler() : mCurrHandleIndex(max_index)
  	{
 		// safety check
 		for(task_index_t i=0 ; i<task_count ; i++){
 			if(mTasks[i].index != i){
-				while(1){}
+				while(1){} // critical error : should happen
 			}
 		}
 	}
@@ -137,7 +132,6 @@ public:
 			
 			mHandlePtr[i] = nullptr;
 		}
-		
 	}
 
 private:
