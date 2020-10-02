@@ -32,10 +32,10 @@ struct task_content{
 	char mText[10];
 };
 
-
+using MyContent_t = Content_M<task_content>;
 
 // defines the type of task properties, i.e. delay handling and buffer
-using Modules = ModuleHub_M< Interval_M, Content_M<task_content>>; 
+using Modules = ModuleHub_M< Interval_M, MyContent_t>; 
 
 
 // PeriodicProcess is an example of class containing the tasks
@@ -55,38 +55,38 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, Modules, 2 >
 
 			// create tasks
 			if(createTask(&PeriodicProcess::fastProcess, &fastHandle)){
-				strcpy(fastHandle->getContent().mText, "fast");
+				strcpy(fastHandle->getModule<MyContent_t>()->getContent().mText, "fast");
 			}
 
 			if(createTask(&PeriodicProcess::slowProcess, &slowHandle)){
-				strcpy(slowHandle->getContent().mText, "slow");
+				strcpy(slowHandle->getModule<MyContent_t>()->getContent().mText, "slow");
 			}
 			
 		}
 
-		void fastProcess()
+		void fastProcess(TaskHandle inHandle)
 		{
 			// do stuff
-			std::cout << thisTaskHandle()->getContent().mText << std::endl;
+			std::cout << inHandle->getModule<MyContent_t>()->getContent().mText << std::endl;
 			
 			// if the task slowProcess is not alive anymore : delete fastProcess
-			if(!slowHandle){
+			if(!slowHandle()){
 				std::cout << "delete fastProcess" << std::endl;
-				deleteTask(thisTaskHandle());
+				deleteTask(inHandle);
 			}
 		}
 
-		void slowProcess()
+		void slowProcess(TaskHandle inHandle)
 		{
 			// do stuff
-			std::cout << thisTaskHandle()->getContent().mText << std::endl;
-			thisTaskHandle()->setDelay(1000); // will restart in 1 s
+			std::cout << inHandle->getModule<MyContent_t>()->getContent().mText << std::endl;
+			inHandle->setDelay(1000); // will restart in 1 s
 
 			// if the task has been executed 5 times : delete slowProcess
-			if(thisTaskHandle()->getContent().mCounter++ >= 5)
+			if(tinHandle->getModule<MyContent_t>()->getContent().mCounter++ >= 5)
 			{
 				std::cout << "delete slowProcess" << std::endl;
-				deleteTask(thisTaskHandle());
+				deleteTask(inHandle);
 			}
 		}
 

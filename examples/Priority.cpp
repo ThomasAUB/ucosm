@@ -51,13 +51,13 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, Priority_M, 2 >
 			lowPrio->setPriority(255); // LowPriorityProcess will be executed every 255 mainloop cycles
 		}
 
-		void highPriorityProcess()
+		void highPriorityProcess(TaskHandle inHandle)
 		{
 			// do stuff
 			std::cout << "high prio" << std::endl;
 		}
 
-		void lowPriorityProcess()
+		void lowPriorityProcess(TaskHandle inHandle)
 		{
 			// do stuff
 			std::cout << "low prio" << std::endl;

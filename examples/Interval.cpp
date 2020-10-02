@@ -42,18 +42,18 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, Interval_M, 2 >
 		
 		}
 
-		void fastProcess()
+		void fastProcess(TaskHandle inHandle)
 		{
 			// do stuff
 			std::cout << "fast" << std::endl;
-			thisTaskHandle()->setDelay(5); // will restart in 5 ms
+			inHandle->setDelay(5); // will restart in 5 ms
 		}
 
-		void slowProcess()
+		void slowProcess(TaskHandle inHandle)
 		{
 			// do stuff
 			std::cout << "slow" << std::endl;
-			thisTaskHandle()->setDelay(1000); // will restart in 1 s
+			inHandle->setDelay(1000); // will restart in 1 s
 		}
 	
 };
