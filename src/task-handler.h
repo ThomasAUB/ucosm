@@ -34,43 +34,41 @@
 
 
 
-
-
-
-
-
 template<typename caller_t, typename task_module, size_t task_count>
 class TaskHandler : public IScheduler
 {
 
 	using task_index_t = uint8_t;
-	
-	static const task_index_t max_index = std::numeric_limits<task_index_t>::max();
-	
-	static_assert(task_count < max_index-1 , "Task count too high");	
-	
+
+	static_assert(task_count < std::numeric_limits<task_index_t>::max() , 
+	              "Task count too high");	
+
 	struct TaskItem : public task_module{
 		constexpr TaskItem():index(sCounterIndex++){}
 		const task_index_t index;
 	private:
 		static size_t sCounterIndex;
 	};
+
+    template<int N=0> 
+	struct cpy_throw{ static_assert(N!=0, "Unauthorized copy"); };
+
+	
 	 
 public:
-	 
-	using TaskHandle = TaskItem*;
-	 
+    
+	struct TaskHandle{
+		void operator=(const TaskHandle&){cpy_throw t;};
+		TaskItem* operator->(){return mP;}
+		bool operator()(){return mP;}
+		private:
+		TaskItem* mP;
+		friend class TaskHandler<caller_t, task_module, task_count>;
+	};
+
 	using task_function_t = void (caller_t::*)(TaskHandle);
-		 
-	TaskHandler() : mCurrHandleIndex(max_index)
- 	{
-		// safety check
-		for(task_index_t i=0 ; i<task_count ; i++){
-			if(mTasks[i].index != i){
-				while(1){} // critical error : should happen
-			}
-		}
-	}
+	 
+	TaskHandler(){}
 	
 	bool schedule() final {
 
@@ -79,14 +77,19 @@ public:
 		task_index_t i=0;
 		
 		do{
+		
 			if( mFunctions[i] && mTasks[i].isExeReady() ){
-				mCurrHandleIndex = i;
+				
 				mTasks[i].makePreExe();
-				(static_cast<caller_t *>(this)->*mFunctions[i])(&mTasks[i]);
+				TaskHandle h;
+				h.mP = &mTasks[i];
+				(static_cast<caller_t *>(this)->*mFunctions[i])(h);
+
 				mTasks[i].makePostExe();
-				mCurrHandleIndex = max_index;
+				
 				hasExe = true;
 			}
+		
 		}while(++i < task_count);
 		
 		return hasExe;
@@ -96,20 +99,29 @@ public:
 				
 		// allocation
 		task_index_t i=0;
+		
 		do{
 			if(!mFunctions[i]){
 				
 				mFunctions[i] = inFunc;
 				
 				if(ioHandle != nullptr){
-					*ioHandle = &mTasks[i];
+					
+					ioHandle->mP = &mTasks[i];
+					
 					mHandlePtr[i] = ioHandle;
+					
 				}else{
+					
 					mHandlePtr[i] = nullptr;
+					
 				}
+				
 				mTasks[i].init();
+				
 				return true;
 			}
+		
 		}while(++i < task_count);
 		
 		return false;
@@ -117,20 +129,24 @@ public:
 
 	bool deleteTask(TaskHandle inHandle){
 		
-		if(!inHandle){ return false; }
+		if(!inHandle.mP){ return false; }
 		
-		task_index_t i = inHandle->index;
+		task_index_t i = inHandle.mP->index;
 
 		if(mTasks[i].isDelReady()){
 			
 			mTasks[i].makePreDel();
+			
 			mFunctions[i] = nullptr;
 			
-			if(&mHandlePtr[i] && ( *mHandlePtr[i] == &mTasks[i] )){
-				*mHandlePtr[i] = nullptr;
+			if(mHandlePtr[i]){ 
+				// client's handle exists
+				if(mHandlePtr[i]->mP == &mTasks[i]){ 
+					// client's handle is valid
+					mHandlePtr[i]->mP = nullptr; // reset client's handle
+				}
+				mHandlePtr[i] = nullptr;
 			}
-			
-			mHandlePtr[i] = nullptr;
 		}
 	}
 
@@ -142,8 +158,6 @@ private:
 	
 	TaskHandle *mHandlePtr[task_count];
 
-	task_index_t mCurrHandleIndex;
-	
 };
 
 

@@ -36,21 +36,16 @@ public:
 	}
 		
 	//////////////////// init
-	template<size_t I=0>
-	typename std::enable_if<I == kModuleCount, void>::type 
-	init(){}
-	
+		
 	template<size_t I=0>
 	typename std::enable_if<I < kModuleCount, void>::type 
 	init(){
 		std::get<I>(mModules).init();
 		init<I+1>();
 	}
-	//////////////////// exe readdy
-	template<size_t I=0>
-	typename std::enable_if<I == kModuleCount, bool>::type 
-	isExeReady(){ return true;	}
 	
+	//////////////////// exe readdy
+		
 	template<size_t I=0>
 	typename std::enable_if<I < kModuleCount, bool>::type 
 	isExeReady(){
@@ -59,11 +54,9 @@ public:
 		}
 		return false;
 	}
-	//////////////////// del ready
-	template<size_t I=0>
-	typename std::enable_if<I == kModuleCount, bool>::type 
-	isDelReady(){ return true; }
 	
+	//////////////////// del ready
+		
 	template<size_t I=0>
 	typename std::enable_if<I < kModuleCount, bool>::type 
 	isDelReady(){
@@ -72,41 +65,61 @@ public:
 		}
 		return false;
 	}
-	//////////////////// pre del
-	template<size_t I=0>
-	typename std::enable_if<I == kModuleCount, void>::type 
-	makePreDel(){}
 	
+	//////////////////// pre del
+		
 	template<size_t I=0>
 	typename std::enable_if<I < kModuleCount, void>::type 
 	makePreDel(){
 		std::get<I>(mModules).makePreDel();
 		makePreDel<I+1>();
 	}
-	//////////////////// pre exe
-	template<size_t I=0>
-	typename std::enable_if<I == kModuleCount, void>::type 
-	makePreExe(){}
 	
+	//////////////////// pre exe
+		
 	template<size_t I=0>
 	typename std::enable_if<I < kModuleCount, void>::type 
 	makePreExe(){
 		std::get<I>(mModules).makePreExe();
 		makePreExe<I+1>();
 	}
-	//////////////////// post exe
-	template<size_t I=0>
-	typename std::enable_if<I == kModuleCount, void>::type 
-	makePostExe(){}
 	
+	//////////////////// post exe
+		
 	template<size_t I=0>
 	typename std::enable_if<I < kModuleCount, void>::type 
 	makePostExe(){
 		std::get<I>(mModules).makePostExe();
 		makePostExe<I+1>();
 	}
+	
 	////////////////////
 	
+private:
 
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, void>::type 
+	init(){}
+
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, bool>::type 
+	isExeReady(){ return true;	}
+
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, bool>::type 
+	isDelReady(){ return true; }
+
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, void>::type 
+	makePreDel(){}
+
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, void>::type 
+	makePreExe(){}
+
+	template<size_t I=0>
+	typename std::enable_if<I == kModuleCount, void>::type 
+	makePostExe(){}
+	
 };
 
