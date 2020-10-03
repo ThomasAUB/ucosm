@@ -50,26 +50,33 @@ class TaskHandler : public IScheduler
 		static size_t sCounterIndex;
 	};
 
-    template<int N=0> 
-	struct cpy_throw{ static_assert(N!=0, "Unauthorized copy"); };
 
-	
+	enum throwExcept{
+		eIllegalCopy,
+		eExceptCount
+	};
+	 
+    template<int N> 
+	struct throw_except{ static_assert(N!=eIllegalCopy, "Illegal copy"); };
 	 
 public:
     
 	struct TaskHandle{
-		void operator=(const TaskHandle&){cpy_throw t;};
+		
+		TaskHandle ():mP(nullptr){}
+		~TaskHandle(){mP=nullptr;} 
+
+		void operator=(const TaskHandle&){throw_except<eIllegalCopy> t;};
 		TaskItem* operator->(){return mP;}
-		bool operator()(){return mP;}
+		bool operator()(){return (mP!=nullptr);}
+
 		private:
 		TaskItem* mP;
 		friend class TaskHandler<caller_t, task_module, task_count>;
 	};
 
 	using task_function_t = void (caller_t::*)(TaskHandle);
-	 
-	TaskHandler(){}
-	
+
 	bool schedule() final {
 
 		bool hasExe = false;
@@ -129,7 +136,7 @@ public:
 
 	bool deleteTask(TaskHandle inHandle){
 		
-		if(!inHandle.mP){ return false; }
+		if(!inHandle()){ return false; }
 		
 		task_index_t i = inHandle.mP->index;
 
@@ -140,7 +147,7 @@ public:
 			mFunctions[i] = nullptr;
 			
 			if(mHandlePtr[i]){ 
-				// client's handle exists
+				// client's handle exists or existed
 				if(mHandlePtr[i]->mP == &mTasks[i]){ 
 					// client's handle is valid
 					mHandlePtr[i]->mP = nullptr; // reset client's handle
@@ -150,8 +157,13 @@ public:
 		}
 	}
 
+    task_function_t getTaskFunction(TaskHandle inHandle){
+		if(!inHandle()){ return 0; }
+		return mFunctions[inHandle.mP->index];
+	}
+	
 private:
-
+	 
 	TaskItem mTasks[task_count];
 
 	task_function_t mFunctions[task_count];

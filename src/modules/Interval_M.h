@@ -29,8 +29,7 @@ struct Interval_M
 		}
 	}
 
-	void init()
-	{
+	void init(){
 		mPeriod = 0;
 		mExecution_time_stamp = SysKernelData::sGetTick();
 	}
@@ -39,7 +38,7 @@ struct Interval_M
 		return (SysKernelData::sGetTick() >= mExecution_time_stamp);
 	}
 
-	bool isDelReady() { return true; }
+	bool isDelReady() const { return true; }
 
 	void makePreExe()
 	{

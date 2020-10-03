@@ -70,16 +70,14 @@ public:
 		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 
-			if(!mHandlerTraits[i].isDelReady())
-			{
+			if(!mHandlerTraits[i].isDelReady()){
 				return;
 			}
 
 			mHandlerTraits[i].makePreDel();
 			
 			// shift handlers for contiguous array
-			while(i<mHandlerCount-1)
-			{
+			while(i<mHandlerCount-1){
 				mHandlers[i] = mHandlers[i+1];
 				mHandlerTraits[i] = mHandlerTraits[i+1];
 				i++;
@@ -97,11 +95,9 @@ public:
 		
 		SysKernelData::sCnt++;
 
-		while(i < mHandlerCount)
-		{
-							
-			if(mHandlers[i] && mHandlerTraits[i].isExeReady())
-			{
+		while(i < mHandlerCount){
+			
+			if(mHandlers[i] && mHandlerTraits[i].isExeReady()){
 				mHandlerTraits[i].makePreExe();
 				hasExe |= mHandlers[i]->schedule();
 				mHandlerTraits[i].makePostExe();
@@ -109,10 +105,8 @@ public:
 			i++;
 		}
 
-		if(!hasExe) 
-		{
-			if(mIdleTask)
-			{
+		if(!hasExe){
+			if(mIdleTask){
 				// idle task if exists
 				mIdleTask();
 			}
@@ -121,8 +115,7 @@ public:
 		return hasExe;
 	}
 
-	void setIdleTask(void (*inIdleTask)())
- 	{
+	void setIdleTask(void (*inIdleTask)()){
 		mIdleTask = inIdleTask;
 	}
 
@@ -130,15 +123,12 @@ public:
 private:
 
 
-	bool getHandlerIndex(IScheduler *inScheduler, handler_index_t& ioIndex)
- 	{
-		if(!mHandlerCount)
-		{
+	bool getHandlerIndex(IScheduler *inScheduler, handler_index_t& ioIndex){
+		if(!mHandlerCount){
 			return false;
 		}
 		ioIndex = 0;	
-		do
-		{
+		do{
 			if(mHandlers[ioIndex] == inScheduler){
 				return true;
 			}
