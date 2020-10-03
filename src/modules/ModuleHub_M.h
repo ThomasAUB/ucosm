@@ -16,22 +16,17 @@ class ModuleHub_M
 
 	static constexpr size_t kModuleCount = std::tuple_size<modules_t>::value;
 
-	template<size_t I>
-    using getTypeAt = typename std::tuple_element<I, modules_t>::type;
-
 	modules_t mModules;
 	
 public:
 	
-	ModuleHub_M(){}
-
 	template<typename module_t>
-	module_t* getModule(){
+	auto getModule(){
 		return &std::get<module_t>(mModules);
 	}
 
 	template<size_t I>
-	getTypeAt<I>* getModule(){
+	auto getModule(){
 		return &std::get<I>(mModules);
 	}
 		
