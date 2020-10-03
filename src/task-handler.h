@@ -50,24 +50,23 @@ class TaskHandler : public IScheduler
 		static size_t sCounterIndex;
 	};
 
-
 	enum throwExcept{
 		eIllegalCopy,
 		eExceptCount
 	};
-	 
+
     template<int N> 
 	struct throw_except{ static_assert(N!=eIllegalCopy, "Illegal copy"); };
-	 
+
 public:
-	     
+
 	struct TaskHandle{
-		
+
 		TaskHandle ():mP(nullptr){}
 		~TaskHandle(){ mP=nullptr; }
 
 		using task_function_t = void (caller_t::*)(TaskHandle);
-		
+
 		void 		operator =	(const TaskHandle&){throw_except<eIllegalCopy> t;};
 		TaskItem* 	operator ->	(){return mP;}
 		bool 		operator ()	(){return (mP!=nullptr);}
@@ -75,13 +74,13 @@ public:
 			if(!mP){return false;}
 			return (handler->getTaskFunction(*this) == f);
 		}
-		
+
 	private:
 		TaskItem* mP;
 		static TaskHandler<caller_t, task_module, task_count> *handler;
 		friend class TaskHandler<caller_t, task_module, task_count>;
 	};
-
+	
 	TaskHandler(){ TaskHandle::handler = this; }
 
 	using task_function_t = typename TaskHandle::task_function_t;
