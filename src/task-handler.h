@@ -50,32 +50,40 @@ class TaskHandler : public IScheduler
 		static size_t sCounterIndex;
 	};
 
-
 	enum throwExcept{
 		eIllegalCopy,
 		eExceptCount
 	};
-	 
+
     template<int N> 
 	struct throw_except{ static_assert(N!=eIllegalCopy, "Illegal copy"); };
-	 
+
 public:
-    
+
 	struct TaskHandle{
-		
+
 		TaskHandle ():mP(nullptr){}
-		~TaskHandle(){mP=nullptr;} 
+		~TaskHandle(){ mP=nullptr; }
 
-		void operator=(const TaskHandle&){throw_except<eIllegalCopy> t;};
-		TaskItem* operator->(){return mP;}
-		bool operator()(){return (mP!=nullptr);}
+		using task_function_t = void (caller_t::*)(TaskHandle);
 
-		private:
+		void 		operator =	(const TaskHandle&){throw_except<eIllegalCopy> t;};
+		TaskItem* 	operator ->	(){return mP;}
+		bool 		operator ()	(){return (mP!=nullptr);}
+		bool 		operator ==	(task_function_t f){
+			if(!mP){return false;}
+			return (handler->getTaskFunction(*this) == f);
+		}
+
+	private:
 		TaskItem* mP;
+		static TaskHandler<caller_t, task_module, task_count> *handler;
 		friend class TaskHandler<caller_t, task_module, task_count>;
 	};
+	
+	TaskHandler(){ TaskHandle::handler = this; }
 
-	using task_function_t = void (caller_t::*)(TaskHandle);
+	using task_function_t = typename TaskHandle::task_function_t;
 
 	bool schedule() final {
 
@@ -146,9 +154,9 @@ public:
 			
 			mFunctions[i] = nullptr;
 			
-			if(mHandlePtr[i]){ 
+			if(mHandlePtr[i]){
 				// client's handle exists or existed
-				if(mHandlePtr[i]->mP == &mTasks[i]){ 
+				if(mHandlePtr[i]->mP == &mTasks[i]){
 					// client's handle is valid
 					mHandlePtr[i]->mP = nullptr; // reset client's handle
 				}
@@ -173,6 +181,9 @@ private:
 };
 
 
-template<typename Caller_t, typename task_traits, size_t task_count>
-size_t TaskHandler<Caller_t, task_traits, task_count>::TaskItem::sCounterIndex = 0;
+template<typename caller_t, typename task_module, size_t task_count>
+size_t TaskHandler<caller_t, task_module, task_count>::TaskItem::sCounterIndex = 0;
+
+template<typename caller_t, typename task_module, size_t task_count>
+TaskHandler<caller_t, task_module, task_count>* TaskHandler<caller_t, task_module, task_count>::TaskHandle::handler = nullptr;
 
