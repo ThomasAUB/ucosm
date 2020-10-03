@@ -64,13 +64,14 @@ public:
 	struct TaskHandle{
 		
 		TaskHandle ():mP(nullptr){}
-		
 		~TaskHandle(){ mP=nullptr; }
 
+		using task_function_t = void (caller_t::*)(TaskHandle);
+		
 		void 		operator =	(const TaskHandle&){throw_except<eIllegalCopy> t;};
 		TaskItem* 	operator ->	(){return mP;}
 		bool 		operator ()	(){return (mP!=nullptr);}
-		bool 		operator ==	(void (caller_t::*f)(TaskHandle)){
+		bool 		operator ==	(task_function_t f){
 			if(!mP){return false;}
 			return (handler->getTaskFunction(*this) == f);
 		}
@@ -83,7 +84,7 @@ public:
 
 	TaskHandler(){ TaskHandle::handler = this; }
 
-	using task_function_t = void (caller_t::*)(TaskHandle);
+	using task_function_t = typename TaskHandle::task_function_t;
 
 	bool schedule() final {
 
