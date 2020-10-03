@@ -13,7 +13,7 @@ Module based cooperative scheduler for microcontroler (Beta)
   
   
   
-  Schedulable function prototype is defined as : void foo(void). 
+  Schedulable function prototype is defined as : void foo(TaskHandle). 
   
   
   Schedulable items can be functions and classes containing these functions. 
@@ -78,8 +78,8 @@ TaskHandler definition example
       class MyClass : public TaskHandler<MyClass, myTaskModules, maxSimultaneousTaskCount>
       {
         public:
-          void schedulableFunction()
-          {
+          void schedulableFunction(TaskHandle inHandle){
+            // do stuff
           }
       };
     
