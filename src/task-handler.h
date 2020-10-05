@@ -146,37 +146,39 @@ public:
 		
 		if(!inHandle()){ return false; }
 		
-		task_index_t i = inHandle.mP->index;
+        task_index_t i = inHandle.mP->index;
 
-		if(mTasks[i].isDelReady()){
+        if(mTasks[i].isDelReady()){
 			
-			mTasks[i].makePreDel();
+            mTasks[i].makePreDel();
 			
-			mFunctions[i] = nullptr;
+            mFunctions[i] = nullptr;
 			
-			if(mHandlePtr[i]){
-				// client's handle exists or existed
-				if(mHandlePtr[i]->mP == &mTasks[i]){
-					// client's handle is valid
-					mHandlePtr[i]->mP = nullptr; // reset client's handle
-				}
-				mHandlePtr[i] = nullptr;
-			}
-		}
-	}
+            if(mHandlePtr[i]){
+                // client's handle exists or existed
+                if(mHandlePtr[i]->mP == &mTasks[i]){
+                    // client's handle is valid
+                    mHandlePtr[i]->mP = nullptr; // reset client's handle
+                }
+                mHandlePtr[i] = nullptr;
+            }
+			return true;
+        }
+		return false;
+    }
 
     task_function_t getTaskFunction(TaskHandle inHandle){
-		if(!inHandle()){ return 0; }
-		return mFunctions[inHandle.mP->index];
-	}
+        if(!inHandle()){ return 0; }
+        return mFunctions[inHandle.mP->index];
+    }
 	
 private:
-	 
-	TaskItem mTasks[task_count];
+ 
+    TaskItem mTasks[task_count];
 
-	task_function_t mFunctions[task_count];
+    task_function_t mFunctions[task_count];
 	
-	TaskHandle *mHandlePtr[task_count];
+    TaskHandle *mHandlePtr[task_count];
 
 };
 
