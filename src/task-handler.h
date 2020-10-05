@@ -40,7 +40,7 @@ class TaskHandler : public IScheduler
 
 	using task_index_t = uint8_t;
 
-	static_assert(task_count < std::numeric_limits<task_index_t>::max() , 
+	static_assert(task_count <= std::numeric_limits<task_index_t>::max() , 
 	              "Task count too high");	
 
 	struct TaskItem : public task_module{
