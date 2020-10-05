@@ -144,7 +144,7 @@ public:
 
     bool deleteTask(TaskHandle inHandle){
 		
-		if(!inHandle()){ return false; }
+        if(!inHandle()){ return false; }
 		
         task_index_t i = inHandle.mP->index;
 
