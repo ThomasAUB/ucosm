@@ -38,34 +38,34 @@ template<typename caller_t, typename task_module, size_t task_count>
 class TaskHandler : public IScheduler
 {
 
-	using task_index_t = uint8_t;
+    using task_index_t = uint8_t;
 
-	static_assert(task_count < std::numeric_limits<task_index_t>::max() , 
-	              "Task count too high");	
+    static_assert(task_count <= std::numeric_limits<task_index_t>::max() , 
+    "Task count too high");	
 
-	struct TaskItem : public task_module{
-		constexpr TaskItem():index(sCounterIndex++){}
-		const task_index_t index;
-	private:
-		static size_t sCounterIndex;
-	};
+    struct TaskItem : public task_module{
+        constexpr TaskItem():index(sCounterIndex++){}
+        const task_index_t index;
+    private:
+        static size_t sCounterIndex;
+    };
 
-	enum throwExcept{
-		eIllegalCopy,
-		eExceptCount
-	};
+    enum throwExcept{
+        eIllegalCopy,
+        eExceptCount
+    };
 
     template<int N> 
-	struct throw_except{ static_assert(N!=eIllegalCopy, "Illegal copy"); };
+    struct throw_except{ static_assert(N!=eIllegalCopy, "Illegal copy"); };
 
 public:
 
-	struct TaskHandle{
+    struct TaskHandle{
 
-		TaskHandle ():mP(nullptr){}
-		~TaskHandle(){ mP=nullptr; }
+        TaskHandle ():mP(nullptr){}
+        ~TaskHandle(){ mP=nullptr; }
 
-		using task_function_t = void (caller_t::*)(TaskHandle);
+        using task_function_t = void (caller_t::*)(TaskHandle);
 
 		void 		operator =	(const TaskHandle&){throw_except<eIllegalCopy> t;};
 		TaskItem* 	operator ->	(){return mP;}
@@ -75,108 +75,110 @@ public:
 			return (handler->getTaskFunction(*this) == f);
 		}
 
-	private:
-		TaskItem* mP;
-		static TaskHandler<caller_t, task_module, task_count> *handler;
-		friend class TaskHandler<caller_t, task_module, task_count>;
-	};
+    private:
+        TaskItem* mP;
+        static TaskHandler<caller_t, task_module, task_count> *handler;
+        friend class TaskHandler<caller_t, task_module, task_count>;
+    };
 	
-	TaskHandler(){ TaskHandle::handler = this; }
+    TaskHandler(){ TaskHandle::handler = this; }
 
-	using task_function_t = typename TaskHandle::task_function_t;
+    using task_function_t = typename TaskHandle::task_function_t;
 
-	bool schedule() final {
+    bool schedule() final {
 
-		bool hasExe = false;
+        bool hasExe = false;
 		
-		task_index_t i=0;
+        task_index_t i=0;
 		
-		do{
+        do{
 		
-			if( mFunctions[i] && mTasks[i].isExeReady() ){
+            if( mFunctions[i] && mTasks[i].isExeReady() ){
 				
-				mTasks[i].makePreExe();
-				TaskHandle h;
-				h.mP = &mTasks[i];
-				(static_cast<caller_t *>(this)->*mFunctions[i])(h);
+                mTasks[i].makePreExe();
+                TaskHandle h;
+                h.mP = &mTasks[i];
+                (static_cast<caller_t *>(this)->*mFunctions[i])(h);
 
-				mTasks[i].makePostExe();
+                mTasks[i].makePostExe();
 				
-				hasExe = true;
-			}
+                hasExe = true;
+            }
 		
-		}while(++i < task_count);
+        }while(++i < task_count);
 		
-		return hasExe;
-	}
+        return hasExe;
+    }
 		
-	bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr){
+    bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr){
 				
-		// allocation
-		task_index_t i=0;
+        // allocation
+        task_index_t i=0;
 		
-		do{
-			if(!mFunctions[i]){
+        do{
+           if(!mFunctions[i]){
 				
-				mFunctions[i] = inFunc;
+               mFunctions[i] = inFunc;
 				
-				if(ioHandle != nullptr){
+               if(ioHandle != nullptr){
 					
-					ioHandle->mP = &mTasks[i];
+                   ioHandle->mP = &mTasks[i];
 					
-					mHandlePtr[i] = ioHandle;
+                   mHandlePtr[i] = ioHandle;
 					
-				}else{
+                }else{
 					
-					mHandlePtr[i] = nullptr;
+                    mHandlePtr[i] = nullptr;
 					
-				}
+                }
 				
-				mTasks[i].init();
+                mTasks[i].init();
 				
-				return true;
-			}
+                return true;
+            }
 		
-		}while(++i < task_count);
+        }while(++i < task_count);
 		
-		return false;
-	}
+        return false;
+    }
 
-	bool deleteTask(TaskHandle inHandle){
+    bool deleteTask(TaskHandle inHandle){
 		
-		if(!inHandle()){ return false; }
+        if(!inHandle()){ return false; }
 		
-		task_index_t i = inHandle.mP->index;
+        task_index_t i = inHandle.mP->index;
 
-		if(mTasks[i].isDelReady()){
+        if(mTasks[i].isDelReady()){
 			
-			mTasks[i].makePreDel();
+            mTasks[i].makePreDel();
 			
-			mFunctions[i] = nullptr;
+            mFunctions[i] = nullptr;
 			
-			if(mHandlePtr[i]){
-				// client's handle exists or existed
-				if(mHandlePtr[i]->mP == &mTasks[i]){
-					// client's handle is valid
-					mHandlePtr[i]->mP = nullptr; // reset client's handle
-				}
-				mHandlePtr[i] = nullptr;
-			}
-		}
-	}
+            if(mHandlePtr[i]){
+                // client's handle exists or existed
+                if(mHandlePtr[i]->mP == &mTasks[i]){
+                    // client's handle is valid
+                    mHandlePtr[i]->mP = nullptr; // reset client's handle
+                }
+                mHandlePtr[i] = nullptr;
+            }
+            return true;
+        }
+        return false;
+    }
 
     task_function_t getTaskFunction(TaskHandle inHandle){
-		if(!inHandle()){ return 0; }
-		return mFunctions[inHandle.mP->index];
-	}
+        if(!inHandle()){ return 0; }
+        return mFunctions[inHandle.mP->index];
+    }
 	
 private:
-	 
-	TaskItem mTasks[task_count];
+ 
+    TaskItem mTasks[task_count];
 
-	task_function_t mFunctions[task_count];
+    task_function_t mFunctions[task_count];
 	
-	TaskHandle *mHandlePtr[task_count];
+    TaskHandle *mHandlePtr[task_count];
 
 };
 
