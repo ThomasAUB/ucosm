@@ -69,7 +69,7 @@ public:
 
 		void 		operator =	(const TaskHandle&){throw_except<eIllegalCopy> t;};
 		TaskItem* 	operator ->	(){return mP;}
-		bool 		operator ()	(){return (mP!=nullptr);}
+		TaskItem*	operator ()	(){return mP;}
 		bool 		operator ==	(task_function_t f){
 			if(!mP){return false;}
 			return (handler->getTaskFunction(*this) == f);

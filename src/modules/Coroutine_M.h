@@ -45,42 +45,41 @@
 
 // mandatory statement
 #define __CR_START(inHandle)													\
-	Coroutine_M *handle = inHandle;														\
-	switch(handle->mLine){												\
+	uint16_t& cr_line = inHandle->mLine;														\
+	switch(cr_line){												\
 	case 0:{
 
 
 // stores the current line and return, will restart at this point
 #define __CR_YIELD__															\
-	}handle->mLine = __LINE__;											\
+	}cr_line = __LINE__;											\
 	return;																		\
 	case __LINE__:{
 
 
 // yields until the condition is true, then stores the new line
 #define __CR_WAIT_UNTIL(condition)												\
-	}handle->mLine = __LINE__;											\
+	}cr_line = __LINE__;											\
 	case __LINE__:																\
 	if(!(condition)){															\
 		return;																	\
 	}																			\
-	CR_GET_HANDLE->mLine = __LINE__+1;case __LINE__+1:{
+	cr_line = __LINE__+1;case __LINE__+1:{
 
 
 	
 
 // restarts the coroutine
 #define __CR_RESET__															\
-	handle->mLine = 0;													\
+	cr_line = 0;													\
 	return;
 
 
 // mandatory statement
-#define __CR_END(inHandle)         														\
+#define __CR_END__         														\
 	break;}																		\
 	default:/* error case : should not happen */								\
 	break;}																		\
-	deleteTask(inHandle);
 
 
 // TODO : 

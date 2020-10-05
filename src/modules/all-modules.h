@@ -18,6 +18,7 @@
 
 // containers
 #include "ModuleHub_M.h"
+#include "ModuleMix_M.h"
 #include "Content_M.h"
 #include "Buffer_M.h"
 #include "Signal_M.h"
