@@ -162,9 +162,9 @@ public:
                 }
                 mHandlePtr[i] = nullptr;
             }
-			return true;
+            return true;
         }
-		return false;
+        return false;
     }
 
     task_function_t getTaskFunction(TaskHandle inHandle){
