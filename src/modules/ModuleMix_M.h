@@ -1,5 +1,6 @@
 #pragma once
 
+#include <tuple>
 // provides a module container
 
 template<class...ModuleCollection> 
