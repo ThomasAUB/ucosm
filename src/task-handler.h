@@ -40,7 +40,9 @@ class TaskHandler : public IScheduler
 
     using task_index_t = uint8_t;
 
-    static_assert(task_count <= std::numeric_limits<task_index_t>::max() , 
+    static const task_index_t kInvalidIdx = std::numeric_limits<task_index_t>::max();
+
+    static_assert(task_count < kInvalidIdx ,
     "Task count too high");	
 
     struct TaskItem : public module_M{
@@ -87,26 +89,34 @@ public:
 
     bool schedule() final {
 
+    	static task_index_t sI = kInvalidIdx;
+
+    	if(sI != kInvalidIdx){
+    		return false;
+    	}
+
+    	sI = 0;
+
         bool hasExe = false;
-		
-        task_index_t i=0;
-		
+
         do{
 		
-            if( mFunctions[i] && mTasks[i].isExeReady() ){
+            if( mFunctions[sI] && mTasks[sI].isExeReady() ){
 				
-                mTasks[i].makePreExe();
+                mTasks[sI].makePreExe();
                 TaskHandle h;
-                h.mP = &mTasks[i];
-                (static_cast<caller_t *>(this)->*mFunctions[i])(h);
+                h.mP = &mTasks[sI];
+                (static_cast<caller_t *>(this)->*mFunctions[sI])(h);
 
-                mTasks[i].makePostExe();
+                mTasks[sI].makePostExe();
 				
                 hasExe = true;
             }
 		
-        }while(++i < task_count);
+        }while(++sI < task_count);
 		
+        sI = kInvalidIdx;
+
         return hasExe;
     }
 		
