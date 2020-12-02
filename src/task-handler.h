@@ -32,9 +32,9 @@
 #include <limits>
 #include "IScheduler.h"
 
+#include "void_M.h"
 
-
-template<typename caller_t, typename task_module, size_t task_count>
+template<typename caller_t, size_t task_count, typename module_M = void_M>
 class TaskHandler : public IScheduler
 {
 
@@ -43,7 +43,7 @@ class TaskHandler : public IScheduler
     static_assert(task_count <= std::numeric_limits<task_index_t>::max() , 
     "Task count too high");	
 
-    struct TaskItem : public task_module{
+    struct TaskItem : public module_M{
         constexpr TaskItem():index(sCounterIndex++){}
         const task_index_t index;
     private:
@@ -77,8 +77,8 @@ public:
 
     private:
         TaskItem* mP;
-        static TaskHandler<caller_t, task_module, task_count> *handler;
-        friend class TaskHandler<caller_t, task_module, task_count>;
+        static TaskHandler<caller_t, task_count, module_M> *handler;
+        friend class TaskHandler<caller_t, task_count, module_M>;
     };
 	
     TaskHandler(){ TaskHandle::handler = this; }
@@ -183,9 +183,9 @@ private:
 };
 
 
-template<typename caller_t, typename task_module, size_t task_count>
-size_t TaskHandler<caller_t, task_module, task_count>::TaskItem::sCounterIndex = 0;
+template<typename caller_t, size_t task_count, typename module_M>
+size_t TaskHandler<caller_t, task_count, module_M>::TaskItem::sCounterIndex = 0;
 
-template<typename caller_t, typename task_module, size_t task_count>
-TaskHandler<caller_t, task_module, task_count>* TaskHandler<caller_t, task_module, task_count>::TaskHandle::handler = nullptr;
+template<typename caller_t, size_t task_count, typename module_M>
+TaskHandler<caller_t, task_count, module_M>* TaskHandler<caller_t, task_count, module_M>::TaskHandle::handler = nullptr;
 

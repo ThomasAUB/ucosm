@@ -33,12 +33,14 @@
 
 #include "IScheduler.h"
 
+#include "void_M.h"
+
 // sCnt
 #include "modules/ucosm-sys-data.h"
 uint8_t SysKernelData::sCnt = 0;
 
 
-template<typename handler_t, size_t max_handler_count> 
+template<size_t max_handler_count, typename module_M = void_M>
 class Kernel : public IScheduler
 {
 
@@ -58,7 +60,7 @@ public:
 		return true;
 	}
 	
-	handler_t *getHandle(IScheduler *inHandler){
+	module_M *getHandle(IScheduler *inHandler){
 		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 			return &mHandlerTraits[i];
@@ -138,7 +140,7 @@ private:
 
 	IScheduler *mHandlers[max_handler_count];
 
-	handler_t mHandlerTraits[max_handler_count];
+	module_M mHandlerTraits[max_handler_count];
 	
 	handler_index_t mHandlerCount;
 
