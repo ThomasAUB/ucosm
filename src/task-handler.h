@@ -83,7 +83,7 @@ public:
         friend class TaskHandler<caller_t, task_count, module_M>;
     };
 	
-    TaskHandler(){ TaskHandle::handler = this; }
+    TaskHandler() : mActiveTaskCount(0) { TaskHandle::handler = this; }
 
     using task_function_t = typename TaskHandle::task_function_t;
 
@@ -99,21 +99,28 @@ public:
 
         bool hasExe = false;
 
-        do{
-		
-            if( mFunctions[sI] && mTasks[sI].isExeReady() ){
-				
-                mTasks[sI].makePreExe();
-                TaskHandle h;
-                h.mP = &mTasks[sI];
-                (static_cast<caller_t *>(this)->*mFunctions[sI])(h);
+        task_index_t taskCounter = 0;
 
-                mTasks[sI].makePostExe();
-				
-                hasExe = true;
+        while(sI < task_count && taskCounter < mActiveTaskCount){
+
+            if( mFunctions[sI] ){
+
+            	taskCounter++;
+
+            	if( mTasks[sI].isExeReady() ){
+
+					mTasks[sI].makePreExe();
+					TaskHandle h;
+					h.mP = &mTasks[sI];
+					(static_cast<caller_t *>(this)->*mFunctions[sI])(h);
+
+					mTasks[sI].makePostExe();
+
+					hasExe = true;
+            	}
             }
-		
-        }while(++sI < task_count);
+            sI++;
+        }
 		
         sI = kInvalidIdx;
 
@@ -141,9 +148,8 @@ public:
                     mHandlePtr[i] = nullptr;
 					
                 }
-				
                 mTasks[i].init();
-				
+                mActiveTaskCount++;
                 return true;
             }
 		
@@ -172,6 +178,7 @@ public:
                 }
                 mHandlePtr[i] = nullptr;
             }
+            mActiveTaskCount--;
             return true;
         }
         return false;
@@ -180,6 +187,10 @@ public:
     task_function_t getTaskFunction(TaskHandle inHandle){
         if(!inHandle()){ return 0; }
         return mFunctions[inHandle.mP->index];
+    }
+
+    task_index_t getTaskCount(){
+    	return mActiveTaskCount;
     }
 	
 private:
@@ -190,6 +201,7 @@ private:
 	
     TaskHandle *mHandlePtr[task_count];
 
+    task_index_t mActiveTaskCount;
 };
 
 
