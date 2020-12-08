@@ -29,7 +29,7 @@ struct ProcessQ_M
 		mPrev = nullptr;
 	}
 
-	void setlast(){
+	void setLast(){
 		// parse nexts
 		if(!mNext){
 			return;
@@ -50,53 +50,34 @@ struct ProcessQ_M
 		mNext = nullptr;
 	}
 
-	void executeBefore(ProcessQ_M *inNext, bool doubleLink = true){
+	void executeBefore(ProcessQ_M *inNext){
 		if(!inNext){
 			return;
 		}
-
 		mNext = inNext;
-
-		if(doubleLink){
-			inNext->mPrev = this;
-		}
+		mNext->mPrev = this;
 	}
 
-	void executeAfert(ProcessQ_M *inPrev, bool doubleLink = true){
+	void executeAfter(ProcessQ_M *inPrev){
 		if(!inPrev){
 			return;
 		}
-
 		mPrev = inPrev;
-
-		if(doubleLink){
-			inPrev->mNext = this;
-		}
-	}
-
-	void setState(bool inState){
-		mState = inState;
+		mPrev->mNext = this;
 	}
 
 	void init(){
 		mPrev = nullptr;
 		mNext = nullptr;
-		mState = false;
 	}
 
     bool isExeReady() const {
-		if(mPrev){
-			return mPrev->mState;
-		}else{
-			return true;
-		}
+    	return (mPrev == nullptr);
 	}
 
 	bool isDelReady() const {return true;}
 
-	void makePreExe(){
-		mState = true; // should we let user only set the state?
-	}
+	void makePreExe(){}
 
 	void makePreDel(){
 		if(mPrev && mNext){
@@ -109,14 +90,16 @@ struct ProcessQ_M
 		}
 	}
 
-	void makePostExe(){}
+	void makePostExe(){
+		if(mNext){
+			mNext->mPrev = nullptr;
+		}
+	}
 
 private:
 
 	ProcessQ_M *mPrev;
 	ProcessQ_M *mNext;
-
-	bool mState;
 
 };
 
