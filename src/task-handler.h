@@ -45,6 +45,9 @@ class TaskHandler : public IScheduler
     static_assert(task_count < kInvalidIdx ,
     "Task count too high");	
 
+    static_assert(task_count > 0 ,
+    "Invalid task count");
+
     struct TaskItem : public module_M{
         constexpr TaskItem():index(sCounterIndex++){}
         const task_index_t index;
@@ -140,6 +143,7 @@ public:
         	}
 		
         }while(++i < task_count);
+
         return false;
     }
 
