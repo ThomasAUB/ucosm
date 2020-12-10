@@ -62,6 +62,7 @@ class TaskHandler : public IScheduler
 
 public:
 
+
     struct TaskHandle{
 
         TaskHandle ():mP(nullptr){}
@@ -131,30 +132,14 @@ public:
 				
         // allocation
         task_index_t i=0;
-		
         do{
-           if(!mFunctions[i]){
-				
-               mFunctions[i] = inFunc;
-				
-               if(ioHandle != nullptr){
-					
-                   ioHandle->mP = &mTasks[i];
-					
-                   mHandlePtr[i] = ioHandle;
-					
-                }else{
-					
-                    mHandlePtr[i] = nullptr;
-					
-                }
-                mTasks[i].init();
-                mActiveTaskCount++;
-                return true;
-            }
+
+        	if(!mFunctions[i]){
+        	   allocate(inFunc, i, ioHandle);
+        	   return true;
+        	}
 		
         }while(++i < task_count);
-		
         return false;
     }
 
@@ -192,8 +177,32 @@ public:
     task_index_t getTaskCount(){
     	return mActiveTaskCount;
     }
+
+protected:
+
+    bool createTaskAt(task_function_t inFunc, task_index_t i, TaskHandle *ioHandle = nullptr){
+		if(mFunctions[i]){
+			return false;
+		}
+		allocate(inFunc, i, ioHandle);
+		return true;
+	}
 	
 private:
+
+    void allocate(task_function_t inFunc, task_index_t i, TaskHandle *ioHandle){
+
+		mFunctions[i] = inFunc;
+
+		if(ioHandle != nullptr){
+			ioHandle->mP = &mTasks[i];
+			mHandlePtr[i] = ioHandle;
+		}else{
+			mHandlePtr[i] = nullptr;
+		}
+		mTasks[i].init();
+		mActiveTaskCount++;
+    }
  
     TaskItem mTasks[task_count];
 
