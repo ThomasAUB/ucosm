@@ -3,20 +3,14 @@
 #include "kernel.h"
 #include "task-handler.h"
 #include "modules/Interval_M.h"
-#include "modules/void_M.h"
 
 
 
 ////////////// time base ///////////////
-#include <ctime>
-
-tick_t getTick(){
-    return time(0)*1000;
-}
-
+#include "time_base.h"
 tick_t (*SysKernelData::sGetTick)() = &getTick;
-
 ////////////////////////////////////////
+
 
 
 
@@ -25,10 +19,10 @@ tick_t (*SysKernelData::sGetTick)() = &getTick;
 // PeriodicProcess is an example of class containing the tasks
 // TaskHandler's arguments : 
 //	  - PeriodicProcess : the container itself using CRTP technique.
-//	  - Module : the type of task handled by PeriodicProcess.
 //	  - 2 : the max number of simultaneous tasks. 
+//	  - Interval_M : the type of task handled by PeriodicProcess.
 
-class PeriodicProcess : public TaskHandler< PeriodicProcess, Interval_M, 2 >
+class PeriodicProcess : public TaskHandler< PeriodicProcess, 2, Interval_M >
 {
 	public:
 
@@ -66,9 +60,8 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, Interval_M, 2 >
 
 // instantiation of the master scheduler
 //  Kernel's argument :
-//	  - void_M : defines the handler's properties, i.e. no properties
 //	  - 1 : the max number of simultaneous handlers.
-Kernel<void_M, 1> kernel;
+Kernel<1> kernel;
 
 
 PeriodicProcess periodicProcess;
