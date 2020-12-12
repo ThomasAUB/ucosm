@@ -15,8 +15,10 @@
 #include <netinet/in.h>
 
 #include "test_priority.h"
-
 CPPUNIT_TEST_SUITE_REGISTRATION( PriorityTest );
+
+#include "test_delay.h"
+CPPUNIT_TEST_SUITE_REGISTRATION( DelayTest );
 
 int main(){
     // informs test-listener about testresults
