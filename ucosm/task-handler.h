@@ -31,7 +31,6 @@
 
 #include <limits>
 #include "IScheduler.h"
-
 #include "void_M.h"
 
 template<typename caller_t, size_t task_count, typename module_M = void_M>
@@ -96,6 +95,7 @@ public:
     	static task_index_t sI = kInvalidIdx;
 
     	if(sI != kInvalidIdx){
+            // error : task handler is already scheduling
     		return false;
     	}
 
@@ -105,7 +105,9 @@ public:
 
         task_index_t taskCounter = 0;
 
-        while(sI < task_count && taskCounter < mActiveTaskCount){
+        TaskHandle h;
+
+        while(taskCounter < mActiveTaskCount && sI < task_count){
 
             if( mFunctions[sI] ){
 
@@ -114,8 +116,11 @@ public:
             	if( mTasks[sI].isExeReady() ){
 
 					mTasks[sI].makePreExe();
-					TaskHandle h;
+					
+                    // build task handle
 					h.mP = &mTasks[sI];
+
+                    // call task
 					(static_cast<caller_t *>(this)->*mFunctions[sI])(h);
 
 					mTasks[sI].makePostExe();
@@ -137,6 +142,7 @@ public:
         task_index_t i=0;
         do{
 
+            // check if slot is free
         	if(!mFunctions[i]){
         	   allocate(inFunc, i, ioHandle);
         	   return true;
@@ -149,35 +155,50 @@ public:
 
     bool deleteTask(TaskHandle inHandle){
 		
+        // check if handle is initialize
         if(!inHandle()){ return false; }
 		
         task_index_t i = inHandle.mP->index;
 
+        // check if the task is ready to be deleted
         if(mTasks[i].isDelReady()){
 			
+            // destroy task
             mTasks[i].makePreDel();
 			
+            // reset task function pointer
             mFunctions[i] = nullptr;
 			
+            // check if client's handle exists or existed
             if(mHandlePtr[i]){
-                // client's handle exists or existed
+                
+                // client's handle is valid
                 if(mHandlePtr[i]->mP == &mTasks[i]){
-                    // client's handle is valid
-                    mHandlePtr[i]->mP = nullptr; // reset client's handle
+
+                    // reset client's handle
+                    mHandlePtr[i]->mP = nullptr;
+
                 }
+
+                // reset task handle pointer
                 mHandlePtr[i] = nullptr;
             }
+
             mActiveTaskCount--;
+
             return true;
         }
+
         return false;
     }
 
+    // resturns the function pointer of the task
     task_function_t getTaskFunction(TaskHandle inHandle){
         if(!inHandle()){ return 0; }
         return mFunctions[inHandle.mP->index];
     }
 
+    // returns the count of currently active tasks
     task_index_t getTaskCount(){
     	return mActiveTaskCount;
     }
@@ -185,6 +206,7 @@ public:
 protected:
 
     bool createTaskAt(task_function_t inFunc, task_index_t i, TaskHandle *ioHandle = nullptr){
+        // check if function pointer is free
 		if(mFunctions[i]){
 			return false;
 		}
@@ -196,24 +218,33 @@ private:
 
     void allocate(task_function_t inFunc, task_index_t i, TaskHandle *ioHandle){
 
+        // set task function pointer
 		mFunctions[i] = inFunc;
 
+        // check if a handle has been passed
 		if(ioHandle != nullptr){
+            // set module pointer
 			ioHandle->mP = &mTasks[i];
+            // set handle pointer
 			mHandlePtr[i] = ioHandle;
 		}else{
+            // reset handle pointer
 			mHandlePtr[i] = nullptr;
 		}
 		mTasks[i].init();
 		mActiveTaskCount++;
     }
  
+    // task's module(s) and index
     TaskItem mTasks[task_count];
 
+    // task function pointers
     task_function_t mFunctions[task_count];
 	
+    // task handle pointers
     TaskHandle *mHandlePtr[task_count];
 
+    // count of currently active tasks
     task_index_t mActiveTaskCount;
 };
 
