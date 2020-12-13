@@ -51,6 +51,7 @@ struct uFifo
 		return true;
 	}
 
+	// removes oldest item
 	T pop(){
 		if(mIsEmpty){
 			return T();
@@ -63,6 +64,24 @@ struct uFifo
 		mIsFull = false;
 		return mElems[n];
 	}
+
+	// removes newest item
+	T popBack(){
+		if(mIsEmpty){
+			return T();
+		}
+
+		mNewV = (mNewV+Size-1)%Size;
+
+		if(mOldV == mNewV){
+			mIsEmpty = true;
+		}
+
+		mIsFull = false;
+
+		return mElems[mNewV];
+	}
+
 
 	bool isEmpty(){
 		return mIsEmpty;
@@ -78,6 +97,19 @@ struct uFifo
 		mIsEmpty = true;
 		mIsFull = false;
 	}
+
+	T getLast(){
+		return mElems[(mNewV+Size-1)%Size];
+	}
+
+	size_t getSize(){
+		if(mOldV > mNewV){
+			return mOldV - mNewV;
+		}else{
+			return mNewV - mOldV;
+		}
+	}
+
 
 private :
 
