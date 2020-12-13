@@ -42,7 +42,7 @@ Module based cooperative scheduler for microcontroler (Beta)
     - Parent_M         : Allows to set a Parent/Child relationship between two tasks, will forbid the
                          deletion of the parent task if the child task is alive. 
                           
-    - Priority_M       : Simple priority handling, the highest priority is 1 and the lowest is 255.
+    - Priority_M       : Simple priority handling, the highest priority is 1 and the lowest is 255. A kernel is required                          for this module.
         
     - ProcessQ_M       : Allows to define an order of execution of active tasks.
     
