@@ -68,12 +68,12 @@ public:
 		return nullptr;
 	}
 
-	void removeHandler(IScheduler *inHandler){
+	bool removeHandler(IScheduler *inHandler){
 		handler_index_t i;
 		if(getHandlerIndex(inHandler, i)){
 
 			if(!mHandlerTraits[i].isDelReady()){
-				return;
+				return false;
 			}
 
 			mHandlerTraits[i].makePreDel();
@@ -86,6 +86,7 @@ public:
 			}
 			mHandlerCount--;
 		}
+		return true;
 	}
 	
 
@@ -107,11 +108,9 @@ public:
 			i++;
 		}
 
-		if(!hasExe){
-			if(mIdleTask){
-				// idle task if exists
-				mIdleTask();
-			}
+		if(!hasExe && mIdleTask){
+			// idle task if exists
+			mIdleTask();
 		}
 		
 		return hasExe;
