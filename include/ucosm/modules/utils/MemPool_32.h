@@ -41,7 +41,7 @@ struct MemPool_32{
 	template<typename T, typename... args_t>
 	bool allocate(T** p, args_t... args){
 
-		static_assert(sizeof(T) < block_size, "Object is bigger than block size");
+		static_assert(sizeof(T) <= block_size, "Object is bigger than block size");
 
 		if(*p != nullptr){
 			return false;

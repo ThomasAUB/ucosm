@@ -23,6 +23,9 @@ CPPUNIT_TEST_SUITE_REGISTRATION( DelayTest );
 #include "test_mem_pool_32.h"
 CPPUNIT_TEST_SUITE_REGISTRATION( MemPool32Test );
 
+#include "test_creator.h"
+CPPUNIT_TEST_SUITE_REGISTRATION( CreatorTest );
+
 int main(){
     // informs test-listener about testresults
     CPPUNIT_NS::TestResult testresult;
