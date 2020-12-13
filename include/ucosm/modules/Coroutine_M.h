@@ -18,10 +18,10 @@
  *		// ...
  *	}
  *
- *	void myTask(){
+ *	void myTask(TaskHandle h){
  *
  * 
- * 		__CR_START(thisTaskHandle())
+ * 		__CR_START(h)
  * 
  * 		// do stuff
  * 
@@ -33,7 +33,7 @@
  * 
  * 		// do stuff
  * 
- *		__CR_END__
+ *		__CR_END(h)
  * 	}
  *
  *
@@ -45,41 +45,47 @@
 
 // mandatory statement
 #define __CR_START(inHandle)													\
-	uint16_t& cr_line = inHandle->mLine;														\
-	switch(cr_line){												\
-	case 0:{
+	uint16_t& cr_line = inHandle->mLine;										\
+	switch(cr_line){case 0:{
+
 
 
 // stores the current line and return, will restart at this point
 #define __CR_YIELD__															\
-	}cr_line = __LINE__;											\
-	return;																		\
-	case __LINE__:{
+	}cr_line = __LINE__;return;case __LINE__:{
+
 
 
 // yields until the condition is true, then stores the new line
 #define __CR_WAIT_UNTIL(condition)												\
-	}cr_line = __LINE__;											\
-	case __LINE__:																\
-	if(!(condition)){															\
-		return;																	\
-	}																			\
+	}cr_line = __LINE__;case __LINE__:if(!(condition)){return;}					\
 	cr_line = __LINE__+1;case __LINE__+1:{
-
-
 	
+
+
+#define __CR_DO__																\
+	}cr_line = __LINE__;case __LINE__:
+
+
+
+#define __CR_WHILE(condition)													\
+	if((condition)){return;}													\
+	cr_line = __LINE__;case __LINE__:{
+
+
 
 // restarts the coroutine
 #define __CR_RESET__															\
-	cr_line = 0;													\
-	return;
+	cr_line = 0;return;
+
 
 
 // mandatory statement
-#define __CR_END__         														\
+#define __CR_END(inHandle)         												\
+	this->deleteTask(inHandle);                                                 \
 	break;}																		\
 	default:/* error case : should not happen */								\
-	break;}																		\
+	break;}
 
 
 // TODO : 
