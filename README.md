@@ -39,6 +39,8 @@ Module based cooperative scheduler for microcontroler (Beta)
     
     - Module_Hub_M     : Allows to define several modules per tasks.
     
+    - Module_Mix_M     : Allows to define several modules per tasks using mixins.
+    
     - Parent_M         : Allows to set a Parent/Child relationship between two tasks, will forbid the
                          deletion of the parent task if the child task is alive. 
                           
