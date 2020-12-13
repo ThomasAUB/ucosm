@@ -21,19 +21,19 @@ Module based cooperative scheduler for microcontroler (Beta)
   properties.
   
   The modules are :
-  
-    - Buffer_M         : Associates a buffer of specified type and size to each task of a handler.
-    
+      
     - Conditional_M    : Associates a free function as "bool foo()" to each task telling if the function should be
                          executed.
-    
-    - Content_M        : Associates an instance of the specified type to each task.
     
     - Coroutine_M      : Implementation of coroutine allowing to yield and loop (Inspired by protothread).
     
     - Coroutine_ctx_M  : Implementation of coroutine allowing to yield, loop and save context (Inspired by protothread).
     
     - CPU_Usage_M      : Measures the CPU usage of tasks.
+    
+    - Creator_M        : Allows to dynamically allocate objects in fixed size buffer.
+    
+    - Delay_M          : Allows to delay the execution of a task.
     
     - Interval_M       : Allows to delay and set an execution period of a task.
     
@@ -43,9 +43,7 @@ Module based cooperative scheduler for microcontroler (Beta)
                          deletion of the parent task if the child task is alive. 
                           
     - Priority_M       : Simple priority handling, the highest priority is 1 and the lowest is 255.
-    
-    - ProcessCounter_M : Counts the number of currently active tasks.
-    
+        
     - ProcessQ_M       : Allows to define an order of execution of active tasks.
     
     - Signal_M         : Allows to send data from one task to another.
@@ -53,12 +51,9 @@ Module based cooperative scheduler for microcontroler (Beta)
     - Stack_Usage      : Measures the count of bytes written on the stack after the execution of a task.
     
     - Status_M         : Contains the status of the task (Running, Started, Suspended, Locked).
-    
-    - Status_Notif_M   : Callback notification when a specified status has changed. 
-        
+            
     - LinkedList_M     : Automatically updated linked list of chronologically executed active tasks.
     
-    - void_M           : Empty module, useful when no task properties are needed.
    
    
   
@@ -75,7 +70,7 @@ TaskHandler definition example
       using myTaskModules = ModuleHub_M< Priority_M, Interval_M >;
       const uint8_t maxSimultaneousTaskCount = 1;
 
-      class MyClass : public TaskHandler<MyClass, myTaskModules, maxSimultaneousTaskCount>
+      class MyClass : public TaskHandler<MyClass, maxSimultaneousTaskCount, myTaskModules>
       {
         public:
           void schedulableFunction(TaskHandle inHandle){
@@ -84,8 +79,7 @@ TaskHandler definition example
       };
     
 Kernel definition example
-  
-    using myHandlerModules = void_M;
+
     const uint8_t maxSimultaneousHandlerCount = 1;
     
-    Kernel kernel<myHandlerModules, maxSimultaneousHandlerCount>
+    Kernel kernel<maxSimultaneousHandlerCount>
