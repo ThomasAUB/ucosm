@@ -72,10 +72,13 @@ Module based cooperative scheduler for microcontroler (Beta)
         
 TaskHandler definition example
 
+      // task properties or features
       using myTaskModules = ModuleHub_M< Priority_M, Interval_M >;
-      const uint8_t maxSimultaneousTaskCount = 1;
+      
+      // max simultaneous task count
+      const uint8_t kTaskCount = 1;
 
-      class MyClass : public TaskHandler<MyClass, maxSimultaneousTaskCount, myTaskModules>
+      class MyClass : public TaskHandler<MyClass, kTaskCount, myTaskModules>
       {
         public:
           void schedulableFunction(TaskHandle inHandle){
@@ -85,6 +88,7 @@ TaskHandler definition example
     
 Kernel definition example
 
-    const uint8_t maxSimultaneousHandlerCount = 1;
+    // max simultaneous handler count
+    const uint8_t kHandlerCount = 1;
     
-    Kernel kernel<maxSimultaneousHandlerCount>
+    Kernel kernel<kHandlerCount>
