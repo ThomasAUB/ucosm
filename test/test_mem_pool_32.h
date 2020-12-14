@@ -4,8 +4,7 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/ucosm/modules/utils/MemPool_32.h"
-//  #include "../include/ucosm/modules/utils/uFifo.h"
+#include "../include/modules/utils/MemPool_32.h"
 
 #include <cstring>
 #include <array>
