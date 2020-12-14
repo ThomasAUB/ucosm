@@ -86,7 +86,9 @@ public:
         friend class TaskHandler<caller_t, task_count, module_M>;
     };
 	
-    TaskHandler() : mActiveTaskCount(0) { TaskHandle::handler = this; }
+    TaskHandler() : 
+    mFunctions{ nullptr }, mHandlePtr{ nullptr }, mActiveTaskCount(0)
+    { TaskHandle::handler = this; }
 
     using task_function_t = typename TaskHandle::task_function_t;
 
