@@ -159,7 +159,7 @@ public:
         return false;
     }
 
-    bool deleteTask(TaskHandle inHandle){
+    bool deleteTask(TaskHandle& inHandle){
 		
         // check if handle is initialize
         if(!inHandle()){ return false; }
@@ -179,6 +179,9 @@ public:
             if(inHandle.mP == mCurTask.mP){
             	mCurTask.mP = nullptr;
             }
+
+            // delete usr's handle
+            inHandle.mP = nullptr;
 
             // check if client's handle exists or existed
             if(mHandlePtr[i]){
