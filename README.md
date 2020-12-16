@@ -27,7 +27,8 @@ Module based cooperative scheduler for microcontroler (Beta)
     - Conditional_M    : Associates a free function as "bool foo()" to each task telling if the function
                          should be executed.
     
-    - Coroutine_M      : Implementation of coroutine allowing to yield and loop (Inspired by protothread).
+    - Coroutine_M      : Implementation of coroutine allowing to yield and loop
+                         (Inspired by protothread).
     
     - Coroutine_ctx_M  : Implementation of coroutine allowing to yield, loop and save context.
     
