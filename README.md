@@ -81,10 +81,20 @@ TaskHandler definition example
 
       class MyClass : public TaskHandler<MyClass, kTaskCount, myTaskModules>
       {
+      
         public:
-          void schedulableFunction(TaskHandle inHandle){
+        
+          MyClass(){
+            // create task execution
+            this->createTask(&MyClass::myTaskFunction);
+          }
+        
+        private:
+        
+          void myTaskFunction(TaskHandle inHandle){
             // do stuff
           }
+          
       };
     
 Kernel definition example
@@ -92,4 +102,16 @@ Kernel definition example
     // max simultaneous handler count
     const uint8_t kHandlerCount = 1;
     
-    Kernel<kHandlerCount> kernel
+    Kernel<kHandlerCount> sKernel;
+    
+    int main(){
+    
+      // add handler to kernel
+      sKernel.addHandler(&sMyHandler);
+      
+      while(1){
+        sKernel.schedule();
+      }
+      
+      return 0;
+    }
