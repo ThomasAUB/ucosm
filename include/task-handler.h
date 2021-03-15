@@ -115,11 +115,11 @@ public:
 
             	if( mTasks[sI].isExeReady() ){
 
+            		// build task handle
+            		mCurTask.mP = &mTasks[sI];
+
 					mTasks[sI].makePreExe();
 					
-                    // build task handle
-					mCurTask.mP = &mTasks[sI];
-
                     // call task
 					(static_cast<caller_t *>(this)->*mFunctions[sI])(mCurTask);
 
