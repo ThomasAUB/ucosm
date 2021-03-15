@@ -4,8 +4,8 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/kernel.h"
-#include "../include/task-handler.h"
+#include "../include/ucosm/kernel.h"
+#include "../include/ucosm/task-handler.h"
 
 /*
 // time base

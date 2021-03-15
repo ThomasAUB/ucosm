@@ -4,13 +4,13 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/kernel.h"
-#include "../include/task-handler.h"
-#include "../include/modules/Delay_M.h"
+#include "../include/ucosm/kernel.h"
+#include "../include/ucosm/task-handler.h"
+#include "../include/ucosm/modules/Delay_M.h"
 
 // time base
 #include "time_base.h"
-#include "../include/modules/ucosm-sys-data.h"
+#include "../include/ucosm/modules/ucosm-sys-data.h"
 tick_t (*SysKernelData::sGetTick)() = &getTick;
 
 
