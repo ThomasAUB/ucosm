@@ -32,17 +32,24 @@ Module based cooperative scheduler for microcontroler (Beta)
     
     - Coroutine_ctx_M  : Implementation of coroutine allowing to yield, loop and save context.
     
+    
     - CPU_Usage_M      : Measures the CPU usage of tasks.
+    
     
     - Creator_M        : Dynamically allocates an object in a shared fixed size buffer.
     
+    
     - Delay_M          : Delays the execution of a task.
+    
     
     - Interval_M       : Delays and set an execution period of a task.
     
+    
     - Module_Hub_M     : Defines several modules per tasks.
     
+    
     - Module_Mix_M     : Defines several modules per tasks using mixins.
+    
     
     - Parent_M         : Sets a Parent/Child relationship between two tasks, will forbid the
                          deletion of the parent task if the child task is alive. 
@@ -52,11 +59,15 @@ Module based cooperative scheduler for microcontroler (Beta)
         
     - ProcessQ_M       : Defines an execution sequence of active tasks.
     
+    
     - Signal_M         : Sends data from one task to another.
+    
     
     - Stack_Usage      : Measures the count of bytes written on the stack after the execution of a task.
     
+    
     - Status_M         : Contains the status of the task (Running, Started, Suspended, Locked).
+            
             
     - LinkedList_M     : Automatically updated linked list of chronologically executed active tasks.
     
