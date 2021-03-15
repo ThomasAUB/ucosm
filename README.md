@@ -104,10 +104,12 @@ Kernel definition example
     
     Kernel<kHandlerCount> sKernel;
     
+    MyClass sHandler;
+    
     int main(){
     
       // add handler to kernel
-      sKernel.addHandler(&sMyHandler);
+      sKernel.addHandler(&sHandler);
       
       while(1){
         sKernel.schedule();
