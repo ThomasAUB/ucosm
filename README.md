@@ -92,4 +92,4 @@ Kernel definition example
     // max simultaneous handler count
     const uint8_t kHandlerCount = 1;
     
-    Kernel kernel<kHandlerCount>
+    Kernel<kHandlerCount> kernel
