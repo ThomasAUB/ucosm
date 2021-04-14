@@ -26,6 +26,9 @@ CPPUNIT_TEST_SUITE_REGISTRATION( MemPool32Test );
 #include "test_creator.h"
 CPPUNIT_TEST_SUITE_REGISTRATION( CreatorTest );
 
+#include "test_task_handler.h"
+CPPUNIT_TEST_SUITE_REGISTRATION( TaskHandlerTest );
+
 int main(){
     // informs test-listener about testresults
     CPPUNIT_NS::TestResult testresult;

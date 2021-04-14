@@ -4,9 +4,9 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/kernel.h"
-#include "../include/task-handler.h"
-#include "../include/modules/Priority_M.h"
+#include "../include/ucosm/kernel.h"
+#include "../include/ucosm/task-handler.h"
+#include "../include/ucosm/modules/Priority_M.h"
 
 
 class PriorityTest : public CppUnit::TestFixture { 

@@ -24,38 +24,50 @@ Module based cooperative scheduler for microcontroler (Beta)
   
   The modules are :
       
-    - Conditional_M    : Associates a free function as "bool foo()" to each task telling if the function should be
-                         executed.
+    - Conditional_M    : Associates a free function as "bool foo()" to each task telling if the
+                         function should be executed.
     
-    - Coroutine_M      : Implementation of coroutine allowing to yield and loop (Inspired by protothread).
+    - Coroutine_M      : Implementation of coroutine allowing to yield and loop
+                         (Inspired by protothread).
     
     - Coroutine_ctx_M  : Implementation of coroutine allowing to yield, loop and save context.
     
+    
     - CPU_Usage_M      : Measures the CPU usage of tasks.
     
-    - Creator_M        : Allows to dynamically allocate objects in fixed size buffer.
     
-    - Delay_M          : Allows to delay the execution of a task.
+    - Creator_M        : Dynamically allocates an object in a shared fixed size buffer.
     
-    - Interval_M       : Allows to delay and set an execution period of a task.
     
-    - Module_Hub_M     : Allows to define several modules per tasks.
+    - Delay_M          : Delays the execution of a task.
     
-    - Module_Mix_M     : Allows to define several modules per tasks using mixins.
     
-    - Parent_M         : Allows to set a Parent/Child relationship between two tasks, will forbid the
+    - Interval_M       : Delays and set an execution period of a task.
+    
+    
+    - Module_Hub_M     : Defines several modules per tasks.
+    
+    
+    - Module_Mix_M     : Defines several modules per tasks using mixins.
+    
+    
+    - Parent_M         : Sets a Parent/Child relationship between two tasks, will forbid the
                          deletion of the parent task if the child task is alive. 
                           
     - Priority_M       : Simple priority handling, the highest priority is 1 and the lowest is 255.
                          A kernel is required for this module.
         
-    - ProcessQ_M       : Allows to define an order of execution of active tasks.
+    - ProcessQ_M       : Defines an execution sequence of active tasks.
     
-    - Signal_M         : Allows to send data from one task to another.
+    
+    - Signal_M         : Sends data from one task to another.
+    
     
     - Stack_Usage      : Measures the count of bytes written on the stack after the execution of a task.
     
+    
     - Status_M         : Contains the status of the task (Running, Started, Suspended, Locked).
+            
             
     - LinkedList_M     : Automatically updated linked list of chronologically executed active tasks.
     
@@ -80,10 +92,20 @@ TaskHandler definition example
 
       class MyClass : public TaskHandler<MyClass, kTaskCount, myTaskModules>
       {
+      
         public:
-          void schedulableFunction(TaskHandle inHandle){
+        
+          MyClass(){
+            // create task execution
+            this->createTask(&MyClass::myTaskFunction);
+          }
+        
+        private:
+        
+          void myTaskFunction(TaskHandle inHandle){
             // do stuff
           }
+          
       };
     
 Kernel definition example
@@ -91,4 +113,18 @@ Kernel definition example
     // max simultaneous handler count
     const uint8_t kHandlerCount = 1;
     
-    Kernel kernel<kHandlerCount>
+    Kernel<kHandlerCount> sKernel;
+    
+    MyClass sHandler;
+    
+    int main(){
+    
+      // add handler to kernel
+      sKernel.addHandler(&sHandler);
+      
+      while(1){
+        sKernel.schedule();
+      }
+      
+      return 0;
+    }

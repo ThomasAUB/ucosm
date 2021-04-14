@@ -85,7 +85,7 @@ public:
         static TaskHandler<caller_t, task_count, module_M> *handler;
         friend class TaskHandler<caller_t, task_count, module_M>;
     };
-	
+
     TaskHandler() : 
     mFunctions{ nullptr }, mHandlePtr{ nullptr }, mActiveTaskCount(0)
     { TaskHandle::handler = this; }
@@ -107,8 +107,6 @@ public:
 
         task_index_t taskCounter = 0;
 
-        TaskHandle h;
-
         while(taskCounter < mActiveTaskCount && sI < task_count){
 
             if( mFunctions[sI] ){
@@ -117,21 +115,27 @@ public:
 
             	if( mTasks[sI].isExeReady() ){
 
+            		// build task handle
+            		mCurTask.mP = &mTasks[sI];
+
 					mTasks[sI].makePreExe();
 					
-                    // build task handle
-					h.mP = &mTasks[sI];
-
                     // call task
-					(static_cast<caller_t *>(this)->*mFunctions[sI])(h);
+					(static_cast<caller_t *>(this)->*mFunctions[sI])(mCurTask);
 
-					mTasks[sI].makePostExe();
+					// call "post exe" if the task
+					// still exists
+					if(mCurTask.mP){
+						mTasks[sI].makePostExe();
+					}
 
 					hasExe = true;
             	}
             }
             sI++;
         }
+
+        mCurTask.mP = nullptr;
 		
         sI = kInvalidIdx;
 
@@ -155,7 +159,7 @@ public:
         return false;
     }
 
-    bool deleteTask(TaskHandle inHandle){
+    bool deleteTask(TaskHandle& inHandle){
 		
         // check if handle is initialize
         if(!inHandle()){ return false; }
@@ -170,7 +174,15 @@ public:
 			
             // reset task function pointer
             mFunctions[i] = nullptr;
-			
+
+            // deleting task is the one currently scheduled
+            if(inHandle.mP == mCurTask.mP){
+            	mCurTask.mP = nullptr;
+            }
+
+            // delete usr's handle
+            inHandle.mP = nullptr;
+
             // check if client's handle exists or existed
             if(mHandlePtr[i]){
                 
@@ -248,6 +260,9 @@ private:
 
     // count of currently active tasks
     task_index_t mActiveTaskCount;
+
+    // currently scheduled task
+    TaskHandle mCurTask;
 };
 
 

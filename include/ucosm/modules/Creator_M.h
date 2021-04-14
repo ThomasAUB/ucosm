@@ -6,8 +6,9 @@ template<typename T, size_t ObjectCount>
 struct Creator_M
 {
 
-	T* create(){
-		sMem.allocate(&mP);
+	template<typename...args_t>
+	T* create(args_t...args){
+		sMem.allocate(&mP, args...);
 		return mP;
 	}
 

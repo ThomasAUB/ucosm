@@ -29,7 +29,7 @@
  * 
  * 		// do stuff
  * 
- * 		__WAIT_UNTIL(isReady())
+ * 		__CR_WAIT_UNTIL(isReady())
  * 
  * 		// do stuff
  * 
@@ -62,7 +62,7 @@
 	cr_line = __LINE__+1;case __LINE__+1:{
 	
 
-
+///////////// do while ////////////////
 #define __CR_DO__																\
 	}cr_line = __LINE__;case __LINE__:
 
@@ -71,8 +71,7 @@
 #define __CR_WHILE(condition)													\
 	if((condition)){return;}													\
 	cr_line = __LINE__;case __LINE__:{
-
-
+//////////////////////////////////////
 
 // restarts the coroutine
 #define __CR_RESET__															\
