@@ -89,7 +89,7 @@ struct MemPool_32{
 			// search for the matching address
 			if(mBlocks[i] == ip){
 
-				// explicitely call destructor
+				// explicitly call destructor
 				(*p)->T::~T();
 
 				// release slot
