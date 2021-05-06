@@ -26,7 +26,7 @@ class CreatorTest : public CppUnit::TestFixture {
 
         void testCreator(){
                         
-            mKernel.addHandler(&mTestH);
+            mKernel.addTask(&mTestH);
 
             while(mTestH.getTaskCount()){
                 mKernel.schedule();

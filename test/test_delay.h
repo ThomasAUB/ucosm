@@ -31,7 +31,7 @@ class DelayTest : public CppUnit::TestFixture {
 
         void testDelay(){
                         
-            mKernel.addHandler(&mTestH);
+            mKernel.addTask(&mTestH);
 
             // while low priority has no execution
             while(!mTestH.mRun1Counter){

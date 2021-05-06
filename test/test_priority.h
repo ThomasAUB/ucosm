@@ -25,7 +25,7 @@ class PriorityTest : public CppUnit::TestFixture {
 
         void testPriority(){
                         
-            mKernel.addHandler(&mTestH);
+            mKernel.addTask(&mTestH);
 
             // while low priority has no execution
             while(!mTestH.mLowPrioCounter){
