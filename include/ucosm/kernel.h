@@ -40,51 +40,51 @@
 uint8_t SysKernelData::sCnt = 0;
 
 
-template<size_t max_handler_count, typename module_M = void_M>
+template<size_t max_task_count, typename module_M = void_M>
 class Kernel : public IScheduler
 {
 
-	using handler_index_t = uint8_t;
+	using task_index_t = uint8_t;
 	 
 public:
 
-	Kernel() : mHandlerCount(0), mIdleTask(nullptr)
+	Kernel() : mTaskCount(0), mIdleTask(nullptr)
 	{}
 
 	template<typename T>
-	bool addHandler(T *inHandler){
-		if(mHandlerCount == max_handler_count){ return false; }
-		mHandlers[mHandlerCount] = static_cast<IScheduler *>(inHandler);
-		mHandlerTraits[mHandlerCount].init();		
-		mHandlerCount++;
+	bool addTask(T *inTask){
+		if(mTaskCount == max_task_count){ return false; }
+		mTasks[mTaskCount] = static_cast<IScheduler *>(inTask);
+		mTaskTraits[mTaskCount].init();
+		mTaskCount++;
 		return true;
 	}
 	
-	module_M *getHandle(IScheduler *inHandler){
-		handler_index_t i;
-		if(getHandlerIndex(inHandler, i)){
-			return &mHandlerTraits[i];
+	module_M *getHandle(IScheduler *inTask){
+		task_index_t i;
+		if(getTaskIndex(inTask, i)){
+			return &mTaskTraits[i];
 		}
 		return nullptr;
 	}
 
-	bool removeHandler(IScheduler *inHandler){
-		handler_index_t i;
-		if(getHandlerIndex(inHandler, i)){
+	bool removeTask(IScheduler *inTask){
+		task_index_t i;
+		if(getTaskIndex(inTask, i)){
 
-			if(!mHandlerTraits[i].isDelReady()){
+			if(!mTaskTraits[i].isDelReady()){
 				return false;
 			}
 
-			mHandlerTraits[i].makePreDel();
+			mTaskTraits[i].makePreDel();
 			
-			// shift handlers for contiguous array
-			while(i<mHandlerCount-1){
-				mHandlers[i] = mHandlers[i+1];
-				mHandlerTraits[i] = mHandlerTraits[i+1];
+			// shift tasks for contiguous array
+			while(i<mTaskCount-1){
+				mTasks[i] = mTasks[i+1];
+				mTaskTraits[i] = mTaskTraits[i+1];
 				i++;
 			}
-			mHandlerCount--;
+			mTaskCount--;
 		}
 		return true;
 	}
@@ -94,16 +94,16 @@ public:
 	
 		bool hasExe = false;	
 				
-		handler_index_t i = 0;
+		task_index_t i = 0;
 		
 		SysKernelData::sCnt++;
 
-		while(i < mHandlerCount){
+		while(i < mTaskCount){
 			
-			if(mHandlers[i] && mHandlerTraits[i].isExeReady()){
-				mHandlerTraits[i].makePreExe();
-				hasExe |= mHandlers[i]->schedule();
-				mHandlerTraits[i].makePostExe();
+			if(mTasks[i] && mTaskTraits[i].isExeReady()){
+				mTaskTraits[i].makePreExe();
+				hasExe |= mTasks[i]->schedule();
+				mTaskTraits[i].makePostExe();
 			}
 			i++;
 		}
@@ -124,24 +124,24 @@ public:
 private:
 
 
-	bool getHandlerIndex(IScheduler *inScheduler, handler_index_t& ioIndex){
-		if(!mHandlerCount){
+	bool getTaskIndex(IScheduler *inScheduler, task_index_t& ioIndex){
+		if(!mTaskCount){
 			return false;
 		}
 		ioIndex = 0;	
 		do{
-			if(mHandlers[ioIndex] == inScheduler){
+			if(mTasks[ioIndex] == inScheduler){
 				return true;
 			}
-		}while(++ioIndex<mHandlerCount);
+		}while(++ioIndex<mTaskCount);
 		return false;
 	}
 
-	IScheduler *mHandlers[max_handler_count];
+	IScheduler *mTasks[max_task_count];
 
-	module_M mHandlerTraits[max_handler_count];
+	module_M mTaskTraits[max_task_count];
 	
-	handler_index_t mHandlerCount;
+	task_index_t mTaskCount;
 
 	void (*mIdleTask)();
 
