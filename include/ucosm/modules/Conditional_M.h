@@ -4,32 +4,37 @@
 // the execution will if the function attributed with "setCondition" returns true
 // or if the task has no attributed condition
 
-struct Conditional_M
-{	
-	void setCondition(bool (*inCondition)()){
-		mCondition = inCondition;
-	}
-	
-	void init(){
-		mCondition = nullptr;
-	}
+struct Conditional_M {
+    void setCondition(bool (*inCondition)()) {
+        mCondition = inCondition;
+    }
 
-	bool isExeReady(){
-		if(!mCondition)	return true;
-		return mCondition();
-	}
+    void init() {
+        mCondition = nullptr;
+    }
 
-	bool isDelReady() const { return true; }
+    bool isExeReady() {
+        if (!mCondition)
+            return true;
+        return mCondition();
+    }
 
-	void makePreExe(){}
+    bool isDelReady() const {
+        return true;
+    }
 
-	void makePreDel(){}
+    void makePreExe() {
+    }
 
-	void makePostExe(){}	
-	
+    void makePreDel() {
+    }
+
+    void makePostExe() {
+    }
+
 private:
 
-	bool (*mCondition)();
-	
+    bool (*mCondition)();
+
 };
 

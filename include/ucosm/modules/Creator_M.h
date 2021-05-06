@@ -3,59 +3,61 @@
 #include "utils/MemPool_32.h"
 
 template<typename T, size_t ObjectCount>
-struct Creator_M
-{
+struct Creator_M {
 
-	template<typename...args_t>
-	T* create(args_t...args){
-		sMem.allocate(&mP, args...);
-		return mP;
-	}
+    template<typename ...args_t>
+    T* create(args_t ...args) {
+        sMem.allocate(&mP, args...);
+        return mP;
+    }
 
-	bool destroy(){
-		return sMem.release(&mP);
-	}
+    bool destroy() {
+        return sMem.release(&mP);
+    }
 
-	T* get(){
-		return mP;
-	}
+    T* get() {
+        return mP;
+    }
 
-	void setAutoRelease(bool inState){
-		mAutoRelease = inState;
-	}
+    void setAutoRelease(bool inState) {
+        mAutoRelease = inState;
+    }
 
-	bool isAutoRelease(){
-		return mAutoRelease;
-	}
+    bool isAutoRelease() {
+        return mAutoRelease;
+    }
 
-	void init(){
-		mP = nullptr;
-		mAutoRelease = true;
-	}
+    void init() {
+        mP = nullptr;
+        mAutoRelease = true;
+    }
 
-	bool isExeReady() const {return true;}
+    bool isExeReady() const {
+        return true;
+    }
 
-	bool isDelReady(){
-		return (mAutoRelease || (mP == nullptr));
-	}
+    bool isDelReady() {
+        return (mAutoRelease || (mP == nullptr));
+    }
 
-	void makePreExe(){}
+    void makePreExe() {
+    }
 
-	void makePreDel(){
-		destroy();
-	}
+    void makePreDel() {
+        destroy();
+    }
 
-	void makePostExe(){}
+    void makePostExe() {
+    }
 
 private:
 
-	static MemPool_32<ObjectCount, sizeof(T)> sMem;
+    static MemPool_32<ObjectCount, sizeof(T)> sMem;
 
-	T *mP;
+    T *mP;
 
-	bool mAutoRelease;
+    bool mAutoRelease;
 };
-
 
 template<typename T, size_t ObjectCount>
 MemPool_32<ObjectCount, sizeof(T)> Creator_M<T, ObjectCount>::sMem;

@@ -4,54 +4,56 @@
 
 // allow to specify a time period of execution of the process or postpone 
 // its execution
-struct Interval_M
-{
+struct Interval_M {
 
-	using period_t = uint16_t;
-	
-	void setPeriod(period_t inPeriod){
-		mPeriod = inPeriod;
-	}
+    using period_t = uint16_t;
 
-	void setDelay(tick_t inDelay){
-		mExecution_time_stamp = SysKernelData::sGetTick()+inDelay; 
-	}
+    void setPeriod(period_t inPeriod) {
+        mPeriod = inPeriod;
+    }
 
-	period_t getPeriod(){
-		return mPeriod;
-	}
-	
-	tick_t getDelay(){
-		if(mExecution_time_stamp > SysKernelData::sGetTick()){
-			return mExecution_time_stamp - SysKernelData::sGetTick(); 
-		}else{
-			return 0;
-		}
-	}
+    void setDelay(tick_t inDelay) {
+        mExecution_time_stamp = SysKernelData::sGetTick() + inDelay;
+    }
 
-	void init(){
-		mPeriod = 0;
-		mExecution_time_stamp = SysKernelData::sGetTick();
-	}
+    period_t getPeriod() {
+        return mPeriod;
+    }
 
-	bool isExeReady() const {
-		return (SysKernelData::sGetTick() >= mExecution_time_stamp);
-	}
+    tick_t getDelay() {
+        if (mExecution_time_stamp > SysKernelData::sGetTick()) {
+            return mExecution_time_stamp - SysKernelData::sGetTick();
+        } else {
+            return 0;
+        }
+    }
 
-	bool isDelReady() const { return true; }
+    void init() {
+        mPeriod = 0;
+        mExecution_time_stamp = SysKernelData::sGetTick();
+    }
 
-	void makePreExe()
-	{
-		mExecution_time_stamp += mPeriod;
-	}
+    bool isExeReady() const {
+        return (SysKernelData::sGetTick() >= mExecution_time_stamp);
+    }
 
-	void makePreDel(){}
+    bool isDelReady() const {
+        return true;
+    }
 
-	void makePostExe(){}
-		
+    void makePreExe() {
+        mExecution_time_stamp += mPeriod;
+    }
+
+    void makePreDel() {
+    }
+
+    void makePostExe() {
+    }
+
 private:
-	
-	tick_t mExecution_time_stamp;
-	period_t mPeriod;
+
+    tick_t mExecution_time_stamp;
+    period_t mPeriod;
 };
 

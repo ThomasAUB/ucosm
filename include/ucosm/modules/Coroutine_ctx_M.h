@@ -1,8 +1,5 @@
 #pragma once
 
-
-
-
 // macro based coroutine inspired by protothread with context saving
 //
 // !!! INFO !!! 
@@ -66,8 +63,6 @@
  *
  */
 
-
-
 // coroutine definition
 #define CR_CTX(name, cr_task_handle)												\
 	void name(TaskHandle inHandle){																\
@@ -78,7 +73,6 @@
 	if(endTask){ deleteTask(inHandle); }}									\
 	struct crctx_##name
 
-
 // mandatory statement
 #define __CR_CTX_START__														\
 	void run(uint16_t& line, bool& end){										\
@@ -86,11 +80,9 @@
 	case 0xFFFF:/*has been reset*/												\
 	case 0 : line = __LINE__ ; case __LINE__ : {
 
-
 // stores the current line and returns, will restart at this point
 #define __CR_CTX_YIELD__														\
 	} line = __LINE__ ; return ; case __LINE__ : {
-												
 
 // yields until the condition is true, then stores the new line
 #define __CR_CTX_WAIT_UNTIL(condition)											\
@@ -98,11 +90,9 @@
 	if(!(condition)){ return; }													\
 	line = __LINE__ +1; case __LINE__ +1: {
 
-
 // restarts the coroutine
 #define __CR_CTX_RESET__														\
 	line = 0xFFFF; return;
-	
 
 // mandatory statement
 #define __CR_CTX_END__     														\
@@ -112,62 +102,61 @@
 	end = true; return;															\
 	}};void MAKE_UNIQUE(dummy)(){/* dummy function only used for syntax purpose*/
 
-
-
-
-
 // TODO : 
 //	CR_WHILE(condition) : loops and yield on every iterations
 
-
 //#include <string.h>
 
-
-
 template<size_t max_context_size>
-struct Coroutine_ctx_M
-{
+struct Coroutine_ctx_M {
 
-	static_assert(max_context_size >= 1 , "Context size must be >= 1");
-	
-	uint16_t mCtxLine;
+    static_assert(max_context_size >= 1 , "Context size must be >= 1");
 
-	void init() { mCtxLine = 0; }
+    uint16_t mCtxLine;
 
-	bool isExeReady() const { return true; }
+    void init() {
+        mCtxLine = 0;
+    }
 
-	bool isDelReady() const { return true; } 
+    bool isExeReady() const {
+        return true;
+    }
 
-	void makePreExe(){}
+    bool isDelReady() const {
+        return true;
+    }
 
-	void makePreDel(){}
+    void makePreExe() {
+    }
 
-	void makePostExe(){}
+    void makePreDel() {
+    }
 
-	template<typename T>
-	void instantiate(){
-		static_assert(sizeof(T) <= sizeof(mContext), "Context Size Error");
-		//T t;
-		//memcpy(mContext, &t, sizeof(t));
-		//T* t = new(mContext) T;
-		new(mContext) T;
-	}
-	
-	template<typename T>
-	T *getInstance(){
-		static_assert(sizeof(T) <= sizeof(mContext), "Context Size Error");
-		return reinterpret_cast<T *>(mContext);
-	}
-	
+    void makePostExe() {
+    }
+
+    template<typename T>
+    void instantiate() {
+        static_assert(sizeof(T) <= sizeof(mContext), "Context Size Error");
+        //T t;
+        //memcpy(mContext, &t, sizeof(t));
+        //T* t = new(mContext) T;
+        new (mContext) T;
+    }
+
+    template<typename T>
+    T* getInstance() {
+        static_assert(sizeof(T) <= sizeof(mContext), "Context Size Error");
+        return reinterpret_cast<T*>(mContext);
+    }
+
 private:
 
-	uint8_t mContext[max_context_size];
-		
-};
+    uint8_t mContext[max_context_size];
 
+};
 
 #define CONCATENATE_DETAIL(x, y) x##y
 #define CONCATENATE(x, y) CONCATENATE_DETAIL(x, y)
 #define MAKE_UNIQUE(x) CONCATENATE(x, __COUNTER__)
-
 

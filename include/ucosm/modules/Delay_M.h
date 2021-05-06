@@ -2,40 +2,43 @@
 
 #include "ucosm-sys-data.h"
 
+struct Delay_M {
 
-struct Delay_M
-{
+    void setDelay(tick_t inDelay) {
+        mExecution_time_stamp = SysKernelData::sGetTick() + inDelay;
+    }
 
-	void setDelay(tick_t inDelay){
-		mExecution_time_stamp = SysKernelData::sGetTick()+inDelay; 
-	}
-	
-	tick_t getDelay(){
-		if(mExecution_time_stamp > SysKernelData::sGetTick()){
-			return mExecution_time_stamp - SysKernelData::sGetTick(); 
-		}else{
-			return 0;
-		}
-	}
+    tick_t getDelay() {
+        if (mExecution_time_stamp > SysKernelData::sGetTick()) {
+            return mExecution_time_stamp - SysKernelData::sGetTick();
+        } else {
+            return 0;
+        }
+    }
 
-	void init(){
-		mExecution_time_stamp = SysKernelData::sGetTick();
-	}
+    void init() {
+        mExecution_time_stamp = SysKernelData::sGetTick();
+    }
 
-	bool isExeReady() const {
-		return (SysKernelData::sGetTick() >= mExecution_time_stamp);
-	}
+    bool isExeReady() const {
+        return (SysKernelData::sGetTick() >= mExecution_time_stamp);
+    }
 
-	bool isDelReady() const { return true; }
+    bool isDelReady() const {
+        return true;
+    }
 
-	void makePreExe(){}
+    void makePreExe() {
+    }
 
-	void makePreDel(){}
+    void makePreDel() {
+    }
 
-	void makePostExe(){}
-		
+    void makePostExe() {
+    }
+
 private:
-	
-	tick_t mExecution_time_stamp;
+
+    tick_t mExecution_time_stamp;
 };
 

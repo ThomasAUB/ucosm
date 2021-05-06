@@ -1,18 +1,24 @@
 #pragma once
 
+struct void_M {
 
-struct void_M
-{
+    void init() {
+    }
 
-	void init(){}
+    bool isExeReady() const {
+        return true;
+    }
 
-	bool isExeReady() const {return true;}
+    bool isDelReady() const {
+        return true;
+    }
 
-	bool isDelReady() const {return true;}
+    void makePreExe() {
+    }
 
-	void makePreExe(){}
+    void makePreDel() {
+    }
 
-	void makePreDel(){}
-
-	void makePostExe(){}
+    void makePostExe() {
+    }
 };

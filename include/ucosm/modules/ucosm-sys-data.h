@@ -30,17 +30,12 @@
 
 #include "stdint.h"
 
-
-
 using tick_t = uint32_t;
 using fine_tick_t = uint32_t;
 
-
-
-struct SysKernelData
-{
-	static uint8_t sCnt;
-	static tick_t (*sGetTick)();
-	static fine_tick_t (*sGetFineTick)();
+struct SysKernelData {
+    static uint8_t sCnt;
+    static tick_t (*sGetTick)();
+    static fine_tick_t (*sGetFineTick)();
 };
 

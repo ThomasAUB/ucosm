@@ -28,99 +28,96 @@
 
 #pragma once
 
-
-
 template<uint8_t block_count, size_t block_size>
-struct MemPool_32{
+struct MemPool_32 {
 
-	static_assert(block_count <= 32, "block count can't exceed 32");
+    static_assert(block_count <= 32, "block count can't exceed 32");
 
-	MemPool_32():mMap(0)
-	{}
+    MemPool_32() :
+            mMap(0) {
+    }
 
-	template<typename T, typename... args_t>
-	bool allocate(T** p, args_t... args){
+    template<typename T, typename ... args_t>
+    bool allocate(T **p, args_t ... args) {
 
-		static_assert(sizeof(T) <= block_size, "Object is bigger than block size");
+        static_assert(sizeof(T) <= block_size, "Object is bigger than block size");
 
-		if(*p != nullptr){
-			return false;
-		}
+        if (*p != nullptr) {
+            return false;
+        }
 
-		// check space left
-		if(mMap == (1<<block_count)-1){
-			return false;
-		}
+        // check space left
+        if (mMap == (1 << block_count) - 1) {
+            return false;
+        }
 
-		uint8_t i=0;
+        uint8_t i = 0;
 
-		do{
-			// check if slot is free
-			if(!(mMap&(1<<i))){
+        do {
+            // check if slot is free
+            if (!(mMap & (1 << i))) {
 
-				// take slot
-				mMap |= (1<<i);
+                // take slot
+                mMap |= (1 << i);
 
-				// allocate
-				*p = new(mBlocks[i]) T(args...);
+                // allocate
+                *p = new (mBlocks[i]) T(args...);
 
-				return (*p != nullptr);
-			}
+                return (*p != nullptr);
+            }
 
-		}while(++i < block_count);
+        } while (++i < block_count);
 
-		// couldn't allocate
-		return false;
-	}
+        // couldn't allocate
+        return false;
+    }
 
-	template<typename T>
-	bool release(T** p){
+    template<typename T>
+    bool release(T **p) {
 
-		if(*p == nullptr){
-			return false;
-		}
+        if (*p == nullptr) {
+            return false;
+        }
 
-		uint8_t i=0;
+        uint8_t i = 0;
 
-		void *ip = reinterpret_cast<void*>(*p);
+        void *ip = reinterpret_cast<void*>(*p);
 
-		do{
+        do {
 
-			// search for the matching address
-			if(mBlocks[i] == ip){
+            // search for the matching address
+            if (mBlocks[i] == ip) {
 
-				// explicitly call destructor
-				(*p)->T::~T();
+                // explicitly call destructor
+                (*p)->T::~T();
 
-				// release slot
-				mMap &= ~(1<<i);
+                // release slot
+                mMap &= ~(1 << i);
 
-				*p = nullptr;
+                *p = nullptr;
 
-				return true;
-			}
+                return true;
+            }
 
-		}while(++i < block_count);
+        } while (++i < block_count);
 
-		return false;
-	}
+        return false;
+    }
 
-	uint8_t getSizeLeft(){
-		uint8_t sizeLeft = 0;
-		for(uint8_t i=0 ; i<block_count ; i++){
-			if(!(mMap&(1<<i))){
-				sizeLeft++;
-			}
-		}
-		return sizeLeft;
-	}
+    uint8_t getSizeLeft() {
+        uint8_t sizeLeft = 0;
+        for (uint8_t i = 0; i < block_count; i++) {
+            if (!(mMap & (1 << i))) {
+                sizeLeft++;
+            }
+        }
+        return sizeLeft;
+    }
 
 private:
 
-	uint32_t mMap;
-	uint8_t mBlocks[block_count][block_size];
+    uint32_t mMap;
+    uint8_t mBlocks[block_count][block_size];
 
 };
-
-
 

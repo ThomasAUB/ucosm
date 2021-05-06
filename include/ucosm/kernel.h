@@ -26,7 +26,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #pragma once
 
 #include <cstddef>
@@ -39,112 +38,109 @@
 #include "modules/ucosm-sys-data.h"
 uint8_t SysKernelData::sCnt = 0;
 
-
 template<size_t max_task_count, typename module_M = void_M>
-class Kernel : public IScheduler
-{
+class Kernel: public IScheduler {
 
-	using task_index_t = uint8_t;
-	 
+    using task_index_t = uint8_t;
+
 public:
 
-	Kernel() : mTaskCount(0), mIdleTask(nullptr)
-	{}
+    Kernel() :
+            mTaskCount(0), mIdleTask(nullptr) {
+    }
 
-	template<typename T>
-	bool addTask(T *inTask){
-		if(mTaskCount == max_task_count){ return false; }
-		mTasks[mTaskCount] = static_cast<IScheduler *>(inTask);
-		mTaskTraits[mTaskCount].init();
-		mTaskCount++;
-		return true;
-	}
-	
-	module_M *getHandle(IScheduler *inTask){
-		task_index_t i;
-		if(getTaskIndex(inTask, i)){
-			return &mTaskTraits[i];
-		}
-		return nullptr;
-	}
+    template<typename T>
+    bool addTask(T *inTask) {
+        if (mTaskCount == max_task_count) {
+            return false;
+        }
+        mTasks[mTaskCount] = static_cast<IScheduler*>(inTask);
+        mTaskTraits[mTaskCount].init();
+        mTaskCount++;
+        return true;
+    }
 
-	bool removeTask(IScheduler *inTask){
-		task_index_t i;
-		if(getTaskIndex(inTask, i)){
+    module_M* getTask(IScheduler *inTask) {
+        task_index_t i;
+        if (getTaskIndex(inTask, i)) {
+            return &mTaskTraits[i];
+        }
+        return nullptr;
+    }
 
-			if(!mTaskTraits[i].isDelReady()){
-				return false;
-			}
+    bool removeTask(IScheduler *inTask) {
+        task_index_t i;
+        if (getTaskIndex(inTask, i)) {
 
-			mTaskTraits[i].makePreDel();
-			
-			// shift tasks for contiguous array
-			while(i<mTaskCount-1){
-				mTasks[i] = mTasks[i+1];
-				mTaskTraits[i] = mTaskTraits[i+1];
-				i++;
-			}
-			mTaskCount--;
-		}
-		return true;
-	}
-	
+            if (!mTaskTraits[i].isDelReady()) {
+                return false;
+            }
 
-	bool schedule () final {
-	
-		bool hasExe = false;	
-				
-		task_index_t i = 0;
-		
-		SysKernelData::sCnt++;
+            mTaskTraits[i].makePreDel();
 
-		while(i < mTaskCount){
-			
-			if(mTasks[i] && mTaskTraits[i].isExeReady()){
-				mTaskTraits[i].makePreExe();
-				hasExe |= mTasks[i]->schedule();
-				mTaskTraits[i].makePostExe();
-			}
-			i++;
-		}
+            // shift tasks for contiguous array
+            while (i < mTaskCount - 1) {
+                mTasks[i] = mTasks[i + 1];
+                mTaskTraits[i] = mTaskTraits[i + 1];
+                i++;
+            }
+            mTaskCount--;
+        }
+        return true;
+    }
 
-		if(!hasExe && mIdleTask){
-			// idle task if exists
-			mIdleTask();
-		}
-		
-		return hasExe;
-	}
+    bool schedule() final {
 
-	void setIdleTask(void (*inIdleTask)()){
-		mIdleTask = inIdleTask;
-	}
+        bool hasExe = false;
 
+        task_index_t i = 0;
+
+        SysKernelData::sCnt++;
+
+        while (i < mTaskCount) {
+
+            if (mTasks[i] && mTaskTraits[i].isExeReady()) {
+                mTaskTraits[i].makePreExe();
+                hasExe |= mTasks[i]->schedule();
+                mTaskTraits[i].makePostExe();
+            }
+            i++;
+        }
+
+        if (!hasExe && mIdleTask) {
+            // idle task if exists
+            mIdleTask();
+        }
+
+        return hasExe;
+    }
+
+    void setIdleTask(void (*inIdleTask)()) {
+        mIdleTask = inIdleTask;
+    }
 
 private:
 
+    bool getTaskIndex(IScheduler *inScheduler, task_index_t &ioIndex) {
+        if (!mTaskCount) {
+            return false;
+        }
+        ioIndex = 0;
+        do {
+            if (mTasks[ioIndex] == inScheduler) {
+                return true;
+            }
+        } while (++ioIndex < mTaskCount);
+        return false;
+    }
 
-	bool getTaskIndex(IScheduler *inScheduler, task_index_t& ioIndex){
-		if(!mTaskCount){
-			return false;
-		}
-		ioIndex = 0;	
-		do{
-			if(mTasks[ioIndex] == inScheduler){
-				return true;
-			}
-		}while(++ioIndex<mTaskCount);
-		return false;
-	}
+    IScheduler *mTasks[max_task_count];
 
-	IScheduler *mTasks[max_task_count];
+    module_M mTaskTraits[max_task_count];
 
-	module_M mTaskTraits[max_task_count];
-	
-	task_index_t mTaskCount;
+    task_index_t mTaskCount;
 
-	void (*mIdleTask)();
+    void (*mIdleTask)();
 
 };
-
 

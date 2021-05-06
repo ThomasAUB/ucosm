@@ -28,97 +28,91 @@
 
 #pragma once
 
-
-
 template<typename T, size_t Size>
-struct uFifo
-{
+struct uFifo {
 
-	uFifo() : mOldV(0), mNewV(0), mIsEmpty(true), mIsFull(false)
-	{}
+    uFifo() :
+            mOldV(0), mNewV(0), mIsEmpty(true), mIsFull(false) {
+    }
 
-	bool push(T data){
-		if(mIsFull){
-			return false;
-		}
-		size_t n = (mNewV+1)%Size;
-		if(n == mOldV){
-			mIsFull = true;
-		}
-		mElems[mNewV] = data;
-		mNewV = n;
-		mIsEmpty = false;
-		return true;
-	}
+    bool push(T data) {
+        if (mIsFull) {
+            return false;
+        }
+        size_t n = (mNewV + 1) % Size;
+        if (n == mOldV) {
+            mIsFull = true;
+        }
+        mElems[mNewV] = data;
+        mNewV = n;
+        mIsEmpty = false;
+        return true;
+    }
 
-	// removes oldest item
-	T pop(){
-		if(mIsEmpty){
-			return T();
-		}
-		size_t n = mOldV;
-		mOldV = (mOldV+1)%Size;
-		if(mOldV == mNewV){
-			mIsEmpty = true;
-		}
-		mIsFull = false;
-		return mElems[n];
-	}
+    // removes oldest item
+    T pop() {
+        if (mIsEmpty) {
+            return T();
+        }
+        size_t n = mOldV;
+        mOldV = (mOldV + 1) % Size;
+        if (mOldV == mNewV) {
+            mIsEmpty = true;
+        }
+        mIsFull = false;
+        return mElems[n];
+    }
 
-	// removes newest item
-	T popBack(){
-		if(mIsEmpty){
-			return T();
-		}
+    // removes newest item
+    T popBack() {
+        if (mIsEmpty) {
+            return T();
+        }
 
-		mNewV = (mNewV+Size-1)%Size;
+        mNewV = (mNewV + Size - 1) % Size;
 
-		if(mOldV == mNewV){
-			mIsEmpty = true;
-		}
+        if (mOldV == mNewV) {
+            mIsEmpty = true;
+        }
 
-		mIsFull = false;
+        mIsFull = false;
 
-		return mElems[mNewV];
-	}
+        return mElems[mNewV];
+    }
 
+    bool isEmpty() {
+        return mIsEmpty;
+    }
 
-	bool isEmpty(){
-		return mIsEmpty;
-	}
+    bool isFull() {
+        return mIsFull;
+    }
 
-	bool isFull(){
-		return mIsFull;
-	}
-	
-	void flush(){
-		mOldV = 0;
-		mNewV = 0;
-		mIsEmpty = true;
-		mIsFull = false;
-	}
+    void flush() {
+        mOldV = 0;
+        mNewV = 0;
+        mIsEmpty = true;
+        mIsFull = false;
+    }
 
-	T getLast(){
-		return mElems[(mNewV+Size-1)%Size];
-	}
+    T getLast() {
+        return mElems[(mNewV + Size - 1) % Size];
+    }
 
-	size_t getSize(){
-		if(mOldV > mNewV){
-			return mOldV - mNewV;
-		}else{
-			return mNewV - mOldV;
-		}
-	}
+    size_t getSize() {
+        if (mOldV > mNewV) {
+            return mOldV - mNewV;
+        } else {
+            return mNewV - mOldV;
+        }
+    }
 
+private:
 
-private :
-
-	size_t mOldV, mNewV;
-	bool mIsEmpty:1;
-	bool mIsFull:1;
-	T mElems[Size];
+    size_t mOldV, mNewV;
+    bool mIsEmpty :1;
+    bool mIsFull :1;
+    T mElems[Size];
 
 };
-
-
 
