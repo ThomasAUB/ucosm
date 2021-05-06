@@ -33,11 +33,11 @@
 #include "IScheduler.h"
 #include "void_M.h"
 
-template<typename caller_t, size_t task_count, typename module_M = void_M>
+using task_index_t = uint8_t;
+
+template<typename caller_t, task_index_t task_count, typename module_M = void_M>
 class TaskHandler : public IScheduler
 {
-
-    using task_index_t = uint8_t;
 
     static const task_index_t kInvalidIdx = std::numeric_limits<task_index_t>::max();
 
@@ -51,7 +51,7 @@ class TaskHandler : public IScheduler
         constexpr TaskItem():index(sCounterIndex++){}
         const task_index_t index;
     private:
-        static size_t sCounterIndex;
+        static task_index_t sCounterIndex;
     };
 
     enum throwExcept{
@@ -266,9 +266,9 @@ private:
 };
 
 
-template<typename caller_t, size_t task_count, typename module_M>
-size_t TaskHandler<caller_t, task_count, module_M>::TaskItem::sCounterIndex = 0;
+template<typename caller_t, task_index_t task_count, typename module_M>
+task_index_t TaskHandler<caller_t, task_count, module_M>::TaskItem::sCounterIndex = 0;
 
-template<typename caller_t, size_t task_count, typename module_M>
+template<typename caller_t, task_index_t task_count, typename module_M>
 TaskHandler<caller_t, task_count, module_M>* TaskHandler<caller_t, task_count, module_M>::TaskHandle::handler = nullptr;
 

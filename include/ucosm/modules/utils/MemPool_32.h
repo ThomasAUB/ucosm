@@ -33,7 +33,7 @@
 template<uint8_t block_count, size_t block_size>
 struct MemPool_32{
 
-	static_assert(block_count < 32, "block count can't exceed 32");
+	static_assert(block_count <= 32, "block count can't exceed 32");
 
 	MemPool_32():mMap(0)
 	{}
@@ -89,7 +89,7 @@ struct MemPool_32{
 			// search for the matching address
 			if(mBlocks[i] == ip){
 
-				// explicitely call destructor
+				// explicitly call destructor
 				(*p)->T::~T();
 
 				// release slot
