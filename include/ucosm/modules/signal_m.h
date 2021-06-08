@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils/uFifo.h"
+#include "utils/u_fifo.h"
 
 // Allow to send data to a specific task
 

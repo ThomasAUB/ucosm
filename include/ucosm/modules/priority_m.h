@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ucosm-sys-data.h"
+#include "../ucosm_sys_data.h"
 
 struct Priority_M {
 
@@ -14,10 +14,10 @@ struct Priority_M {
     }
 
     bool isExeReady() const {
-        if (SysKernelData::sCnt) {
-            return (!(SysKernelData::sCnt % mPriority));
+        if (UcosmSysData::sCnt) {
+            return (!(UcosmSysData::sCnt % mPriority));
         } else {
-            return (!((SysKernelData::sCnt + 1) % mPriority));
+            return (!((UcosmSysData::sCnt + 1) % mPriority));
         }
     }
 

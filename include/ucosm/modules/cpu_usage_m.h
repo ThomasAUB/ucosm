@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ucosm-sys-data.h"
+#include "../ucosm_sys_data.h"
 
 #include <limits>
 
@@ -45,11 +45,11 @@ struct CPU_Usage_M {
     }
 
     void makePreExe() {
-        mStartExeTS = SysKernelData::sGetFineTick();
+        mStartExeTS = UcosmSysData::sGetFineTick();
     }
 
     void makePostExe() {
-        fine_tick_t curTS = SysKernelData::sGetFineTick();
+        fine_tick_t curTS = UcosmSysData::sGetFineTick();
 
         mExeTime = curTS - mStartExeTS;
 

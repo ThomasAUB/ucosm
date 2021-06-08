@@ -1,5 +1,5 @@
 #pragma once
 
-struct IScheduler {
+struct ITask {
     virtual bool schedule() = 0;
 };

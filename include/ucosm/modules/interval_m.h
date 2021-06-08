@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ucosm-sys-data.h"
+#include "../ucosm_sys_data.h"
 
 // allow to specify a time period of execution of the process or postpone 
 // its execution
@@ -13,7 +13,7 @@ struct Interval_M {
     }
 
     void setDelay(tick_t inDelay) {
-        mExecution_time_stamp = SysKernelData::sGetTick() + inDelay;
+        mExecution_time_stamp = UcosmSysData::sGetTick() + inDelay;
     }
 
     period_t getPeriod() {
@@ -21,8 +21,8 @@ struct Interval_M {
     }
 
     tick_t getDelay() {
-        if (mExecution_time_stamp > SysKernelData::sGetTick()) {
-            return mExecution_time_stamp - SysKernelData::sGetTick();
+        if (mExecution_time_stamp > UcosmSysData::sGetTick()) {
+            return mExecution_time_stamp - UcosmSysData::sGetTick();
         } else {
             return 0;
         }
@@ -30,11 +30,11 @@ struct Interval_M {
 
     void init() {
         mPeriod = 0;
-        mExecution_time_stamp = SysKernelData::sGetTick();
+        mExecution_time_stamp = UcosmSysData::sGetTick();
     }
 
     bool isExeReady() const {
-        return (SysKernelData::sGetTick() >= mExecution_time_stamp);
+        return (UcosmSysData::sGetTick() >= mExecution_time_stamp);
     }
 
     bool isDelReady() const {

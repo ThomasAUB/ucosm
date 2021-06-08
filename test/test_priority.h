@@ -4,9 +4,9 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/ucosm/kernel.h"
-#include "../include/ucosm/task-handler.h"
-#include "../include/ucosm/modules/Priority_M.h"
+#include "../include/ucosm/obj_scheduler.h"
+#include "../include/ucosm/function_scheduler.h"
+#include "../include/ucosm/modules/priority_m.h"
 
 
 class PriorityTest : public CppUnit::TestFixture { 
@@ -35,7 +35,7 @@ class PriorityTest : public CppUnit::TestFixture {
             CPPUNIT_ASSERT(mTestH.mHighPrioCounter>200);
         }
 
-        struct TestH : public TaskHandler<TestH, 2, Priority_M>{
+        struct TestH : public FunctionScheduler<TestH, 2, Priority_M>{
 
             TestH() : mHighPrioCounter(0), mLowPrioCounter(0)
             {
@@ -62,7 +62,7 @@ class PriorityTest : public CppUnit::TestFixture {
             uint16_t mLowPrioCounter;
         };
 
-        Kernel<1> mKernel;
+        ObjScheduler<1> mKernel;
         TestH mTestH;
         
 };
