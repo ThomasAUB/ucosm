@@ -30,37 +30,36 @@
 
 #include <cstddef>
 
-#include "IScheduler.h"
+#include "itask.h"
 
 #include "void_M.h"
 
 // sCnt
-#include "modules/ucosm-sys-data.h"
-uint8_t SysKernelData::sCnt = 0;
+#include "ucosm_sys_data.h"
+uint8_t UcosmSysData::sCnt = 0;
 
 template<size_t max_task_count, typename module_M = void_M>
-class Kernel: public IScheduler {
+class ObjScheduler: public ITask {
 
     using task_index_t = uint8_t;
 
 public:
 
-    Kernel() :
+    ObjScheduler() :
             mTaskCount(0), mIdleTask(nullptr) {
     }
 
-    template<typename T>
-    bool addTask(T *inTask) {
+    bool addTask(ITask *inTask) {
         if (mTaskCount == max_task_count) {
             return false;
         }
-        mTasks[mTaskCount] = static_cast<IScheduler*>(inTask);
+        mTasks[mTaskCount] = inTask;
         mTaskTraits[mTaskCount].init();
         mTaskCount++;
         return true;
     }
 
-    module_M* getTask(IScheduler *inTask) {
+    module_M* getTask(ITask *inTask) {
         task_index_t i;
         if (getTaskIndex(inTask, i)) {
             return &mTaskTraits[i];
@@ -68,7 +67,7 @@ public:
         return nullptr;
     }
 
-    bool removeTask(IScheduler *inTask) {
+    bool removeTask(ITask *inTask) {
         task_index_t i;
         if (getTaskIndex(inTask, i)) {
 
@@ -95,7 +94,7 @@ public:
 
         task_index_t i = 0;
 
-        SysKernelData::sCnt++;
+        UcosmSysData::sCnt++;
 
         while (i < mTaskCount) {
 
@@ -121,7 +120,7 @@ public:
 
 private:
 
-    bool getTaskIndex(IScheduler *inScheduler, task_index_t &ioIndex) {
+    bool getTaskIndex(ITask *inScheduler, task_index_t &ioIndex) {
         if (!mTaskCount) {
             return false;
         }
@@ -134,7 +133,7 @@ private:
         return false;
     }
 
-    IScheduler *mTasks[max_task_count];
+    ITask *mTasks[max_task_count];
 
     module_M mTaskTraits[max_task_count];
 
