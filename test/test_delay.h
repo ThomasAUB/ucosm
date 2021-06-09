@@ -4,14 +4,14 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/ucosm/obj_scheduler.h"
-#include "../include/ucosm/function_scheduler.h"
+#include "../include/ucosm/task_object.h"
+#include "../include/ucosm/task_function.h"
 #include "../include/ucosm/modules/delay_m.h"
 
 // time base
 #include "time_base.h"
 #include "../include/ucosm/ucosm_sys_data.h"
-tick_t (*UcosmSysData::sGetTick)() = &getTick;
+UcosmSysData::tick_t (*UcosmSysData::sGetTick)() = &getTick;
 
 
 
@@ -41,7 +41,7 @@ class DelayTest : public CppUnit::TestFixture {
             CPPUNIT_ASSERT(mTestH.mRun2Counter==10);
         }
 
-        struct TestH : public FunctionScheduler<TestH, 2, Delay_M>{
+        struct TestH : public TaskFunction<TestH, 2, Delay_M>{
 
             TestH() : mRun1Counter(0), mRun2Counter(0)
             {
@@ -69,7 +69,7 @@ class DelayTest : public CppUnit::TestFixture {
             uint16_t mRun2Counter;
         };
 
-        ObjScheduler<1> mKernel;
+        TaskObject<1> mKernel;
         TestH mTestH;
         
 };

@@ -4,8 +4,8 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/ucosm/obj_scheduler.h"
-#include "../include/ucosm/function_scheduler.h"
+#include "../include/ucosm/task_object.h"
+#include "../include/ucosm/task_function.h"
 #include "../include/ucosm/modules/creator_m.h"
 
 
@@ -35,7 +35,7 @@ class CreatorTest : public CppUnit::TestFixture {
 
         using text_t =std::array<char, 50>;
 
-        struct TestH : public FunctionScheduler<TestH, 5, Creator_M<text_t, 5>>{
+        struct TestH : public TaskFunction<TestH, 5, Creator_M<text_t, 5>>{
 
             TestH()
             {
@@ -85,7 +85,7 @@ class CreatorTest : public CppUnit::TestFixture {
         };
 
         
-        ObjScheduler<1> mKernel;
+        TaskObject<1> mKernel;
         TestH mTestH;
         
 };

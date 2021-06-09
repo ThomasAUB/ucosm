@@ -65,41 +65,41 @@
 
 // coroutine definition
 #define CR_CTX(name, cr_task_handle)												\
-	void name(TaskHandle inHandle){																\
+	void name(TaskHandle inHandle){													\
 	if(!cr_task_handle->mCtxLine){	cr_task_handle->instantiate<crctx_##name>(); } 	\
 	crctx_##name *i = cr_task_handle->getInstance<crctx_##name>();					\
-	bool endTask = false;														\
+	bool endTask = false;														    \
 	i->run(cr_task_handle->mCtxLine, endTask);										\
-	if(endTask){ deleteTask(inHandle); }}									\
+	if(endTask){ deleteTask(inHandle); }}									        \
 	struct crctx_##name
 
 // mandatory statement
-#define __CR_CTX_START__														\
-	void run(uint16_t& line, bool& end){										\
-	switch(line){																\
-	case 0xFFFF:/*has been reset*/												\
+#define __CR_CTX_START__														    \
+	void run(uint16_t& line, bool& end){										    \
+	switch(line){																    \
+	case 0xFFFF:/*has been reset*/												    \
 	case 0 : line = __LINE__ ; case __LINE__ : {
 
 // stores the current line and returns, will restart at this point
-#define __CR_CTX_YIELD__														\
+#define __CR_CTX_YIELD__														    \
 	} line = __LINE__ ; return ; case __LINE__ : {
 
 // yields until the condition is true, then stores the new line
-#define __CR_CTX_WAIT_UNTIL(condition)											\
-	}line = __LINE__; case __LINE__:											\
-	if(!(condition)){ return; }													\
+#define __CR_CTX_WAIT_UNTIL(condition)											    \
+	}line = __LINE__; case __LINE__:											    \
+	if(!(condition)){ return; }													    \
 	line = __LINE__ +1; case __LINE__ +1: {
 
 // restarts the coroutine
-#define __CR_CTX_RESET__														\
+#define __CR_CTX_RESET__														    \
 	line = 0xFFFF; return;
 
 // mandatory statement
-#define __CR_CTX_END__     														\
-	}break;																		\
-	default:while(1){}/* error case : should not happen */						\
-	}/*switch*/																	\
-	end = true; return;															\
+#define __CR_CTX_END__     														    \
+	}break;																		    \
+	default:while(1){}/* error case : should not happen */						    \
+	}/*switch*/																	    \
+	end = true; return;															    \
 	}};void MAKE_UNIQUE(dummy)(){/* dummy function only used for syntax purpose*/
 
 // TODO : 

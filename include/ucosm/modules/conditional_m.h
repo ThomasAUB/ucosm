@@ -1,7 +1,7 @@
 #pragma once
 
 // contains a free function pointer "mCondition"
-// the execution will if the function attributed with "setCondition" returns true
+// the execution will occur if the function attributed with "setCondition" returns true
 // or if the task has no attributed condition
 
 struct Conditional_M {

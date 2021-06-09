@@ -26,7 +26,7 @@ CPPUNIT_TEST_SUITE_REGISTRATION( MemPool32Test );
 #include "test_creator.h"
 CPPUNIT_TEST_SUITE_REGISTRATION( CreatorTest );
 
-#include "test_function_scheduler.h"
+#include "test_task_function.h"
 CPPUNIT_TEST_SUITE_REGISTRATION( TaskHandlerTest );
 
 int main(){

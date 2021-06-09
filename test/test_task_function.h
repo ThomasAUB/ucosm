@@ -4,8 +4,8 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/ucosm/obj_scheduler.h"
-#include "../include/ucosm/function_scheduler.h"
+#include "../include/ucosm/task_object.h"
+#include "../include/ucosm/task_function.h"
 
 /*
 // time base
@@ -47,7 +47,7 @@ class TaskHandlerTest : public CppUnit::TestFixture {
             int16_t mDBGIndex;
         };
 
-        struct TestH : public FunctionScheduler<TestH, 1, Test_M>{
+        struct TestH : public TaskFunction<TestH, 1, Test_M>{
 
             TestH(){
 

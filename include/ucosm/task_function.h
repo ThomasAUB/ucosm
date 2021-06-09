@@ -30,23 +30,24 @@
 
 #include <limits>
 #include "itask.h"
-#include "void_M.h"
+#include "void_m.h"
 
 #include "stdint.h"
 
-using task_index_t = uint8_t;
+// this class uses CRTP to call the task functions
+// class MyClass : TaskFunction<MyClass, 2>{ /*...*/ };
 
-template<typename caller_t, task_index_t task_count, typename module_M = void_M>
-class FunctionScheduler: public ITask {
+template<typename caller_t, uint32_t task_count, typename module_M = void_M>
+class TaskFunction: public ITask {
+
+    using task_index_t = uint8_t;
 
     static const task_index_t kInvalidIdx =
             std::numeric_limits<task_index_t>::max();
 
-    static_assert(task_count < kInvalidIdx ,
-            "Task count too high");
+    static_assert(task_count < kInvalidIdx, "Task count too high");
 
-    static_assert(task_count > 0 ,
-            "Invalid task count");
+    static_assert(task_count > 0, "Task count must be at least 1");
 
     struct TaskItem: public module_M {
         constexpr TaskItem() :
@@ -80,9 +81,9 @@ public:
         using task_function_t = void (caller_t::*)(TaskHandle);
 
         void operator =(const TaskHandle&) {
-            throw_except<eIllegalCopy> t;
+            throw_except<eIllegalCopy> _;
         }
-        ;
+
         TaskItem* operator ->() {
             return mP;
         }
@@ -98,31 +99,46 @@ public:
 
     private:
         TaskItem *mP;
-        static FunctionScheduler<caller_t, task_count, module_M> *handler;
-        friend class FunctionScheduler<caller_t, task_count, module_M> ;
+        static TaskFunction<caller_t, task_count, module_M> *handler;
+        friend class TaskFunction<caller_t, task_count, module_M> ;
     };
 
-    FunctionScheduler() :
+    TaskFunction() :
             mFunctions { nullptr }, mHandlePtr { nullptr }, mActiveTaskCount(0) {
         TaskHandle::handler = this;
     }
 
     using task_function_t = typename TaskHandle::task_function_t;
 
-    bool schedule() final;
-
+    // creates a child task to schedule
+    // returns true if success, false otherwise
+    // a function can be executed through several tasks
+    // ioHandle is optional, it is used to access module after creation
+    // if the task associated with a TaskHandle exists : myTaskHandle() == true
+    // if the TaskHandle still exists at task deletion, it will be reset : myTaskHandle() == false
+    // even if the task has been deleted with the TaskHandle passed to the function
     bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr);
 
+    // deletes a child task
+    // returns true is success, false otherwise
     bool deleteTask(TaskHandle &inHandle);
 
     // resturns the function pointer of the task
     task_function_t getTaskFunction(TaskHandle inHandle);
 
-    // returns the count of currently active tasks
+    // returns the number of currently active tasks
     task_index_t getTaskCount();
+
+    // to call periodically
+    // manually or through another instance
+    // returns true if a task has been executed,
+    // false otherwise
+    bool schedule() final;
 
 protected:
 
+    // allocate task on the specified slot
+    // returns true if success(slot was free), false otherwise
     bool createTaskAt(task_function_t inFunc, task_index_t i,
             TaskHandle *ioHandle = nullptr);
 
@@ -146,16 +162,16 @@ private:
     TaskHandle mCurTask;
 };
 
-template<typename caller_t, task_index_t task_count, typename module_M>
-task_index_t FunctionScheduler<caller_t, task_count, module_M>::TaskItem::sCounterIndex =
-        0;
+template<typename caller_t, uint32_t task_count, typename module_M>
+typename TaskFunction<caller_t, task_count, module_M>::task_index_t TaskFunction<
+        caller_t, task_count, module_M>::TaskItem::sCounterIndex = 0;
 
-template<typename caller_t, task_index_t task_count, typename module_M>
-FunctionScheduler<caller_t, task_count, module_M> *FunctionScheduler<caller_t,
-        task_count, module_M>::TaskHandle::handler = nullptr;
+template<typename caller_t, uint32_t task_count, typename module_M>
+TaskFunction<caller_t, task_count, module_M> *TaskFunction<caller_t, task_count,
+        module_M>::TaskHandle::handler = nullptr;
 
-template<typename caller_t, task_index_t task_count, typename module_M>
-bool FunctionScheduler<caller_t, task_count, module_M>::schedule() {
+template<typename caller_t, uint32_t task_count, typename module_M>
+bool TaskFunction<caller_t, task_count, module_M>::schedule() {
 
     static task_index_t sI = kInvalidIdx;
 
@@ -205,8 +221,8 @@ bool FunctionScheduler<caller_t, task_count, module_M>::schedule() {
     return hasExe;
 }
 
-template<typename caller_t, task_index_t task_count, typename module_M>
-bool FunctionScheduler<caller_t, task_count, module_M>::createTask(
+template<typename caller_t, uint32_t task_count, typename module_M>
+bool TaskFunction<caller_t, task_count, module_M>::createTask(
         task_function_t inFunc, TaskHandle *ioHandle) {
 
     // allocation
@@ -224,8 +240,8 @@ bool FunctionScheduler<caller_t, task_count, module_M>::createTask(
     return false;
 }
 
-template<typename caller_t, task_index_t task_count, typename module_M>
-bool FunctionScheduler<caller_t, task_count, module_M>::deleteTask(
+template<typename caller_t, uint32_t task_count, typename module_M>
+bool TaskFunction<caller_t, task_count, module_M>::deleteTask(
         TaskHandle &inHandle) {
 
     // check if handle is initialize
@@ -276,9 +292,9 @@ bool FunctionScheduler<caller_t, task_count, module_M>::deleteTask(
 }
 
 // resturns the function pointer of the task
-template<typename caller_t, task_index_t task_count, typename module_M>
-typename FunctionScheduler<caller_t, task_count, module_M>::task_function_t FunctionScheduler<
-        caller_t, task_count, module_M>::getTaskFunction(TaskHandle inHandle) {
+template<typename caller_t, uint32_t task_count, typename module_M>
+typename TaskFunction<caller_t, task_count, module_M>::task_function_t
+TaskFunction<caller_t, task_count, module_M>::getTaskFunction(TaskHandle inHandle) {
     if (!inHandle()) {
         return 0;
     }
@@ -286,13 +302,14 @@ typename FunctionScheduler<caller_t, task_count, module_M>::task_function_t Func
 }
 
 // returns the count of currently active tasks
-template<typename caller_t, task_index_t task_count, typename module_M>
-task_index_t FunctionScheduler<caller_t, task_count, module_M>::getTaskCount() {
+template<typename caller_t, uint32_t task_count, typename module_M>
+typename TaskFunction<caller_t, task_count, module_M>::task_index_t
+TaskFunction<caller_t, task_count, module_M>::getTaskCount() {
     return mActiveTaskCount;
 }
 
-template<typename caller_t, task_index_t task_count, typename module_M>
-bool FunctionScheduler<caller_t, task_count, module_M>::createTaskAt(
+template<typename caller_t, uint32_t task_count, typename module_M>
+bool TaskFunction<caller_t, task_count, module_M>::createTaskAt(
         task_function_t inFunc, task_index_t i, TaskHandle *ioHandle) {
     // check if function pointer is free
     if (mFunctions[i]) {
@@ -302,8 +319,8 @@ bool FunctionScheduler<caller_t, task_count, module_M>::createTaskAt(
     return true;
 }
 
-template<typename caller_t, task_index_t task_count, typename module_M>
-void FunctionScheduler<caller_t, task_count, module_M>::allocate(
+template<typename caller_t, uint32_t task_count, typename module_M>
+void TaskFunction<caller_t, task_count, module_M>::allocate(
         task_function_t inFunc, task_index_t i, TaskHandle *ioHandle) {
 
     // set task function pointer
