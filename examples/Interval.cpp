@@ -1,14 +1,14 @@
 #include <iostream>
 
-#include "kernel.h"
-#include "task-handler.h"
-#include "modules/Interval_M.h"
+#include "obj_scheduler.h"
+#include "function_scheduler.h"
+#include "modules/interval_m.h"
 
 
 
 ////////////// time base ///////////////
-#include "time_base.h"
-tick_t (*SysKernelData::sGetTick)() = &getTick;
+#include "../../examples/time_base.h"
+tick_t (*UcosmSysData::sGetTick)() = &getTick;
 ////////////////////////////////////////
 
 
@@ -17,39 +17,39 @@ tick_t (*SysKernelData::sGetTick)() = &getTick;
 
 
 // PeriodicProcess is an example of class containing the tasks
-// TaskHandler's arguments : 
-//	  - PeriodicProcess : the container itself using CRTP technique.
-//	  - 2 : the max number of simultaneous tasks. 
-//	  - Interval_M : the type of task handled by PeriodicProcess.
+// TaskHandler's arguments :
+//    - PeriodicProcess : the container itself using CRTP technique.
+//    - 2 : the max number of simultaneous tasks.
+//    - Interval_M : the type of task handled by PeriodicProcess.
 
-class PeriodicProcess : public TaskHandler< PeriodicProcess, 2, Interval_M >
+class PeriodicProcess : public FunctionScheduler< PeriodicProcess, 2, Interval_M >
 {
-	public:
+    public:
 
-		PeriodicProcess()
-		{
+        PeriodicProcess()
+        {
 
-			// create tasks
-			createTask(&PeriodicProcess::fastProcess);
+            // create tasks
+            createTask(&PeriodicProcess::fastProcess);
 
-			createTask(&PeriodicProcess::slowProcess);
-		
-		}
+            createTask(&PeriodicProcess::slowProcess);
 
-		void fastProcess(TaskHandle inHandle)
-		{
-			// do stuff
-			std::cout << "fast" << std::endl;
-			inHandle->setDelay(5); // will restart in 5 ms
-		}
+        }
 
-		void slowProcess(TaskHandle inHandle)
-		{
-			// do stuff
-			std::cout << "slow" << std::endl;
-			inHandle->setDelay(1000); // will restart in 1 s
-		}
-	
+        void fastProcess(TaskHandle inHandle)
+        {
+            // do stuff
+            std::cout << "fast" << std::endl;
+            inHandle->setDelay(5); // will restart in 5 ms
+        }
+
+        void slowProcess(TaskHandle inHandle)
+        {
+            // do stuff
+            std::cout << "slow" << std::endl;
+            inHandle->setDelay(1000); // will restart in 1 s
+        }
+
 };
 
 
@@ -60,8 +60,8 @@ class PeriodicProcess : public TaskHandler< PeriodicProcess, 2, Interval_M >
 
 // instantiation of the master scheduler
 //  Kernel's argument :
-//	  - 1 : the max number of simultaneous handlers.
-Kernel<1> kernel;
+//    - 1 : the max number of simultaneous handlers.
+ObjScheduler<1> kernel;
 
 
 PeriodicProcess periodicProcess;
@@ -69,13 +69,13 @@ PeriodicProcess periodicProcess;
 int main()
 {
 
-	// adding periodicProcess to the master scheduler
-	kernel.addHandler(&periodicProcess);
-		
-	while(1)
-	{
-		kernel.schedule();
-	}
-	
-	return 0;
+    // adding periodicProcess to the master scheduler
+    kernel.addTask(&periodicProcess);
+
+    while(1)
+    {
+        kernel.schedule();
+    }
+
+    return 0;
 }
