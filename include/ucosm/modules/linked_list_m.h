@@ -1,7 +1,9 @@
 #pragma once
 
+#include "stdint.h"
+
 // automatically updated linked list of tasks by chronology of execution
-template<size_t listIndex = 0>
+template<uint32_t listIndex = 0>
 struct LinkedList_M //: public ListItem // 9 bytes
 {
 

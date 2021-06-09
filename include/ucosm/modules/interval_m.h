@@ -12,7 +12,7 @@ struct Interval_M {
         mPeriod = inPeriod;
     }
 
-    void setDelay(tick_t inDelay) {
+    void setDelay(UcosmSysData::tick_t inDelay) {
         mExecution_time_stamp = UcosmSysData::sGetTick() + inDelay;
     }
 
@@ -20,7 +20,7 @@ struct Interval_M {
         return mPeriod;
     }
 
-    tick_t getDelay() {
+    UcosmSysData::tick_t getDelay() {
         if (mExecution_time_stamp > UcosmSysData::sGetTick()) {
             return mExecution_time_stamp - UcosmSysData::sGetTick();
         } else {
@@ -53,7 +53,7 @@ struct Interval_M {
 
 private:
 
-    tick_t mExecution_time_stamp;
+    UcosmSysData::tick_t mExecution_time_stamp;
     period_t mPeriod;
 };
 
