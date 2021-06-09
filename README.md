@@ -3,9 +3,9 @@
 # uCoSM
 Module based cooperative scheduler for microcontroler (Beta)
 
-  uCoSM is a lightweight and modular embedded scheduler designed in C++ (c++14 or above). 
+  uCoSM is a lightweight and modular C++ embedded dynamic scheduler (c++14 or above). 
   
-  Its features are :
+## Its features are :
   
  - Dynamically add and remove schedulable items such as function and class.
  - No use of heap memory.
@@ -17,63 +17,63 @@ Module based cooperative scheduler for microcontroler (Beta)
   Schedulable items can be functions or objects. 
   Modules can be added to those in order to add features.
   
-  The modules are :
+## The modules are :
       
- - Conditional_M : Associates a free function as "bool foo()" to each task telling if the function should be executed.
+ - **Conditional_M** : Associates a free function as "bool foo()" to each task telling if the function should be executed.
     
- - Coroutine_M : Implementation of coroutine allowing to yield and loop (Inspired by protothread).
+ - **Coroutine_M** : Implementation of coroutine allowing to yield and loop (Inspired by protothread).
     
- - Coroutine_ctx_M : Implementation of coroutine allowing to yield, loop and save context.
-    
-    
- - CPU_Usage_M : Measures the CPU usage of tasks.
+ - **Coroutine_ctx_M** : Implementation of coroutine allowing to yield, loop and save context.
     
     
- - Creator_M        : Dynamically allocates an object in a shared fixed size buffer.
+ - **CPU_Usage_M** : Measures the CPU usage of tasks.
     
     
- - Delay_M          : Delays the execution of a task.
+ - **Creator_M**        : Dynamically allocates an object in a shared fixed size buffer.
     
     
- - Interval_M       : Delays and set an execution period of a task.
+ - **Delay_M**          : Delays the execution of a task.
     
     
- - Module_Hub_M     : Defines several modules per tasks.
+ - **Interval_M**       : Delays and set an execution period of a task.
     
     
- - Module_Mix_M     : Defines several modules per tasks using mixins.
+ - **Module_Hub_M**     : Defines several modules per tasks.
     
     
- - Parent_M         : Sets a Parent/Child relationship between two tasks, will forbid the deletion of the parent task if the child task is alive. 
+ - **Module_Mix_M**     : Defines several modules per tasks using mixins.
+    
+    
+ - **Parent_M**         : Sets a Parent/Child relationship between two tasks, will forbid the deletion of the parent task if the child task is alive. 
                           
- - Priority_M       : Simple priority handling, the highest priority is 1 and the lowest is 255. A kernel is required for this module.
+ - **Priority_M**       : Simple priority handling, the highest priority is 1 and the lowest is 255. A kernel is required for this module.
         
- - ProcessQ_M       : Defines an execution sequence of active tasks.
+ - **ProcessQ_M**       : Defines an execution sequence of active tasks.
     
     
- - Signal_M         : Sends data from one task to another.
+ - **Signal_M**         : Sends data from one task to another.
     
     
- - Stack_Usage      : Measures the count of bytes written on the stack after the execution of a task.
+ - **Stack_Usage_M**      : Measures the count of bytes written on the stack after the execution of a task.
     
     
- - Status_M         : Contains the status of the task (Running, Started, Suspended, Locked).
+ - **Status_M**         : Contains the status of the task (Running, Started, Suspended, Locked).
             
             
- - LinkedList_M     : Automatically updated linked list of chronologically executed active tasks.
+ - **LinkedList_M**     : Automatically updated linked list of chronologically executed active tasks.
     
    
    
   
 
-  uCoSM is divided into three entities which are :
+### uCoSM is divided into three entities which are :
   
- - Modules     : The properties of a schedulable item.
- - FunctionScheduler : Contains function pointers and their specified modules.
- - ObjScheduler      : Contains iTask pointers and their specified module.
+ - ***Modules***     : The properties of a schedulable item.
+ - ***TaskFunction*** : Contains function pointers and their specified modules.
+ - ***TaskObject***      : Contains iTask pointers and their specified module.
           
         
-FunctionScheduler definition example
+### TaskFunction definition example
 ```cpp
 // task properties or features
 using myTaskModules = ModuleHub_M< Priority_M, Interval_M >;
@@ -81,7 +81,7 @@ using myTaskModules = ModuleHub_M< Priority_M, Interval_M >;
 // max simultaneous task count
 const uint8_t kTaskCount = 1;
 
-class MyClass : public FunctionScheduler<MyClass, kTaskCount, myTaskModules>
+class MyClass : public TaskFunction<MyClass, kTaskCount, myTaskModules>
 {
 
   public:
@@ -99,12 +99,12 @@ class MyClass : public FunctionScheduler<MyClass, kTaskCount, myTaskModules>
     
 };
 ```
-ObjScheduler definition example
+### TaskObject definition example
 ```cpp
 // max simultaneous handler count
 const uint8_t kHandlerCount = 1;
 
-ObjScheduler<kHandlerCount> sKernel;
+TaskObject<kHandlerCount> sKernel;
 
 MyClass sHandler;
 
