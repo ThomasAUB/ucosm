@@ -38,9 +38,11 @@ class TaskObject: public ITask {
 
     using task_index_t = uint8_t;
 
-    static_assert(task_count <= std::numeric_limits<task_index_t>::max(), "Task count too high");
+    static_assert(task_count <= std::numeric_limits<task_index_t>::max(), 
+    "Task count too high");
 
-    static_assert(task_count > 0, "Task count must be at least 1");
+    static_assert(task_count > 0, 
+    "Task count must be at least 1");
 
 public:
 

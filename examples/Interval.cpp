@@ -1,7 +1,7 @@
 #include <iostream>
 
-#include "obj_scheduler.h"
-#include "function_scheduler.h"
+#include "task_object.h"
+#include "task_function.h"
 #include "modules/interval_m.h"
 
 
@@ -22,7 +22,7 @@ tick_t (*UcosmSysData::sGetTick)() = &getTick;
 //    - 2 : the max number of simultaneous tasks.
 //    - Interval_M : the type of task handled by PeriodicProcess.
 
-class PeriodicProcess : public FunctionScheduler< PeriodicProcess, 2, Interval_M >
+class PeriodicProcess : public TaskFunction< PeriodicProcess, 2, Interval_M >
 {
     public:
 
@@ -61,7 +61,7 @@ class PeriodicProcess : public FunctionScheduler< PeriodicProcess, 2, Interval_M
 // instantiation of the master scheduler
 //  Kernel's argument :
 //    - 1 : the max number of simultaneous handlers.
-ObjScheduler<1> kernel;
+TaskObject<1> kernel;
 
 
 PeriodicProcess periodicProcess;

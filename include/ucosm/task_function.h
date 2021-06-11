@@ -111,7 +111,8 @@ public:
     // a function can be executed through several tasks
     // ioHandle is optional, it is used to access module after creation
     // if the task associated with a TaskHandle exists : myTaskHandle() == true
-    // if the TaskHandle still exists at task deletion, it will be reset : myTaskHandle() == false
+    // if the TaskHandle still exists at task deletion
+    // it will be reset : myTaskHandle() == false
     // even if the task has been deleted with the TaskHandle passed to the function
     bool createTask(task_function_t inFunc, TaskHandle *ioHandle = nullptr);
 
