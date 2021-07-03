@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.com/ThomasAUB/uCoSM.svg?branch=master)](https://travis-ci.com/ThomasAUB/uCoSM)
 
 # uCoSM
-Module based cooperative scheduler for microcontroler (Beta)
+Module based cooperative scheduler for microcontroler
 
   uCoSM is a lightweight and modular C++ embedded dynamic scheduler (c++14 or above). 
   
