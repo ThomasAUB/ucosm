@@ -70,7 +70,7 @@ Module based cooperative scheduler for microcontroler
   
  - ***Modules***     : The properties of a schedulable item.
  - ***TaskFunction*** : Contains function pointers and their specified modules.
- - ***TaskObject***      : Contains iTask pointers and their specified module.
+ - ***TaskObject***      : Contains iTask pointers and their specified modules.
           
         
 ### TaskFunction definition example
