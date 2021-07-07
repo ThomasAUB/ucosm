@@ -40,13 +40,13 @@ class ModuleHub_M {
 public:
 
     template<typename module_t>
-    auto getModule() {
-        return &std::get<module_t>(mModules);
+    module_t& getModule() {
+        return std::get<module_t>(mModules);
     }
 
     template<size_t I>
-    auto getModule() {
-        return &std::get<I>(mModules);
+    typename std::tuple_element<I, modules_t>::type& getModule() {
+        return std::get<I>(mModules);
     }
 
     //////////////////// init
