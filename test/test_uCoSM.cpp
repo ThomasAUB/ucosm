@@ -29,6 +29,8 @@ CPPUNIT_TEST_SUITE_REGISTRATION( CreatorTest );
 #include "test_task_function.h"
 CPPUNIT_TEST_SUITE_REGISTRATION( TaskHandlerTest );
 
+uint8_t UcosmSysData::sCnt = 0;
+
 int main(){
     // informs test-listener about testresults
     CPPUNIT_NS::TestResult testresult;

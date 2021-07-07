@@ -31,7 +31,7 @@
 #include "void_m.h"
 
 #include "ucosm_sys_data.h"
-uint8_t UcosmSysData::sCnt = 0;
+
 
 template<uint32_t task_count, typename module_M = void_M>
 class TaskObject: public ITask {
