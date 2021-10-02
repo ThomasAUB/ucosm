@@ -76,7 +76,7 @@ Module based cooperative scheduler for microcontroler
 ### TaskFunction definition example
 ```cpp
 // task properties or features
-using myTaskModules = ModuleHub_M< Priority_M, Interval_M >;
+using myTaskModules = ModuleMix_M< Priority_M, Interval_M >;
 
 // max simultaneous task count
 const uint8_t kTaskCount = 1;
@@ -86,17 +86,37 @@ class MyClass : public TaskFunction<MyClass, kTaskCount, myTaskModules>
 
   public:
   
-    MyClass(){
+    MyClass() : mDelay(true), mExeCount(0) {
+      
+      // create task handle
+      TaskHandle h;
+      
       // create task execution
-      this->createTask(&MyClass::myTaskFunction);
+      if(this->createTask(&MyClass::myTaskFunction, &h)) {
+        h->setPeriod(5);
+        h->setPriority(128);
+      }
     }
   
   private:
   
-    void myTaskFunction(TaskHandle inHandle){
+    void myTaskFunction(TaskHandle h){
+    
       // do stuff
+      if(mDelay) {
+        h->setDelay(50);
+      }
+      
+      mDelay = !mDelay;
+      
+      if(mExeCount++ == 200) {
+        this->deleteTask(h);
+      }
+      
     }
     
+    bool mDelay;
+    uint8_t mExeCount;
 };
 ```
 ### TaskObject definition example
