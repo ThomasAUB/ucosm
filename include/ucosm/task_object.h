@@ -48,13 +48,11 @@ public:
 
     // add a child task to schedule
     // returns true if success, false otherwise
-    template<typename T>
-    bool addTask(T *inTask);
+    bool addTask(ITask *inTask);
 
     // removes a child task
     // returns true is success, false otherwise
-    template<typename T>
-    bool removeTask(T *inTask);
+    bool removeTask(ITask *inTask);
 
     // returns the associated module
     // returns nullptr if task doesn't exist
@@ -79,23 +77,18 @@ private:
 };
 
 template<uint32_t task_count, typename module_M>
-template<typename T>
-bool TaskObject<task_count, module_M>::addTask(T *inTask) {
+bool TaskObject<task_count, module_M>::addTask(ITask *inTask) {
     if (mTaskCount == task_count) {
         return false;
     }
     mTasks[mTaskCount] = inTask;
     mTaskTraits[mTaskCount].init();
-    if constexpr (std::is_base_of<T, IExecutor<>>::value) {
-        inTask->init();
-    }
     mTaskCount++;
     return true;
 }
 
 template<uint32_t task_count, typename module_M>
-template<typename T>
-bool TaskObject<task_count, module_M>::removeTask(T *inTask) {
+bool TaskObject<task_count, module_M>::removeTask(ITask *inTask) {
     task_index_t i;
     if (getTaskIndex(inTask, i)) {
 
