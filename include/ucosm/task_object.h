@@ -64,9 +64,13 @@ public:
     // false otherwise
     bool schedule() final;
 
-private:
+protected:
 
-    bool getTaskIndex(ITask *inScheduler, task_index_t &ioIndex);
+    bool getTaskIndex(ITask *inTask, task_index_t &ioIndex);
+
+    task_index_t getTaskCount() { return mTaskCount; }
+
+private:
 
     ITask *mTasks[task_count];
 
@@ -89,23 +93,27 @@ bool TaskObject<task_count, module_M>::addTask(ITask *inTask) {
 
 template<uint32_t task_count, typename module_M>
 bool TaskObject<task_count, module_M>::removeTask(ITask *inTask) {
+
     task_index_t i;
-    if (getTaskIndex(inTask, i)) {
 
-        if (!mTaskTraits[i].isDelReady()) {
-            return false;
-        }
-
-        mTaskTraits[i].makePreDel();
-
-        // shift tasks for contiguous array
-        while (i < mTaskCount - 1) {
-            mTasks[i] = mTasks[i + 1];
-            mTaskTraits[i] = mTaskTraits[i + 1];
-            i++;
-        }
-        mTaskCount--;
+    if (!getTaskIndex(inTask, i)) {
+        return false;
     }
+
+    if (!mTaskTraits[i].isDelReady()) {
+        return false;
+    }
+
+    mTaskTraits[i].makePreDel();
+
+    // shift tasks for contiguous array
+    while (i < mTaskCount - 1) {
+        mTasks[i] = mTasks[i + 1];
+        mTaskTraits[i] = mTaskTraits[i + 1];
+        i++;
+    }
+
+    mTaskCount--;
     return true;
 }
 
@@ -139,13 +147,13 @@ bool TaskObject<task_count, module_M>::schedule() {
 }
 
 template<uint32_t task_count, typename module_M>
-bool TaskObject<task_count, module_M>::getTaskIndex(ITask *inScheduler, task_index_t &ioIndex) {
+bool TaskObject<task_count, module_M>::getTaskIndex(ITask *inTask, task_index_t &ioIndex) {
     if (!mTaskCount) {
         return false;
     }
     ioIndex = 0;
     do {
-        if (mTasks[ioIndex] == inScheduler) {
+        if (mTasks[ioIndex] == inTask) {
             return true;
         }
     } while (++ioIndex < mTaskCount);
