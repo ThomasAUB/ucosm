@@ -30,8 +30,6 @@
 
 #include "void_m.h"
 
-#include "ucosm_sys_data.h"
-
 
 template<uint32_t task_count, typename module_M = void_M>
 class TaskObject: public ITask {
@@ -46,25 +44,21 @@ class TaskObject: public ITask {
 
 public:
 
-    TaskObject() :
-            mTaskCount(0), mIdleTask(nullptr) {
-    }
+    TaskObject() : mTaskCount(0) {}
 
     // add a child task to schedule
     // returns true if success, false otherwise
-    bool addTask(ITask *inTask);
+    template<typename T>
+    bool addTask(T *inTask);
 
     // removes a child task
     // returns true is success, false otherwise
-    bool removeTask(ITask *inTask);
+    template<typename T>
+    bool removeTask(T *inTask);
 
     // returns the associated module
     // returns nullptr if task doesn't exist
     module_M* getTask(ITask *inTask);
-
-    // set the free or static function to execute
-    // when no child task is executed
-    void setIdleTask(void (*inIdleTask)());
 
     // to call periodically
     // manually or through another instance
@@ -82,32 +76,26 @@ private:
 
     task_index_t mTaskCount;
 
-    void (*mIdleTask)();
-
 };
 
 template<uint32_t task_count, typename module_M>
-bool TaskObject<task_count, module_M>::addTask(ITask *inTask) {
+template<typename T>
+bool TaskObject<task_count, module_M>::addTask(T *inTask) {
     if (mTaskCount == task_count) {
         return false;
     }
     mTasks[mTaskCount] = inTask;
     mTaskTraits[mTaskCount].init();
+    if constexpr (std::is_base_of<T, IExecutor<>>::value) {
+        inTask->init();
+    }
     mTaskCount++;
     return true;
 }
 
 template<uint32_t task_count, typename module_M>
-module_M* TaskObject<task_count, module_M>::getTask(ITask *inTask) {
-    task_index_t i;
-    if (getTaskIndex(inTask, i)) {
-        return &mTaskTraits[i];
-    }
-    return nullptr;
-}
-
-template<uint32_t task_count, typename module_M>
-bool TaskObject<task_count, module_M>::removeTask(ITask *inTask) {
+template<typename T>
+bool TaskObject<task_count, module_M>::removeTask(T *inTask) {
     task_index_t i;
     if (getTaskIndex(inTask, i)) {
 
@@ -129,13 +117,20 @@ bool TaskObject<task_count, module_M>::removeTask(ITask *inTask) {
 }
 
 template<uint32_t task_count, typename module_M>
+module_M* TaskObject<task_count, module_M>::getTask(ITask *inTask) {
+    task_index_t i;
+    if (getTaskIndex(inTask, i)) {
+        return &mTaskTraits[i];
+    }
+    return nullptr;
+}
+
+template<uint32_t task_count, typename module_M>
 bool TaskObject<task_count, module_M>::schedule() {
 
     bool hasWork = false;
 
     task_index_t i = 0;
-
-    UcosmSysData::sCnt++;
 
     while (i < mTaskCount) {
 
@@ -147,22 +142,11 @@ bool TaskObject<task_count, module_M>::schedule() {
         i++;
     }
 
-    if (!hasWork && mIdleTask) {
-        // idle task if exists
-        mIdleTask();
-    }
-
     return hasWork;
 }
 
 template<uint32_t task_count, typename module_M>
-void TaskObject<task_count, module_M>::setIdleTask(void (*inIdleTask)()) {
-    mIdleTask = inIdleTask;
-}
-
-template<uint32_t task_count, typename module_M>
-bool TaskObject<task_count, module_M>::
-getTaskIndex(ITask *inScheduler, task_index_t &ioIndex) {
+bool TaskObject<task_count, module_M>::getTaskIndex(ITask *inScheduler, task_index_t &ioIndex) {
     if (!mTaskCount) {
         return false;
     }
