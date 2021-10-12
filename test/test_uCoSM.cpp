@@ -18,14 +18,17 @@
 #include "test_delay.h"
 CPPUNIT_TEST_SUITE_REGISTRATION( DelayTest );
 
-#include "test_mem_pool_32.h"
-CPPUNIT_TEST_SUITE_REGISTRATION( MemPool32Test );
+#include "test_mem_pool.h"
+CPPUNIT_TEST_SUITE_REGISTRATION( MemPoolTest );
 
 #include "test_creator.h"
 CPPUNIT_TEST_SUITE_REGISTRATION( CreatorTest );
 
 #include "test_task_function.h"
 CPPUNIT_TEST_SUITE_REGISTRATION( TaskHandlerTest );
+
+#include "test_task_object_allocator.h"
+CPPUNIT_TEST_SUITE_REGISTRATION( TaskObjectAllocTest );
 
 int main(){
     // informs test-listener about testresults
