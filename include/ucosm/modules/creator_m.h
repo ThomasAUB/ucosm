@@ -24,13 +24,13 @@
 
 #pragma once
 
-#include "utils/mem_pool_32.h"
+#include "utils/mem_pool.h"
 
-template<typename T, size_t ObjectCount>
+template<typename T, uint32_t object_count, uint8_t alignment = 4>
 struct Creator_M {
 
-    template<typename ...args_t>
-    T* create(args_t ...args) {
+    template<typename ... args_t>
+    T* create(args_t&&...args) {
         sMem.allocate(&mP, args...);
         return mP;
     }
@@ -76,13 +76,13 @@ struct Creator_M {
 
 private:
 
-    static MemPool_32<ObjectCount, sizeof(T)> sMem;
+    static MemPool<object_count, sizeof(T), alignment> sMem;
 
     T *mP;
 
     bool mAutoRelease;
 };
 
-template<typename T, size_t ObjectCount>
-MemPool_32<ObjectCount, sizeof(T)> Creator_M<T, ObjectCount>::sMem;
+template<typename T, uint32_t object_count, uint8_t alignment>
+MemPool<object_count, sizeof(T), alignment> Creator_M<T, object_count, alignment>::sMem;
 
