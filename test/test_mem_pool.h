@@ -4,15 +4,15 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/ucosm/modules/utils/mem_pool_32.h"
+#include "../include/ucosm/modules/utils/mem_pool.h"
 
 #include <cstring>
 #include <array>
 
-class MemPool32Test : public CppUnit::TestFixture { 
+class MemPoolTest : public CppUnit::TestFixture { 
     
-    CPPUNIT_TEST_SUITE(MemPool32Test);
-    CPPUNIT_TEST(testPool32);
+    CPPUNIT_TEST_SUITE(MemPoolTest);
+    CPPUNIT_TEST(testPool);
     CPPUNIT_TEST_SUITE_END();
 
     public:
@@ -25,9 +25,9 @@ class MemPool32Test : public CppUnit::TestFixture {
 
         static const uint8_t kTextSize = 50;
 
-        void testPool32(){
+        void testPool(){
 
-            MemPool_32<3, 100> mem;
+            MemPool<3, 100> mem;
 
             TextObject *o1 = nullptr;
             TextObject *o2 = nullptr;
