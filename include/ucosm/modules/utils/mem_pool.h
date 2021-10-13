@@ -30,6 +30,8 @@ struct MemPool {
 
     static_assert(block_count <= 32, "block count can't exceed 32");
 
+    static_assert((block_size % alignment) == 0, "block_size must be a multiple of alignment");
+
     MemPool() : mMap(0) {}
 
     template<typename T, typename ... args_t>
