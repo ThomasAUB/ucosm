@@ -17,7 +17,20 @@ Module based cooperative scheduler for microcontroler
   Schedulable items can be functions or objects. 
   Modules can be added to those in order to add features.
   
-## The modules are :
+### uCoSM is divided into three entities which are :
+  
+ - ***Modules***     : The properties of a schedulable item.
+ - ***TaskFunction*** : Contains function pointers and their specified modules.
+ - ***TaskObject***      : Contains ITask pointers and their specified modules.
+ - ***TaskObjectAllocator***      : Contains ITask instances and their specified modules.
+
+#### note : 
+#### The tasks contained in TaskObject are supposed unique, i.e. only one task per object pointer
+#### The tasks contained in TaskFunction are not supposed unique, i.e. multiple task per function pointer is possible
+
+
+
+## Modules
       
  - **Conditional_M** : Associates a free function as "bool foo()" to each task telling if the function should be executed.
     
@@ -65,14 +78,14 @@ Module based cooperative scheduler for microcontroler
    
   
 
-### uCoSM is divided into three entities which are :
-  
- - ***Modules***     : The properties of a schedulable item.
- - ***TaskFunction*** : Contains function pointers and their specified modules.
- - ***TaskObject***      : Contains iTask pointers and their specified modules.
-          
-        
-### TaskFunction definition example
+
+
+
+
+## TaskFunction
+
+### Tasks defined as function pointers
+
 ```cpp
 // task properties or features
 using myTaskModules = ModuleMix_M< Priority_M, Interval_M >;
@@ -118,7 +131,10 @@ class MyClass : public TaskFunction<MyClass, kTaskCount, myTaskModules>
     uint8_t mExeCount;
 };
 ```
-### TaskObject definition example
+## TaskObject
+
+### Tasks defined as ITask pointers
+
 ```cpp
 // max simultaneous handler count
 const uint8_t kHandlerCount = 1;
@@ -138,4 +154,35 @@ int main(){
   
   return 0;
 }
+```
+
+## Custom module
+
+#### To create your own module, the simplest approach is to start from void_M.
+#### It's the minimal mandatory definition.
+#### From here, you can add functions and members you need for your program.
+#### An instance of module is associtated to every tasks.
+
+```cpp
+struct void_M {
+
+  // will be called each time the task is created or added
+  void init() {}
+
+  // the result of this call will tell if the task must be executed or not
+  bool isExeReady() const { return true; }
+
+  // the result of this call will tell if the deletion of the task is allowed or not
+  bool isDelReady() const { return true; }
+
+  // called right before every executions of the task
+  void makePreExe() {}
+
+  // called right before the deletion of the task
+  void makePreDel() {}
+
+  // called right after every executions of the task
+  void makePostExe() {}
+
+};
 ```
