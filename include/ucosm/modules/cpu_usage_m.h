@@ -33,22 +33,22 @@
 
 struct CPU_Usage_M {
 
-    fine_tick_t getCPU_UsagePercent() {
+    UcosmSysData::fine_tick_t getCPU_UsagePercent() {
         if (mLoopTime == 0) {
             return 100;
         }
         return ((mExeTime * 100) / mLoopTime);
     }
 
-    fine_tick_t getExecutionTime() {
+    UcosmSysData::fine_tick_t getExecutionTime() {
         return mExeTime;
     }
 
-    fine_tick_t getMaxExecutionTime() {
+    UcosmSysData::fine_tick_t getMaxExecutionTime() {
         return mMaxExeTime;
     }
 
-    fine_tick_t getCallPeriod() {
+    UcosmSysData::fine_tick_t getCallPeriod() {
         return mLoopTime;
     }
 
@@ -73,7 +73,7 @@ struct CPU_Usage_M {
     }
 
     void makePostExe() {
-        fine_tick_t curTS = UcosmSysData::sGetFineTick();
+        UcosmSysData::fine_tick_t curTS = UcosmSysData::sGetFineTick();
 
         mExeTime = curTS - mStartExeTS;
 
@@ -90,12 +90,12 @@ struct CPU_Usage_M {
 
 private:
 
-    fine_tick_t mStartExeTS;
-    fine_tick_t mExeTime;
-    fine_tick_t mMaxExeTime;
+    UcosmSysData::fine_tick_t mStartExeTS;
+    UcosmSysData::fine_tick_t mExeTime;
+    UcosmSysData::fine_tick_t mMaxExeTime;
 
-    fine_tick_t mStartLoopTS;
-    fine_tick_t mLoopTime;
+    UcosmSysData::fine_tick_t mStartLoopTS;
+    UcosmSysData::fine_tick_t mLoopTime;
 
 };
 
