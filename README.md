@@ -17,12 +17,12 @@ Module based cooperative scheduler for microcontroler
   Schedulable items can be functions or objects. 
   Modules can be added to those in order to add features.
   
-### uCoSM is divided into three entities which are :
+### uCoSM is divided into several entities which are :
   
  - ***Modules***     : The properties of a schedulable item.
- - ***TaskFunction*** : Contains function pointers and their specified modules.
  - ***TaskObject***      : Contains ITask pointers and their specified modules.
  - ***TaskObjectAllocator***      : Contains ITask instances and their specified modules.
+ - ***TaskFunction*** : Contains function pointers and their specified modules.
 
 #### note : 
 #### The tasks contained in TaskObject are supposed unique, i.e. only one task per object pointer
@@ -77,7 +77,36 @@ Module based cooperative scheduler for microcontroler
    
    
   
+## TaskObject
 
+### Tasks defined as ITask pointers
+
+```cpp
+struct MyTask : ITask {
+  bool schedule() override final {
+    // do stuff...
+    return true;
+  }
+};
+
+MyTask sTask;
+
+// max simultaneous handler count
+const uint8_t kHandlerCount = 1;
+TaskObject<kHandlerCount> sKernel;
+
+int main(){
+
+  // add handler to kernel
+  sKernel.addTask(&sTask);
+  
+  while(1){
+    sKernel.schedule();
+  }
+  
+  return 0;
+}
+```
 
 
 
@@ -87,26 +116,31 @@ Module based cooperative scheduler for microcontroler
 ### Tasks defined as function pointers
 
 ```cpp
+
 // task properties or features
-using myTaskModules = ModuleMix_M< Priority_M, Interval_M >;
+using myTaskModules = ModuleMix_M< Interval_M, Conditional_M >;
+
+bool isReady() {
+  return true;
+}
 
 // max simultaneous task count
 const uint8_t kTaskCount = 1;
 
-class MyClass : public TaskFunction<MyClass, kTaskCount, myTaskModules>
+class MyTaskClass : public TaskFunction<MyTaskClass, kTaskCount, myTaskModules>
 {
 
   public:
   
-    MyClass() : mDelay(true), mExeCount(0) {
+    MyTaskClass() : mDelay(true), mExeCount(0) {
       
       // create task handle
       TaskHandle h;
       
       // create task execution
-      if(this->createTask(&MyClass::myTaskFunction, &h)) {
+      if(this->createTask(&MyTaskClass::myTaskFunction, &h)) {
         h->setPeriod(5);
-        h->setPriority(128);
+        h->setCondition(isReady);
       }
     }
   
@@ -130,31 +164,25 @@ class MyClass : public TaskFunction<MyClass, kTaskCount, myTaskModules>
     bool mDelay;
     uint8_t mExeCount;
 };
-```
-## TaskObject
 
-### Tasks defined as ITask pointers
+MyTaskClass sTask;
 
-```cpp
 // max simultaneous handler count
 const uint8_t kHandlerCount = 1;
-
 TaskObject<kHandlerCount> sKernel;
 
-MyClass sHandler;
 
-int main(){
+int main() {
 
-  // add handler to kernel
-  sKernel.addTask(&sHandler);
-  
-  while(1){
+  sKernel.addTask(&sTask);
+
+  while(1) {
     sKernel.schedule();
   }
-  
   return 0;
 }
 ```
+
 
 ## Custom module
 
