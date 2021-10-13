@@ -39,7 +39,7 @@ struct TaskObjectAllocator: TaskObject<task_count, module_M> {
 
 private:
 
-    MemPool<task_count, max_task_size, alignment> mPool;
+    MemPool<task_count, max_task_size + max_task_size % alignment, alignment> mPool;
 
 };
 

@@ -76,7 +76,7 @@ struct Creator_M {
 
 private:
 
-    static MemPool<object_count, sizeof(T), alignment> sMem;
+    static MemPool<object_count, sizeof(T) + sizeof(T) % alignment, alignment> sMem;
 
     T *mP;
 
@@ -84,5 +84,5 @@ private:
 };
 
 template<typename T, uint32_t object_count, uint8_t alignment>
-MemPool<object_count, sizeof(T), alignment> Creator_M<T, object_count, alignment>::sMem;
+MemPool<object_count, sizeof(T) + sizeof(T) % alignment, alignment> Creator_M<T, object_count, alignment>::sMem;
 
