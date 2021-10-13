@@ -26,7 +26,7 @@
 
 #include "task_object.h"
 
-#include "modules/utils/mem_pool.h"
+#include "utils/mem_pool.h"
 
 template<uint32_t task_count, uint32_t max_task_size, typename module_M = void_M, uint8_t alignment = 4>
 struct TaskObjectAllocator: TaskObject<task_count, module_M> {

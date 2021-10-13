@@ -4,7 +4,7 @@
 #include <cppunit/TestCase.h>
 #include <cppunit/TestFixture.h>
 
-#include "../include/ucosm/modules/utils/mem_pool.h"
+#include "../include/ucosm/utils/mem_pool.h"
 
 #include <cstring>
 #include <array>
