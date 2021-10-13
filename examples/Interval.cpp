@@ -28,26 +28,40 @@ class PeriodicProcess : public TaskFunction< PeriodicProcess, 2, Interval_M >
 
         PeriodicProcess()
         {
+            TaskHandle h;
 
             // create tasks
-            createTask(&PeriodicProcess::fastProcess);
+
+            // if createTask returns true, the task has been created with success
+            if(createTask(&PeriodicProcess::fastProcess, &h)){
+                // set execution period, will be executed every 5ms
+                h->setPeriod(5);
+            }
 
             createTask(&PeriodicProcess::slowProcess);
-
         }
 
         void fastProcess(TaskHandle inHandle)
         {
             // do stuff
             std::cout << "fast" << std::endl;
-            inHandle->setDelay(5); // will restart in 5 ms
         }
 
         void slowProcess(TaskHandle inHandle)
         {
             // do stuff
             std::cout << "slow" << std::endl;
-            inHandle->setDelay(1000); // will restart in 1 s
+
+            static bool sC = false;
+            sC = !sC;
+
+            if(sC) {
+                // set delay manually to 1000 ms
+                inHandle->setDelay(1000); // will restart in 1 s
+            }else{
+                // set delay manually to 500 ms
+                inHandle->setDelay(500); // will restart in 500 ms
+            }
         }
 
 };
