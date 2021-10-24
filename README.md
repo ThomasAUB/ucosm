@@ -118,7 +118,7 @@ int main(){
 ```cpp
 
 // task properties or features
-using myTaskModules = ModuleMix_M< Interval_M, Conditional_M >;
+using task_modules_t = ModuleMix_M< Interval_M, Conditional_M >;
 
 bool isReady() {
   return true;
@@ -127,7 +127,7 @@ bool isReady() {
 // max simultaneous task count
 const uint8_t kTaskCount = 1;
 
-class MyTaskClass : public TaskFunction<MyTaskClass, kTaskCount, myTaskModules>
+class MyTaskClass : public TaskFunction<MyTaskClass, kTaskCount, task_modules_t>
 {
 
   public:
