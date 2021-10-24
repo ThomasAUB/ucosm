@@ -117,7 +117,7 @@ int main(){
 
 ```cpp
 
-// task properties or features
+// task modules
 using task_modules_t = ModuleMix_M< Interval_M, Conditional_M >;
 
 bool isReady() {
@@ -139,8 +139,16 @@ class MyTaskClass : public TaskFunction<MyTaskClass, kTaskCount, task_modules_t>
       
       // create task execution
       if(this->createTask(&MyTaskClass::myTaskFunction, &h)) {
+      
+        // access to Interval_M module
+        // myTaskFunction will try to execute every 5 ticks
         h->setPeriod(5);
+        
+        // access to Conditional_M
+        // myTaskFunction will try to execute when isReady returns true 
         h->setCondition(isReady);
+        
+        // myTaskFunction will execute when both modules are ready
       }
     }
   
