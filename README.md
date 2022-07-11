@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/ThomasAUB/uCoSM.svg?branch=master)](https://travis-ci.com/ThomasAUB/uCoSM)
-
+[![License](https://img.shields.io/github/license/ThomasAUB/ucosm.svg)](LICENSE)
 # uCoSM
 Module based cooperative scheduler for microcontrollers
 
