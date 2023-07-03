@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "../utils/u_fifo.h"
+#include "ucosm/utils/u_fifo.h"
 
 // Allow to send data to a specific task
 

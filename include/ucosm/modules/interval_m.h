@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "../ucosm_sys_data.h"
+#include "ucosm/ucosm_sys_data.h"
 
 // allow to specify a time period of execution of the process or postpone 
 // its execution
@@ -54,7 +54,7 @@ struct Interval_M {
 
     void init() {
         mPeriod = 0;
-        mExecution_time_stamp = UcosmSysData::sGetTick();
+        mExecution_time_stamp = 0;
     }
 
     bool isExeReady() const {

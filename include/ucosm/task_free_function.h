@@ -30,11 +30,9 @@
 
 #include "void_m.h"
 
-#include <stdint.h>
-
 
 template<uint32_t task_count, typename module_M = void_M>
-class TaskObject: public ITask {
+class TaskFreeFunction: public ITask {
 
     using task_index_t = uint8_t;
 
@@ -44,21 +42,23 @@ class TaskObject: public ITask {
     static_assert(task_count > 0, 
     "Task count must be at least 1");
 
+    using task_t = void(*)();
+
 public:
 
-    TaskObject() : mTaskCount(0) {}
+    TaskFreeFunction() : mTaskCount(0) {}
 
     // add a child task to schedule
     // returns true if success, false otherwise
-    bool addTask(ITask *inTask);
+    bool addTask(task_t inTask);
 
     // removes a child task
     // returns true is success, false otherwise
-    bool removeTask(ITask *inTask);
+    bool removeTask(task_t inTask);
 
     // returns the associated module
     // returns nullptr if task doesn't exist
-    module_M* getTask(ITask *inTask);
+    module_M* getTask(task_t inTask);
 
     // to call periodically
     // manually or through another instance
@@ -68,13 +68,13 @@ public:
 
 protected:
 
-    bool getTaskIndex(ITask *inTask, task_index_t &ioIndex);
+    bool getTaskIndex(task_t inTask, task_index_t &ioIndex);
 
     task_index_t getTaskCount() { return mTaskCount; }
 
 private:
 
-    ITask *mTasks[task_count];
+    task_t mTasks[task_count];
 
     module_M mTaskTraits[task_count];
 
@@ -83,8 +83,7 @@ private:
 };
 
 template<uint32_t task_count, typename module_M>
-bool TaskObject<task_count, module_M>::addTask(ITask *inTask) {
-
+bool TaskFreeFunction<task_count, module_M>::addTask(task_t inTask) {
     if (mTaskCount == task_count) {
         return false;
     }
@@ -104,7 +103,7 @@ bool TaskObject<task_count, module_M>::addTask(ITask *inTask) {
 }
 
 template<uint32_t task_count, typename module_M>
-bool TaskObject<task_count, module_M>::removeTask(ITask *inTask) {
+bool TaskFreeFunction<task_count, module_M>::removeTask(task_t inTask) {
 
     task_index_t i;
 
@@ -130,7 +129,7 @@ bool TaskObject<task_count, module_M>::removeTask(ITask *inTask) {
 }
 
 template<uint32_t task_count, typename module_M>
-module_M* TaskObject<task_count, module_M>::getTask(ITask *inTask) {
+module_M* TaskFreeFunction<task_count, module_M>::getTask(task_t inTask) {
     task_index_t i;
     if (getTaskIndex(inTask, i)) {
         return &mTaskTraits[i];
@@ -139,18 +138,19 @@ module_M* TaskObject<task_count, module_M>::getTask(ITask *inTask) {
 }
 
 template<uint32_t task_count, typename module_M>
-bool TaskObject<task_count, module_M>::schedule() {
-
-    bool hasWork = false;
+bool TaskFreeFunction<task_count, module_M>::schedule() {
 
     task_index_t i = 0;
+
+    bool hasWork = false;
 
     while (i < mTaskCount) {
 
         if (mTasks[i] && mTaskTraits[i].isExeReady()) {
             mTaskTraits[i].makePreExe();
-            hasWork |= mTasks[i]->schedule();
+            mTasks[i]();
             mTaskTraits[i].makePostExe();
+            hasWork = true;
         }
         i++;
     }
@@ -159,7 +159,7 @@ bool TaskObject<task_count, module_M>::schedule() {
 }
 
 template<uint32_t task_count, typename module_M>
-bool TaskObject<task_count, module_M>::getTaskIndex(ITask *inTask, task_index_t &ioIndex) {
+bool TaskFreeFunction<task_count, module_M>::getTaskIndex(task_t inTask, task_index_t &ioIndex) {
     if (!mTaskCount) {
         return false;
     }

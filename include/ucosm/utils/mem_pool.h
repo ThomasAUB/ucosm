@@ -23,7 +23,7 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 #pragma once
 
-#include "stdint.h"
+#include <stdint.h>
 
 template<uint8_t block_count, uint32_t block_size, uint8_t alignment = 4>
 struct MemPool {

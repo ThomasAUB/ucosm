@@ -26,4 +26,5 @@
 
 struct ITask {
     virtual bool schedule() = 0;
+    virtual ~ITask() {}
 };
