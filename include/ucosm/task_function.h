@@ -28,7 +28,7 @@
 #include "itask.h"
 #include "void_m.h"
 
-#include "stdint.h"
+#include <stdint.h>
 
 // this class uses CRTP to call the task functions
 // class MyClass : TaskFunction<MyClass, 2>{ /*...*/ };
@@ -45,13 +45,11 @@ class TaskFunction: public ITask {
 
     static_assert(task_count > 0, "Task count must be at least 1");
 
-    struct TaskItem: public module_M {
-        constexpr TaskItem() :
-                index(sCounterIndex++) {
-        }
-        const task_index_t index;
-    private:
-        static task_index_t sCounterIndex;
+    class TaskItem: public module_M {
+        task_index_t mIndex;
+        friend class TaskFunction<caller_t, task_count, module_M>;
+    public:
+        task_index_t index() const { return mIndex; }
     };
 
     enum throwExcept {
@@ -67,17 +65,17 @@ public:
 
     struct TaskHandle {
 
-        TaskHandle() :
-                mP(nullptr) {
-        }
+        TaskHandle() = default;
+
         ~TaskHandle() {
             mP = nullptr;
         }
 
         using task_function_t = void (caller_t::*)(TaskHandle);
 
-        void operator =(const TaskHandle&) {
+        TaskHandle& operator =(const TaskHandle& h) {
             throw_except<eIllegalCopy> _;
+            return h;
         }
 
         TaskItem* operator ->() {
@@ -94,13 +92,17 @@ public:
         }
 
     private:
-        TaskItem *mP;
-        static TaskFunction<caller_t, task_count, module_M> *handler;
+        TaskItem *mP = nullptr;
+        static inline TaskFunction<caller_t, task_count, module_M> *handler = nullptr;
         friend class TaskFunction<caller_t, task_count, module_M> ;
     };
 
-    TaskFunction() :
-            mFunctions { nullptr }, mHandlePtr { nullptr }, mActiveTaskCount(0) {
+    TaskFunction() {
+
+        for (uint32_t i = 0; i < task_count; i++) {
+            mTasks[i].mIndex = i; 
+        }
+
         TaskHandle::handler = this;
     }
 
@@ -144,28 +146,21 @@ private:
     void allocate(task_function_t inFunc, task_index_t i, TaskHandle *ioHandle);
 
     // task's module(s) and index
-    TaskItem mTasks[task_count];
+    TaskItem mTasks[task_count] {};
 
     // task function pointers
-    task_function_t mFunctions[task_count];
+    task_function_t mFunctions[task_count] {};
 
     // task handle pointers
-    TaskHandle *mHandlePtr[task_count];
+    TaskHandle *mHandlePtr[task_count] {};
 
     // count of currently active tasks
-    task_index_t mActiveTaskCount;
+    task_index_t mActiveTaskCount = 0;
 
     // currently scheduled task
     TaskHandle mCurTask;
 };
 
-template<typename caller_t, uint32_t task_count, typename module_M>
-typename TaskFunction<caller_t, task_count, module_M>::task_index_t TaskFunction<
-        caller_t, task_count, module_M>::TaskItem::sCounterIndex = 0;
-
-template<typename caller_t, uint32_t task_count, typename module_M>
-TaskFunction<caller_t, task_count, module_M> *TaskFunction<caller_t, task_count,
-        module_M>::TaskHandle::handler = nullptr;
 
 template<typename caller_t, uint32_t task_count, typename module_M>
 bool TaskFunction<caller_t, task_count, module_M>::schedule() {
@@ -246,10 +241,10 @@ bool TaskFunction<caller_t, task_count, module_M>::deleteTask(
         return false;
     }
 
-    task_index_t i = inHandle.mP->index;
+    task_index_t i = inHandle.mP->index();
 
     // check if the task is ready to be deleted
-    if (mTasks[i].isDelReady()) {
+    if (mFunctions[i] && mTasks[i].isDelReady()) {
 
         // destroy task
         mTasks[i].makePreDel();
@@ -295,7 +290,7 @@ TaskFunction<caller_t, task_count, module_M>::getTaskFunction(TaskHandle inHandl
     if (!inHandle()) {
         return 0;
     }
-    return mFunctions[inHandle.mP->index];
+    return mFunctions[inHandle.mP->index()];
 }
 
 // returns the count of currently active tasks
