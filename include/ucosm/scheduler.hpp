@@ -1,45 +1,62 @@
 #pragma once
 
 #include "itask.hpp"
+#include <limits>
+
 
 namespace ucosm {
 
-    struct Scheduler : ITask {
+    template<typename rank_t>
+    struct IScheduler : ITask<rank_t> {
 
-        Scheduler(std::string_view inName = "") :
-            ITask(inName) {}
+        IScheduler(std::string_view inName = "") :
+            ITask<rank_t>(inName) {}
 
         void run() override {
 
-            if (mTasks.empty() || mTasks.front().getRank() > 0) {
-                // no tasks or not ready
-                return;
-            }
-
-            while (!mTasks.empty() && mTasks.front().getRank() <= 0) {
+            while (!mTasks.empty() && mTasks.front().isReady()) {
                 mTasks.front().run();
             }
-        }
 
-        rank_t getRank() const override {
-            if (mTasks.empty()) {
-                return 1;
+            // this assumes that the scheduler is scheduled according the same policy
+            /*if (!mTasks.empty()) {
+                this->setRank(mTasks.front().getRank());
             }
             else {
-                return mTasks.front().getRank();
-            }
+                this->setRank(std::numeric_limits<rank_t>::max());
+            }*/
+
         }
 
-        bool addTask(ITask& inTask) {
+        bool addTask(ITask<rank_t>& inTask) {
+
             if (!inTask.init()) {
                 return false;
             }
+
             mTasks.push_front(inTask);
+
+            inTask.updateRank();
+
+            auto& front = mTasks.front();
+
+            if (&front == &inTask) {
+                this->setRank(front.getRank());
+            }
+
             return true;
         }
 
+        bool isReady() const override {
+            return (!mTasks.empty() && mTasks.front().isReady());
+        }
+
+        bool empty() const {
+            return mTasks.empty();
+        }
+
     private:
-        ulink::List<ITask> mTasks;
+        ulink::List<ITask<rank_t>> mTasks;
     };
 
 }

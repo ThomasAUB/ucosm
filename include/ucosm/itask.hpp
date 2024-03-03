@@ -5,9 +5,8 @@
 
 namespace ucosm {
 
-    struct ITask : ulink::Node<ITask> {
-
-        using rank_t = int;
+    template<typename rank_t>
+    struct ITask : ulink::Node<ITask<rank_t>> {
 
         ITask(std::string_view inName = "") :
             mName(inName) {}
@@ -18,61 +17,67 @@ namespace ucosm {
 
         virtual void run() = 0;
 
-        virtual rank_t getRank() const = 0;
-
         std::string_view name() const { return mName; }
 
+        virtual bool isReady() const = 0;
+
+        void updateRank() {
+
+            if (this->prev && this->prev->prev && mRank < this->prev->mRank) {
+                // move task to the left
+
+                auto* prevTask = this->prev;
+
+                while (prevTask->prev && mRank < prevTask->prev->mRank) {
+                    prevTask = prevTask->prev;
+                }
+
+                this->remove();
+
+                // insert before prevTask
+                this->next = prevTask;
+                this->prev = prevTask->prev;
+                this->next->prev = this;
+
+                if (this->prev) {
+                    this->prev->next = this;
+                }
+
+            }
+            else if (this->next && this->next->next && this->next->mRank < mRank) {
+                // move task to the right
+
+                auto* nextTask = this->next;
+
+                while (nextTask->next && nextTask->next->mRank < mRank) {
+                    nextTask = nextTask->next;
+                }
+
+                this->remove();
+
+                // insert after nextTask
+                this->prev = nextTask;
+                this->next = nextTask->next;
+                this->prev->next = this;
+
+                if (this->next) {
+                    this->next->prev = this;
+                }
+            }
+        }
+
+        rank_t getRank() const { return mRank; }
+
     protected:
-        rank_t mRank = 0;
+
+        rank_t mRank = rank_t();
+
         void setRank(rank_t inRank) {
             mRank = inRank;
             updateRank();
         }
 
-        void updateRank() {
 
-            const rank_t r = getRank();
-
-            if (this->prev->prev && r < this->prev->getRank()) {
-                // move task to the left
-                this->remove();
-
-                auto* prevTask = this->prev;
-
-                while (prevTask->prev && r < prevTask->prev->getRank()) {
-                    prevTask = prevTask->prev;
-                }
-
-                // insert before prevTask
-                next = prevTask;
-                prev = prevTask->prev;
-                next->prev = this;
-
-                if (prev) {
-                    prev->next = this;
-                }
-
-            }
-            else if (this->next->next && this->next->getRank() < r) {
-                // move task to the right
-                this->remove();
-
-                auto* nextTask = this->next;
-
-                while (nextTask->next && nextTask->next->getRank() < r) {
-                    nextTask = nextTask->next;
-                }
-
-                // insert after nextTask
-                prev = nextTask;
-                next = nextTask->next;
-                prev->next = this;
-
-                if (next) {
-                    next->prev = this;
-                }
-            }
-        }
 
     private:
 
