@@ -1,3 +1,30 @@
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * MIT License                                                                     *
+ *                                                                                 *
+ * Copyright (c) 2024 Thomas AUBERT                                                *
+ *                                                                                 *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy    *
+ * of this software and associated documentation files (the "Software"), to deal   *
+ * in the Software without restriction, including without limitation the rights    *
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell       *
+ * copies of the Software, and to permit persons to whom the Software is           *
+ * furnished to do so, subject to the following conditions:                        *
+ *                                                                                 *
+ * The above copyright notice and this permission notice shall be included in all  *
+ * copies or substantial portions of the Software.                                 *
+ *                                                                                 *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
+ * SOFTWARE.                                                                       *
+ *                                                                                 *
+ * github : https://github.com/ThomasAUB/ucosm                                     *
+ *                                                                                 *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 #pragma once
 
 #include "ulink.hpp"
@@ -5,84 +32,85 @@
 
 namespace ucosm {
 
-    template<typename rank_t>
-    struct ITask : ulink::Node<ITask<rank_t>> {
+    template<typename _rank_t>
+    struct ITask : ulink::Node<ITask<_rank_t>> {
 
-        ITask(std::string_view inName = "") :
-            mName(inName) {}
+        using rank_t = _rank_t;
+
+        virtual void run() = 0;
 
         virtual bool init() { return true; }
 
         virtual void deinit() {}
 
-        virtual void run() = 0;
+        virtual std::string_view name() const { return ""; }
 
-        std::string_view name() const { return mName; }
+        void updateRank();
 
-        virtual bool isReady() const = 0;
+        void setRank(rank_t inRank);
 
-        void updateRank() {
-
-            if (this->prev && this->prev->prev && mRank < this->prev->mRank) {
-                // move task to the left
-
-                auto* prevTask = this->prev;
-
-                while (prevTask->prev && mRank < prevTask->prev->mRank) {
-                    prevTask = prevTask->prev;
-                }
-
-                this->remove();
-
-                // insert before prevTask
-                this->next = prevTask;
-                this->prev = prevTask->prev;
-                this->next->prev = this;
-
-                if (this->prev) {
-                    this->prev->next = this;
-                }
-
-            }
-            else if (this->next && this->next->next && this->next->mRank < mRank) {
-                // move task to the right
-
-                auto* nextTask = this->next;
-
-                while (nextTask->next && nextTask->next->mRank < mRank) {
-                    nextTask = nextTask->next;
-                }
-
-                this->remove();
-
-                // insert after nextTask
-                this->prev = nextTask;
-                this->next = nextTask->next;
-                this->prev->next = this;
-
-                if (this->next) {
-                    this->next->prev = this;
-                }
-            }
-        }
-
-        rank_t getRank() const { return mRank; }
-
-    protected:
-
-        rank_t mRank = rank_t();
-
-        void setRank(rank_t inRank) {
-            mRank = inRank;
-            updateRank();
-        }
-
-
+        auto getRank() const;
 
     private:
 
-        std::string_view mName;
+        rank_t mRank = rank_t();
 
     };
+
+    template<typename _rank_t>
+    void ITask<_rank_t>::setRank(rank_t inRank) {
+        mRank = inRank;
+        updateRank();
+    }
+
+    template<typename _rank_t>
+    auto ITask<_rank_t>::getRank() const { return mRank; }
+
+    template<typename _rank_t>
+    void ITask<_rank_t>::updateRank() {
+
+        if (!this->isLinked()) {
+            return;
+        }
+
+        if (this->prev->prev && mRank < this->prev->mRank) {
+            // move task to the left
+
+            auto* prevTask = this->prev->prev;
+
+            while (prevTask->prev && mRank < prevTask->mRank) {
+                prevTask = prevTask->prev;
+            }
+
+            // insert after prevTask
+
+            this->remove();
+
+            this->prev = prevTask;
+            this->next = prevTask->next;
+            this->prev->next = this;
+            this->next->prev = this;
+
+        }
+        else if (this->next->next && this->next->mRank < mRank) {
+            // move task to the right
+
+            auto* nextTask = this->next->next;
+
+            while (nextTask->next && nextTask->mRank < mRank) {
+                nextTask = nextTask->next;
+            }
+
+            // insert before nextTask
+
+            this->remove();
+
+            this->next = nextTask;
+            this->prev = nextTask->prev;
+            this->next->prev = this;
+            this->prev->next = this;
+
+        }
+    }
 
 }
