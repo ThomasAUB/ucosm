@@ -3,19 +3,20 @@
 
 # uCosm
 
-Lightweight scheduler for microcontrollers.
+Lightweight cooperative scheduler for microcontrollers.
 
 # Example
 
 ```cpp
 #include <chrono>
-
 uint32_t getMilliseconds() {
     static auto start = std::chrono::steady_clock::now();
     auto end = std::chrono::steady_clock::now();
     return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
+```
 
+```cpp
 #include "ucosm/itask.hpp"
 #include "ucosm/scheduler.hpp"
 
@@ -24,9 +25,9 @@ struct IPeriodicTask : ucosm::ITask<uint32_t> {
     IPeriodicTask(uint32_t inPeriod) :
         mPeriod(inPeriod) {}
 
-protected:
-
-    uint32_t mPeriod = 0;
+    void setPeriod(uint32_t inPeriod) {
+        mPeriod = inPeriod;
+    }
 
 private:
 
@@ -36,6 +37,8 @@ private:
         periodicCallback();
         this->setRank(getMilliseconds() + mPeriod);
     }
+
+    uint32_t mPeriod = 0;
 
 };
 
@@ -54,13 +57,15 @@ private:
 };
 
 
-
-
 int main() {
 
-    Task t1(1, 1000); // execute task 1 every seconds
-    Task t2(2, 2000); // execute task 2 every 2 seconds
-    Task t3(3, 3000); // execute task 3 every 3 seconds
+    Task t1(1);
+    Task t2(2);
+    Task t3(3);
+
+    t1.setPeriod(1000); // run t1 every seconds
+    t2.setPeriod(2000); // run t2 every 2 seconds
+    t3.setPeriod(3000); // run t3 every 3 seconds
 
     ucosm::Scheduler<uint32_t, uint32_t> scheduler(
         +[] (uint32_t inTimeStamp) {
