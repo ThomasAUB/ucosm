@@ -22,9 +22,6 @@ uint32_t getMilliseconds() {
 
 struct IPeriodicTask : ucosm::ITask<uint32_t> {
 
-    IPeriodicTask(uint32_t inPeriod) :
-        mPeriod(inPeriod) {}
-
     void setPeriod(uint32_t inPeriod) {
         mPeriod = inPeriod;
     }
@@ -44,9 +41,9 @@ private:
 
 struct Task : IPeriodicTask {
 
-    Task(int inID, uint32_t inPeriod) :
-        IPeriodicTask(inPeriod),
-        id(inID) {}
+    Task(int inID) :
+    id(inID)
+    {}
 
     void periodicCallback() override {
         std::cout << "Task " << id << std::endl;
