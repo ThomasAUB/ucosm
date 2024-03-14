@@ -32,42 +32,95 @@
 
 namespace ucosm {
 
-    template<typename _rank_t>
-    struct ITask : ulink::Node<ITask<_rank_t>> {
+    /**
+     * @brief Task interface.
+     *
+     * @tparam rank_t Type used to sort tasks execution.
+     */
+    template<typename rank_t>
+    struct ITask : ulink::Node<ITask<rank_t>> {
 
-        using rank_t = _rank_t;
-
+        /**
+         * @brief Runs the task.
+         * Typically called by the scheduler when the task is ready.
+         */
         virtual void run() = 0;
 
+        /**
+         * @brief Initializes the task.
+         * Typically called by the scheduler when the task is added.
+         *
+         * @return true if the task was successfully initialized.
+         * @return false otherwise.
+         */
         virtual bool init() { return true; }
 
+        /**
+         * @brief Deinitializes the task.
+         * Called when the task is removed.
+         */
         virtual void deinit() {}
 
+        /**
+         * @brief Removes the task from the scheduler.
+         */
+        void remove();
+
+        /**
+         * @brief Returns the name of the task.
+         *
+         * @return std::string_view Task name.
+         */
         virtual std::string_view name() const { return ""; }
 
+        /**
+         * @brief Updates the task position in the list according to its rank value.
+         */
         void updateRank();
 
+        /**
+         * @brief Sets the task rank value.
+         *
+         * @param inRank New rank value.
+         */
         void setRank(rank_t inRank);
 
-        auto getRank() const;
+        /**
+         * @brief Gets the task rank value.
+         *
+         * @return rank_t Rank value.
+         */
+        rank_t getRank() const;
+
+        /**
+         * @brief Destroys the ITask object.
+         */
+        ~ITask();
 
     private:
-
+        using ulink::Node<ITask<rank_t>>::remove;
         rank_t mRank = rank_t();
-
     };
 
-    template<typename _rank_t>
-    void ITask<_rank_t>::setRank(rank_t inRank) {
+    template<typename rank_t>
+    void ITask<rank_t>::remove() {
+        if (this->isLinked()) {
+            deinit();
+        }
+        this->ulink::Node<ITask<rank_t>>::remove();
+    }
+
+    template<typename rank_t>
+    void ITask<rank_t>::setRank(rank_t inRank) {
         mRank = inRank;
         updateRank();
     }
 
-    template<typename _rank_t>
-    auto ITask<_rank_t>::getRank() const { return mRank; }
+    template<typename rank_t>
+    rank_t ITask<rank_t>::getRank() const { return mRank; }
 
-    template<typename _rank_t>
-    void ITask<_rank_t>::updateRank() {
+    template<typename rank_t>
+    void ITask<rank_t>::updateRank() {
 
         if (!this->isLinked()) {
             return;
@@ -84,7 +137,7 @@ namespace ucosm {
 
             // insert after prevTask
 
-            this->remove();
+            this->ulink::Node<ITask<rank_t>>::remove();
 
             this->prev = prevTask;
             this->next = prevTask->next;
@@ -103,13 +156,20 @@ namespace ucosm {
 
             // insert before nextTask
 
-            this->remove();
+            this->ulink::Node<ITask<rank_t>>::remove();
 
             this->next = nextTask;
             this->prev = nextTask->prev;
             this->next->prev = this;
             this->prev->next = this;
 
+        }
+    }
+
+    template<typename rank_t>
+    ITask<rank_t>::~ITask() {
+        if (this->isLinked()) {
+            deinit();
         }
     }
 

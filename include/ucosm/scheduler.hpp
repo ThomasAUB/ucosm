@@ -32,25 +32,70 @@
 
 namespace ucosm {
 
+    /**
+     * @brief Scheduler.
+     *
+     * @tparam task_rank_t Rank type of the tasks to schedule.
+     * @tparam sched_rank_t Rank type if the scheduler.
+     */
     template<typename task_rank_t, typename sched_rank_t>
     struct Scheduler : ITask<sched_rank_t> {
 
         using task_t = ITask<task_rank_t>;
         using policy_t = bool(*)(task_rank_t);
 
+        /**
+         * @brief Constructs a new scheduler object.
+         *
+         * @param inPolicy Function pointer of the policy to follow
+         * for task execution.
+         */
         Scheduler(policy_t inPolicy) :
             mPolicy(inPolicy) {}
 
+        /**
+         * @brief Runs the scheduler.
+         */
         void run() override;
 
+        /**
+         * @brief Adds a task to the scheduler.
+         *
+         * @param inTask Task instance.
+         * @return true if the task was successfully added.
+         * @return false otherwise.
+         */
         virtual bool addTask(task_t& inTask);
 
+        /**
+         * @brief Returns the number of task in the scheduler.
+         * This function will traverse the task list in order to count them.
+         * This function might perform poorly if the scheduler contains a lot of tasks.
+         *
+         * @return std::size_t Number of task.
+         */
         std::size_t size() const;
 
+        /**
+         * @brief Tells if the scheduler contains any task.
+         *
+         * @return true if the scheduler doesn't contain any task.
+         * @return false otherwise.
+         */
         bool empty() const;
 
+        /**
+         * @brief Removes every tasks from the scheduler.
+         */
         void clear();
 
+        /**
+         * @brief Pushes task names into a given stream.
+         *
+         * @tparam stream_t Stream type.
+         * @param inStream Stream instance.
+         * @param inSep Character used to separate task names.
+         */
         template<typename stream_t>
         void list(stream_t&& inStream, const char inSep = '\n');
 
