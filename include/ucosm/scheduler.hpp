@@ -68,6 +68,13 @@ namespace ucosm {
         virtual bool addTask(task_t& inTask);
 
         /**
+         * @brief Returns the currently executed task.
+         *
+         * @return task_t* Pointer to the task.
+         */
+        task_t* thisTask();
+
+        /**
          * @brief Returns the number of task in the scheduler.
          * This function will traverse the task list in order to count them.
          * This function might perform poorly if the scheduler contains a lot of tasks.
@@ -102,12 +109,15 @@ namespace ucosm {
     protected:
         policy_t mPolicy;
         ulink::List<task_t> mTasks;
+        task_t* mCurrentTask = nullptr;
     };
 
     template<typename task_rank_t, typename sched_rank_t>
     void Scheduler<task_rank_t, sched_rank_t>::run() {
         if (!mTasks.empty() && mPolicy(mTasks.front().getRank())) {
-            mTasks.front().run();
+            mCurrentTask = &mTasks.front();
+            mCurrentTask->run();
+            mCurrentTask = nullptr;
         }
     }
 
@@ -119,6 +129,12 @@ namespace ucosm {
         mTasks.push_front(inTask);
         inTask.updateRank();
         return true;
+    }
+
+    template<typename task_rank_t, typename sched_rank_t>
+    typename Scheduler<task_rank_t, sched_rank_t>::task_t*
+        Scheduler<task_rank_t, sched_rank_t>::thisTask() {
+        return mCurrentTask;
     }
 
     template<typename task_rank_t, typename sched_rank_t>
