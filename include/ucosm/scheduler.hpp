@@ -42,7 +42,7 @@ namespace ucosm {
     struct Scheduler : ITask<sched_rank_t> {
 
         using task_t = ITask<task_rank_t>;
-        using policy_t = bool(*)(task_rank_t);
+        using get_rank_t = task_rank_t(*)(void);
 
         /**
          * @brief Constructs a new scheduler object.
@@ -50,8 +50,11 @@ namespace ucosm {
          * @param inPolicy Function pointer of the policy to follow
          * for task execution.
          */
-        Scheduler(policy_t inPolicy) :
-            mPolicy(inPolicy) {}
+        Scheduler(get_rank_t inGetCurrentRank) :
+            mGetCurrentRank(inGetCurrentRank) {
+            mTasks.push_front(mCursorTask);
+            mCursorTask.setRank(mGetCurrentRank());
+        }
 
         /**
          * @brief Runs the scheduler.
@@ -85,7 +88,7 @@ namespace ucosm {
 
         /**
          * @brief Tells if the scheduler contains any task.
-         *
+         *            //task_t* next() { return this->next; }
          * @return true if the scheduler doesn't contain any task.
          * @return false otherwise.
          */
@@ -104,21 +107,62 @@ namespace ucosm {
          * @param inSep Character used to separate task names.
          */
         template<typename stream_t>
-        void list(stream_t&& inStream, const char inSep = '\n');
+        void list(stream_t&& inStream, std::string_view inSeparator = "\n");
 
     protected:
-        policy_t mPolicy;
+
         ulink::List<task_t> mTasks;
+
         task_t* mCurrentTask = nullptr;
+
+        get_rank_t mGetCurrentRank;
+
+        struct CursorTask : ITask<task_rank_t> {
+            void run() final {}
+            std::string_view name() const override { return "cursor"; }
+        };
+
+        CursorTask mCursorTask;
+
     };
 
     template<typename task_rank_t, typename sched_rank_t>
     void Scheduler<task_rank_t, sched_rank_t>::run() {
-        if (!mTasks.empty() && mPolicy(mTasks.front().getRank())) {
-            mCurrentTask = &mTasks.front();
-            mCurrentTask->run();
-            mCurrentTask = nullptr;
+
+        using iterator_t = typename ulink::List<task_t>::iterator;
+
+        iterator_t it(&mCursorTask);
+        ++it;
+
+        if (!mCursorTask.setRank(mGetCurrentRank())) {
+            return;
         }
+
+        iterator_t it_rank(&mCursorTask);
+
+        while (it != it_rank && it != mTasks.end()) {
+            mCurrentTask = &(*it);
+            ++it;
+            mCurrentTask->run();
+        }
+
+        mCurrentTask = nullptr;
+
+        if (it == it_rank) {
+            // no more task to run
+            return;
+        }
+
+        it = mTasks.begin();
+
+        while (it != it_rank) {
+            mCurrentTask = &(*it);
+            ++it;
+            mCurrentTask->run();
+        }
+
+        mCurrentTask = nullptr;
+
     }
 
     template<typename task_rank_t, typename sched_rank_t>
@@ -126,8 +170,8 @@ namespace ucosm {
         if (!inTask.init()) {
             return false;
         }
-        mTasks.push_front(inTask);
-        inTask.updateRank();
+        mTasks.insert_after(&mCursorTask, inTask);
+        inTask.setRank(mGetCurrentRank());
         return true;
     }
 
@@ -139,27 +183,28 @@ namespace ucosm {
 
     template<typename task_rank_t, typename sched_rank_t>
     bool Scheduler<task_rank_t, sched_rank_t>::empty() const {
-        return mTasks.empty();
+        return (&mTasks.front() == &mTasks.back());
     }
 
     template<typename task_rank_t, typename sched_rank_t>
     void Scheduler<task_rank_t, sched_rank_t>::clear() {
-        return mTasks.clear();
+        mTasks.clear();
+        mTasks.push_front(mCursorTask);
     }
 
     template<typename task_rank_t, typename sched_rank_t>
     std::size_t Scheduler<task_rank_t, sched_rank_t>::size() const {
-        return mTasks.size();
+        return (mTasks.size() - 1); // remove rank task
     }
 
     template<typename task_rank_t, typename sched_rank_t>
     template<typename stream_t>
     void Scheduler<task_rank_t, sched_rank_t>::list(
         stream_t&& inStream,
-        const char inSep
+        std::string_view inSeparator
     ) {
         for (const auto& t : mTasks) {
-            inStream << t.name() << ":" << t.getRank() << inSep;
+            inStream << t.name() << inSeparator;
         }
     }
 

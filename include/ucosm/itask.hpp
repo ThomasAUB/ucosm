@@ -75,15 +75,20 @@ namespace ucosm {
 
         /**
          * @brief Updates the task position in the list according to its rank value.
+         *
+         * @return true if the task was moved in the list
+         * @return false otherwise.
          */
-        void updateRank();
+        bool updateRank();
 
         /**
          * @brief Sets the task rank value.
          *
-         * @param inRank New rank value.
+         * @param inRank inRank New rank value.
+         * @return true if the task was moved in the list
+         * @return false otherwise.
          */
-        void setRank(rank_t inRank);
+        bool setRank(rank_t inRank);
 
         /**
          * @brief Gets the task rank value.
@@ -111,19 +116,19 @@ namespace ucosm {
     }
 
     template<typename rank_t>
-    void ITask<rank_t>::setRank(rank_t inRank) {
+    bool ITask<rank_t>::setRank(rank_t inRank) {
         mRank = inRank;
-        updateRank();
+        return updateRank();
     }
 
     template<typename rank_t>
     rank_t ITask<rank_t>::getRank() const { return mRank; }
 
     template<typename rank_t>
-    void ITask<rank_t>::updateRank() {
+    bool ITask<rank_t>::updateRank() {
 
         if (!this->isLinked()) {
-            return;
+            return false;
         }
 
         if (this->prev->prev && mRank < this->prev->mRank) {
@@ -164,6 +169,11 @@ namespace ucosm {
             this->prev->next = this;
 
         }
+        else {
+            return false;
+        }
+
+        return true;
     }
 
     template<typename rank_t>

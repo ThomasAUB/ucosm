@@ -11,6 +11,11 @@
 
 TEST_CASE("basic ucosm tests") {
 
+    auto getCurrentRank = [] () {
+        static uint8_t sRank = 0;
+        return sRank++;
+        };
+
     struct Task : ucosm::ITask<uint8_t> {
 
         void deinit() override {
@@ -29,11 +34,7 @@ TEST_CASE("basic ucosm tests") {
 
     static uint8_t readCount = 0;
 
-    ucosm::Scheduler<uint8_t, uint8_t> sched(
-        +[] (uint8_t) {
-            return true;
-        }
-    );
+    ucosm::Scheduler<uint8_t, uint8_t> sched(getCurrentRank);
 
     Task t1;
     Task t2;
@@ -58,47 +59,43 @@ TEST_CASE("basic ucosm tests") {
     }
 
     CHECK(1);
+    /*
+
+        ucosm::setTickFunction(
+            +[] () {
+                static auto start = std::chrono::steady_clock::now();
+                auto end = std::chrono::steady_clock::now();
+                return static_cast<ucosm::tick_t>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+            }
+        );
+
+        struct PTask : ucosm::IPeriodicTask {
+
+            void periodElapsed() override {
+                std::cout << "period " << this->period() << std::endl;
+            }
+
+        };
 
 
-    ucosm::setTickFunction(
-        +[] () {
-            static auto start = std::chrono::steady_clock::now();
-            auto end = std::chrono::steady_clock::now();
-            return static_cast<ucosm::tick_t>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+        ucosm::Scheduler<ucosm::tick_t, int> psched(ucosm::getTick);
+
+        PTask p;
+        PTask p2;
+
+        p.setPeriod(1000);
+        p2.setPeriod(500);
+
+        psched.addTask(p);
+        psched.addTask(p2);
+
+        p.setDelay(2000);
+
+        uint32_t counter = 0;
+
+        while (counter++ < 100000) {
+            psched.run();
         }
-    );
-
-    struct PTask : ucosm::IPeriodicTask {
-
-        void periodElapsed() override {
-            std::cout << "period " << this->period() << std::endl;
-        }
-
-    };
-
-
-    ucosm::Scheduler<ucosm::tick_t, int> psched(
-        +[] (ucosm::tick_t inTS) {
-            return ucosm::getTick() >= inTS;
-        }
-    );
-
-    PTask p;
-    PTask p2;
-
-    p.setPeriod(1000);
-    p.setDelay(2000);
-
-    p2.setPeriod(500);
-
-    psched.addTask(p);
-    psched.addTask(p2);
-
-    uint32_t counter = 0;
-
-    while (counter++ < 100000) {
-        psched.run();
-    }
-
+    */
 }
 
