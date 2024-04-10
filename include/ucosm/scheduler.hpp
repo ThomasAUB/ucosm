@@ -119,7 +119,7 @@ namespace ucosm {
 
         struct CursorTask : ITask<task_rank_t> {
             void run() final {}
-            std::string_view name() const override { return "cursor"; }
+            std::string_view name() const override { return ">"; }
         };
 
         CursorTask mCursorTask;

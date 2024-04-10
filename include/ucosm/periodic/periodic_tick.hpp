@@ -29,12 +29,12 @@
 
 #include <stdint.h>
 
-namespace ucosm {
+namespace ucosm::periodic {
 
     using tick_t = uint32_t;
 
     tick_t(*getTick)() = +[] () { return tick_t(); };
 
-    void setTickFunction(tick_t(*f)()) { getTick = f; }
+    static void setTickFunction(tick_t(*f)()) { getTick = f; }
 
 }

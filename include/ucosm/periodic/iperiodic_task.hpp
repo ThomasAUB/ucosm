@@ -28,9 +28,9 @@
 #pragma once
 
 #include "itask.hpp"
-#include "tick.hpp"
+#include "periodic_tick.hpp"
 
-namespace ucosm {
+namespace ucosm::periodic {
 
     struct IPeriodicTask : ITask<tick_t> {
 
@@ -48,11 +48,11 @@ namespace ucosm {
 
     private:
 
-        virtual void periodElapsed() = 0;
+        virtual void onPeriodElapsed() = 0;
 
         void run() override {
-            periodElapsed();
             setDelay(mPeriod);
+            onPeriodElapsed();
         }
 
         tick_t mPeriod;
