@@ -1,5 +1,5 @@
 ![build status](https://github.com/ThomasAUB/ucosm/actions/workflows/build.yml/badge.svg)
-[![License](https://img.shields.io/github/license/ThomasAUB/ucosm.svg)](LICENSE)
+[![License](https://img.shields.io/github/license/ThomasAUB/ucosm)](LICENSE)
 
 # uCosm
 
