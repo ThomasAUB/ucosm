@@ -7,6 +7,10 @@
 #include "ucosm/scheduler.hpp"
 #include "iperiodic_task.hpp"
 
+
+#include "cfs/icfs_task.hpp"
+#include "cfs/cfs_tick.hpp"
+
 #include <chrono>
 
 
