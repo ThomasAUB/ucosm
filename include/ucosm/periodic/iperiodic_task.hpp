@@ -44,7 +44,7 @@ namespace ucosm::periodic {
 
         void setPeriod(tick_t inPeriod) { mPeriod = inPeriod; }
 
-        tick_t period() const { return mPeriod; }
+        tick_t getPeriod() const { return mPeriod; }
 
     private:
 
