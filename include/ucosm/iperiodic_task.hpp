@@ -27,14 +27,46 @@
 
 #pragma once
 
+#include "itask.hpp"
 #include <stdint.h>
 
 namespace ucosm::periodic {
 
     using tick_t = uint32_t;
 
-    tick_t(*getTick)() = +[] () { return tick_t(); };
+    struct IPeriodicTask : ITask<tick_t> {
 
-    static void setTickFunction(tick_t(*f)()) { getTick = f; }
+        using get_tick_t = tick_t(*)();
+
+        IPeriodicTask() :
+            mPeriod(0) {}
+
+        IPeriodicTask(tick_t inPeriod) :
+            mPeriod(inPeriod) {}
+
+        void setDelay(tick_t inDelay) { this->setRank(sGetTick() + inDelay); }
+
+        void setPeriod(tick_t inPeriod) { mPeriod = inPeriod; }
+
+        tick_t getPeriod() const { return mPeriod; }
+
+        static void setTickFunction(get_tick_t inGetTick) { sGetTick = inGetTick; }
+
+        static tick_t getTick() { return sGetTick(); }
+
+    private:
+
+        virtual void onPeriodElapsed() = 0;
+
+        void run() override {
+            onPeriodElapsed();
+            this->setRank(this->getRank() + mPeriod);
+        }
+
+        tick_t mPeriod;
+
+        inline static get_tick_t sGetTick = +[] { return tick_t(); };
+
+    };
 
 }

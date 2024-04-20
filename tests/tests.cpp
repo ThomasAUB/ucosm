@@ -5,15 +5,14 @@
 
 
 #include "ucosm/scheduler.hpp"
-#include "periodic/iperiodic_task.hpp"
-#include "periodic/periodic_tick.hpp"
+#include "iperiodic_task.hpp"
 
 #include <chrono>
 
 
 TEST_CASE("basic ucosm tests") {
 
-    ucosm::periodic::setTickFunction(
+    ucosm::periodic::IPeriodicTask::setTickFunction(
         +[] () {
             static auto start = std::chrono::steady_clock::now();
             auto end = std::chrono::steady_clock::now();
@@ -40,7 +39,7 @@ TEST_CASE("basic ucosm tests") {
         bool mIsDeinit = false;
     };
 
-    ucosm::Scheduler<ucosm::periodic::tick_t, uint8_t> sched(ucosm::periodic::getTick);
+    ucosm::Scheduler<ucosm::periodic::tick_t, uint8_t> sched(ucosm::periodic::IPeriodicTask::getTick);
 
     Task t1;
     Task t2;
