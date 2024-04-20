@@ -43,6 +43,7 @@ namespace ucosm {
 
         using task_t = ITask<task_rank_t>;
         using get_rank_t = task_rank_t(*)(void);
+        using idle_func_t = void(*)();
 
         /**
          * @brief Constructs a new scheduler object.
@@ -100,6 +101,13 @@ namespace ucosm {
         void clear();
 
         /**
+         * @brief Set the idle function object.
+         *
+         * @param inIdleUntil Function to call on idle.
+         */
+        void setIdleFunction(idle_func_t inIdleFunction);
+
+        /**
          * @brief Pushes task names into a given stream.
          *
          * @tparam stream_t Stream type.
@@ -112,6 +120,8 @@ namespace ucosm {
     protected:
 
         ulink::List<task_t> mTasks;
+
+        idle_func_t mIdleFunction = nullptr;
 
         task_t* mCurrentTask = nullptr;
 
@@ -135,6 +145,10 @@ namespace ucosm {
         ++it;
 
         if (!mCursorTask.setRank(mGetCurrentRank())) {
+            // no task to run
+            if (mIdleFunction) {
+                mIdleFunction();
+            }
             return;
         }
 
@@ -195,6 +209,11 @@ namespace ucosm {
     template<typename task_rank_t, typename sched_rank_t>
     std::size_t Scheduler<task_rank_t, sched_rank_t>::size() const {
         return (mTasks.size() - 1); // remove rank task
+    }
+
+    template<typename task_rank_t, typename sched_rank_t>
+    void Scheduler<task_rank_t, sched_rank_t>::setIdleFunction(idle_func_t inIdleFunction) {
+        mIdleFunction = inIdleFunction;
     }
 
     template<typename task_rank_t, typename sched_rank_t>
