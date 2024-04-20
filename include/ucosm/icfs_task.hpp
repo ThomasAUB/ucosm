@@ -27,14 +27,47 @@
 
 #pragma once
 
+#include "itask.hpp"
 #include <stdint.h>
 
 namespace ucosm::cfs {
 
     using tick_t = uint32_t;
 
-    tick_t(*getTick)() = +[] () { return tick_t(); };
+    struct ICFSTask : ITask<tick_t> {
 
-    static void setTickFunction(tick_t(*f)()) { getTick = f; }
+        using get_tick_t = tick_t(*)();
+
+        using priority_t = uint8_t;
+
+        void setPriority(priority_t inPriority) {
+            if (inPriority > 16) {
+                inPriority = 16;
+            }
+            mPriority = inPriority;
+        }
+
+        priority_t getPriority() const { return mPriority; }
+
+        static void setTickFunction(get_tick_t inGetTick) { sGetTick = inGetTick; }
+
+        static tick_t getTick() { return sGetTick(); }
+
+    private:
+
+        virtual void execute() = 0;
+
+        void run() override {
+            const auto startTick = getTick();
+            execute();
+            tick_t duration = 1 + getTick() - startTick;
+            this->setRank(startTick + (duration << mPriority));
+        }
+
+        priority_t mPriority = 2;
+
+        inline static get_tick_t sGetTick = +[] { return tick_t(); };
+
+    };
 
 }
