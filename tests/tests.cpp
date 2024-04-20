@@ -19,17 +19,17 @@ TEST_CASE("basic ucosm tests") {
     std::cout << "periodic" << std::endl;
 
     {
-        ucosm::periodic::IPeriodicTask::setTickFunction(
+        ucosm::IPeriodicTask::setTickFunction(
             +[] () {
                 static auto start = std::chrono::steady_clock::now();
                 auto end = std::chrono::steady_clock::now();
-                return static_cast<ucosm::periodic::tick_t>(
+                return static_cast<ucosm::tick_t>(
                     std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
                     );
             }
         );
 
-        struct Task : ucosm::periodic::IPeriodicTask {
+        struct Task : ucosm::IPeriodicTask {
 
             void deinit() override {
                 mIsDeinit = true;
@@ -46,7 +46,7 @@ TEST_CASE("basic ucosm tests") {
             bool mIsDeinit = false;
         };
 
-        ucosm::Scheduler<ucosm::periodic::tick_t, uint8_t> sched(ucosm::periodic::IPeriodicTask::getTick);
+        ucosm::Scheduler<ucosm::tick_t, uint8_t> sched(ucosm::IPeriodicTask::getTick);
 
         Task t1;
         Task t2;
@@ -92,17 +92,17 @@ TEST_CASE("basic ucosm tests") {
 
     {
 
-        ucosm::cfs::ICFSTask::setTickFunction(
+        ucosm::ICFSTask::setTickFunction(
             +[] () {
                 static auto start = std::chrono::steady_clock::now();
                 auto end = std::chrono::steady_clock::now();
-                return static_cast<ucosm::periodic::tick_t>(
+                return static_cast<ucosm::tick_t>(
                     std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
                     );
             }
         );
 
-        struct Task : ucosm::cfs::ICFSTask {
+        struct Task : ucosm::ICFSTask {
 
             void execute() override {
 
@@ -120,7 +120,7 @@ TEST_CASE("basic ucosm tests") {
             uint32_t mLength;
         };
 
-        ucosm::Scheduler<ucosm::cfs::tick_t, uint8_t> sched(ucosm::cfs::ICFSTask::getTick);
+        ucosm::Scheduler<ucosm::tick_t, uint8_t> sched(ucosm::ICFSTask::getTick);
 
         Task t1;
         Task t2;

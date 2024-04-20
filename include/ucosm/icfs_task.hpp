@@ -27,19 +27,22 @@
 
 #pragma once
 
-#include "itask.hpp"
-#include <stdint.h>
+#include "iperiodic_task.hpp"
 
-namespace ucosm::cfs {
+namespace ucosm {
 
-    using tick_t = uint32_t;
-
-    struct ICFSTask : ITask<tick_t> {
-
-        using get_tick_t = tick_t(*)();
+    /**
+     * @brief Completely fair scheduler.
+     */
+    struct ICFSTask : IPeriodicTask {
 
         using priority_t = uint8_t;
 
+        /**
+         * @brief Set the task priority.
+         *
+         * @param inPriority Priority value between 0 (highest) and 16 (lowest)
+         */
         void setPriority(priority_t inPriority) {
             if (inPriority > 16) {
                 inPriority = 16;
@@ -47,26 +50,33 @@ namespace ucosm::cfs {
             mPriority = inPriority;
         }
 
+        /**
+         * @brief Get the task priority.
+         *
+         * @return priority_t Priority value.
+         */
         priority_t getPriority() const { return mPriority; }
 
-        static void setTickFunction(get_tick_t inGetTick) { sGetTick = inGetTick; }
-
-        static tick_t getTick() { return sGetTick(); }
-
     private:
+
+        void onPeriodElapsed() override final {}
 
         virtual void execute() = 0;
 
         void run() override {
-            const auto startTick = getTick();
+
+            auto timeStamp = getTick();
+
             execute();
-            tick_t duration = 1 + getTick() - startTick;
-            this->setRank(startTick + (duration << mPriority));
+
+            tick_t duration = 1 + getTick() - timeStamp;
+            duration <<= mPriority;
+
+            timeStamp += (duration > this->mPeriod) ? duration : this->mPeriod;
+            this->setRank(timeStamp);
         }
 
         priority_t mPriority = 2;
-
-        inline static get_tick_t sGetTick = +[] { return tick_t(); };
 
     };
 
