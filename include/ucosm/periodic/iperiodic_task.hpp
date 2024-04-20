@@ -51,8 +51,8 @@ namespace ucosm::periodic {
         virtual void onPeriodElapsed() = 0;
 
         void run() override {
-            setDelay(mPeriod);
             onPeriodElapsed();
+            this->setRank(this->getRank() + mPeriod);
         }
 
         tick_t mPeriod;
