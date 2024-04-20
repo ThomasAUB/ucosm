@@ -59,15 +59,15 @@ namespace ucosm {
 
     private:
 
-        void onPeriodElapsed() override final {}
+        void periodicRun() override final {}
 
-        virtual void execute() = 0;
+        virtual void cfsRun() = 0;
 
         void run() override {
 
             auto timeStamp = getTick();
 
-            execute();
+            cfsRun();
 
             tick_t duration = 1 + getTick() - timeStamp;
             duration <<= mPriority;

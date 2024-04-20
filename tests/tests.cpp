@@ -35,7 +35,7 @@ TEST_CASE("basic ucosm tests") {
                 mIsDeinit = true;
             }
 
-            void onPeriodElapsed() override {
+            void periodicRun() override {
                 if (mCounter++ == count) {
                     this->remove();
                 }
@@ -104,7 +104,7 @@ TEST_CASE("basic ucosm tests") {
 
         struct Task : ucosm::ICFSTask {
 
-            void execute() override {
+            void cfsRun() override {
 
                 for (volatile uint32_t i = 0; i < mLength; i++) {}
 

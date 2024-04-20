@@ -88,10 +88,10 @@ namespace ucosm {
 
     private:
 
-        virtual void onPeriodElapsed() = 0;
+        virtual void periodicRun() = 0;
 
         void run() override {
-            onPeriodElapsed();
+            periodicRun();
             this->setRank(this->getRank() + mPeriod);
         }
 
