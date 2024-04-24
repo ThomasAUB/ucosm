@@ -27,14 +27,19 @@
 
 #pragma once
 
-#include "iperiodic_task.hpp"
+#include "itask.hpp"
+#include <stdint.h>
 
 namespace ucosm {
 
     /**
      * @brief Completely fair scheduler.
      */
-    struct ICFSTask : IPeriodicTask {
+    struct ICFSTask : ITask<uint32_t> {
+
+        using tick_t = uint32_t;
+
+        using get_tick_t = tick_t(*)();
 
         using priority_t = uint8_t;
 
@@ -57,27 +62,34 @@ namespace ucosm {
          */
         priority_t getPriority() const { return mPriority; }
 
-    private:
+        /**
+         * @brief Set the tick function.
+         *
+         * @param inGetTick Get tick function pointer.
+         */
+        static void setTickFunction(get_tick_t inGetTick) { sGetTick = inGetTick; }
 
-        void periodicRun() override final {}
+    private:
 
         virtual void cfsRun() = 0;
 
         void run() override {
 
-            auto timeStamp = getTick();
+            auto timeStamp = sGetTick();
 
             cfsRun();
 
-            tick_t duration = 1 + getTick() - timeStamp;
+            tick_t duration = 1 + sGetTick() - timeStamp;
             duration <<= mPriority;
 
-            timeStamp += (duration > this->mPeriod) ? duration : this->mPeriod;
-            this->setRank(timeStamp);
+            duration += this->getRank();
+
+            this->setRank(duration);
         }
 
         priority_t mPriority = 2;
 
+        inline static get_tick_t sGetTick = +[] { return tick_t(); };
     };
 
 }

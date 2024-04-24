@@ -2,22 +2,12 @@
 
 #include "doctest.h"
 
-#include "ucosm/scheduler.hpp"
-#include "iperiodic_task.hpp"
+#include "periodic_scheduler.hpp"
 
 #include <chrono>
 
 void periodicTaskTests() {
 
-    ucosm::IPeriodicTask::setTickFunction(
-        +[] () {
-            static auto start = std::chrono::steady_clock::now();
-            auto end = std::chrono::steady_clock::now();
-            return static_cast<ucosm::tick_t>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-                );
-        }
-    );
 
     struct Task : ucosm::IPeriodicTask {
 
@@ -25,7 +15,7 @@ void periodicTaskTests() {
             mIsDeinit = true;
         }
 
-        void periodicRun() override {
+        void run() override {
             if (mCounter++ == count) {
                 this->remove();
             }
@@ -36,7 +26,15 @@ void periodicTaskTests() {
         bool mIsDeinit = false;
     };
 
-    ucosm::Scheduler<ucosm::tick_t, uint8_t> sched(ucosm::IPeriodicTask::getTick);
+    ucosm::PeriodicScheduler<uint8_t> sched(
+        +[] () {
+            static auto start = std::chrono::steady_clock::now();
+            auto end = std::chrono::steady_clock::now();
+            return static_cast<ucosm::IPeriodicTask::tick_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+                );
+        }
+    );
 
     Task t1;
     Task t2;

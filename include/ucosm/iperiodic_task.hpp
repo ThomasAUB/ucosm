@@ -27,32 +27,20 @@
 
 #pragma once
 
-#include "itask.hpp"
+#include "core/itask.hpp"
 #include <stdint.h>
 
 namespace ucosm {
 
-    using tick_t = uint32_t;
-
     /**
      * @brief Periodic task.
      */
-    struct IPeriodicTask : ITask<tick_t> {
+    struct IPeriodicTask : ITask<uint32_t> {
 
-        using get_tick_t = tick_t(*)();
+        using tick_t = uint32_t;
 
-        IPeriodicTask() :
-            mPeriod(0) {}
-
-        IPeriodicTask(tick_t inPeriod) :
+        IPeriodicTask(tick_t inPeriod = 0) :
             mPeriod(inPeriod) {}
-
-        /**
-         * @brief Delay task.
-         *
-         * @param inDelay Delay value.
-         */
-        void setDelay(tick_t inDelay) { this->setRank(sGetTick() + inDelay); }
 
         /**
          * @brief Set the task period.
@@ -68,34 +56,9 @@ namespace ucosm {
          */
         tick_t getPeriod() const { return mPeriod; }
 
-        /**
-         * @brief Set the tick function.
-         *
-         * @param inGetTick Get tick function pointer.
-         */
-        static void setTickFunction(get_tick_t inGetTick) { sGetTick = inGetTick; }
-
-        /**
-         * @brief Get the tick value.
-         *
-         * @return tick_t Tick value.
-         */
-        static tick_t getTick() { return sGetTick(); }
-
-    protected:
-
-        tick_t mPeriod;
-
     private:
 
-        virtual void periodicRun() = 0;
-
-        void run() override {
-            periodicRun();
-            this->setRank(this->getRank() + mPeriod);
-        }
-
-        inline static get_tick_t sGetTick = +[] { return tick_t(); };
+        tick_t mPeriod;
 
     };
 
