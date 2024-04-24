@@ -5,6 +5,26 @@
 
 Lightweight cooperative scheduler for microcontrollers.
 
+```mermaid
+
+flowchart LR
+
+scheduler(Scheduler)
+
+task1(Task)
+task2(Task)
+schedTask(Scheduler)
+subTask1(Task)
+subTask2(Task)
+
+scheduler --> task1
+scheduler --> task2
+scheduler --> schedTask
+
+schedTask --> subTask1
+schedTask --> subTask2
+```
+
 # Example
 
 ```cpp
