@@ -27,56 +27,38 @@
 
 #pragma once
 
-#include "iperiodic_task.hpp"
+#include "core/itask.hpp"
+#include <stdint.h>
 
 namespace ucosm {
 
     /**
-     * @brief Completely fair scheduler.
+     * @brief Periodic task.
      */
-    struct ICFSTask : IPeriodicTask {
+    struct IPeriodicTask : ITask<uint32_t> {
 
-        using priority_t = uint8_t;
+        using tick_t = uint32_t;
 
-        /**
-         * @brief Set the task priority.
-         *
-         * @param inPriority Priority value between 0 (highest) and 16 (lowest)
-         */
-        void setPriority(priority_t inPriority) {
-            if (inPriority > 16) {
-                inPriority = 16;
-            }
-            mPriority = inPriority;
-        }
+        IPeriodicTask(tick_t inPeriod = 0) :
+            mPeriod(inPeriod) {}
 
         /**
-         * @brief Get the task priority.
+         * @brief Set the task period.
          *
-         * @return priority_t Priority value.
+         * @param inPeriod Period value.
          */
-        priority_t getPriority() const { return mPriority; }
+        void setPeriod(tick_t inPeriod) { mPeriod = inPeriod; }
+
+        /**
+         * @brief Get the task period.
+         *
+         * @return tick_t Period  value.
+         */
+        tick_t getPeriod() const { return mPeriod; }
 
     private:
 
-        void periodicRun() override final {}
-
-        virtual void cfsRun() = 0;
-
-        void run() override {
-
-            auto timeStamp = getTick();
-
-            cfsRun();
-
-            tick_t duration = 1 + getTick() - timeStamp;
-            duration <<= mPriority;
-
-            timeStamp += (duration > this->mPeriod) ? duration : this->mPeriod;
-            this->setRank(timeStamp);
-        }
-
-        priority_t mPriority = 2;
+        tick_t mPeriod;
 
     };
 

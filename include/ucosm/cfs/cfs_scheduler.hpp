@@ -27,76 +27,85 @@
 
 #pragma once
 
-#include "itask.hpp"
-#include <stdint.h>
+#include "core/ischeduler.hpp"
+#include "icfs_task.hpp"
 
 namespace ucosm {
 
-    using tick_t = uint32_t;
-
     /**
-     * @brief Periodic task.
+     * @brief Completely fair scheduler.
+     *
+     * @tparam sched_rank_t Scheduler rank type.
      */
-    struct IPeriodicTask : ITask<tick_t> {
+    template<typename sched_rank_t>
+    struct CFSScheduler : IScheduler<ICFSTask, sched_rank_t> {
 
-        using get_tick_t = tick_t(*)();
+        using get_tick_t = ICFSTask::tick_t(*)();
 
-        IPeriodicTask() :
-            mPeriod(0) {}
-
-        IPeriodicTask(tick_t inPeriod) :
-            mPeriod(inPeriod) {}
+        CFSScheduler(get_tick_t inGetTick) : mGetTick(inGetTick) {}
 
         /**
-         * @brief Delay task.
-         *
-         * @param inDelay Delay value.
+         * @brief Runs the task that has the lower execution time.
          */
-        void setDelay(tick_t inDelay) { this->setRank(sGetTick() + inDelay); }
-
-        /**
-         * @brief Set the task period.
-         *
-         * @param inPeriod Period value.
-         */
-        void setPeriod(tick_t inPeriod) { mPeriod = inPeriod; }
-
-        /**
-         * @brief Get the task period.
-         *
-         * @return tick_t Period  value.
-         */
-        tick_t getPeriod() const { return mPeriod; }
-
-        /**
-         * @brief Set the tick function.
-         *
-         * @param inGetTick Get tick function pointer.
-         */
-        static void setTickFunction(get_tick_t inGetTick) { sGetTick = inGetTick; }
-
-        /**
-         * @brief Get the tick value.
-         *
-         * @return tick_t Tick value.
-         */
-        static tick_t getTick() { return sGetTick(); }
-
-    protected:
-
-        tick_t mPeriod;
+        void run() override;
 
     private:
 
-        virtual void periodicRun() = 0;
-
-        void run() override {
-            periodicRun();
-            this->setRank(this->getRank() + mPeriod);
-        }
-
-        inline static get_tick_t sGetTick = +[] { return tick_t(); };
+        get_tick_t mGetTick;
 
     };
+
+    template<typename sched_rank_t>
+    void CFSScheduler<sched_rank_t>::run() {
+
+        using iterator_t = typename decltype(this->mTasks)::iterator;
+
+        if (this->empty()) {
+            // no task to run
+            if (this->mIdleFunction) {
+                this->mIdleFunction();
+            }
+            return;
+        }
+
+        iterator_t it(&this->mCursorTask);
+        ++it;
+
+        if (it == this->mTasks.end()) {
+            it = this->mTasks.begin();
+        }
+
+        this->mCurrentTask = static_cast<ICFSTask*>(&(*it));
+
+        auto rank = mGetTick();
+
+        this->mCurrentTask->run();
+
+        rank = mGetTick() - rank;
+
+        if (!this->mCurrentTask->isLinked()) {
+            // task is not linked anymore : don't move the cursor task
+            this->mCurrentTask = nullptr;
+            return;
+        }
+
+        rank <<= this->mCurrentTask->getPriority();
+        rank += this->mCurrentTask->getRank();
+
+        if (!this->mCurrentTask->setRank(rank)) {
+            // rank didn't change : don't move cursor task
+            this->mCurrentTask = nullptr;
+            return;
+        }
+
+        if (&this->mTasks.back() == &(*it)) {
+            this->mTasks.push_front(this->mCursorTask);
+        }
+        else {
+            this->mTasks.insert_after(it, this->mCursorTask);
+        }
+
+        this->mCurrentTask = nullptr;
+    }
 
 }

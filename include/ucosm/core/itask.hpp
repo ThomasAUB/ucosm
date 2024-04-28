@@ -37,8 +37,10 @@ namespace ucosm {
      *
      * @tparam rank_t Type used to sort tasks execution.
      */
-    template<typename rank_t>
-    struct ITask : ulink::Node<ITask<rank_t>> {
+    template<typename _rank_t>
+    struct ITask : ulink::Node<ITask<_rank_t>> {
+
+        using rank_t = _rank_t;
 
         /**
          * @brief Runs the task.
@@ -71,7 +73,7 @@ namespace ucosm {
          *
          * @return std::string_view Task name.
          */
-        virtual std::string_view name() const { return ""; }
+        virtual std::string_view name() { return ""; }
 
         /**
          * @brief Updates the task position in the list according to its rank value.
@@ -112,7 +114,7 @@ namespace ucosm {
         if (this->isLinked()) {
             deinit();
         }
-        this->ulink::Node<ITask<rank_t>>::remove();
+        ulink::Node<ITask<rank_t>>::remove();
     }
 
     template<typename rank_t>
@@ -122,7 +124,9 @@ namespace ucosm {
     }
 
     template<typename rank_t>
-    rank_t ITask<rank_t>::getRank() const { return mRank; }
+    rank_t ITask<rank_t>::getRank() const {
+        return mRank;
+    }
 
     template<typename rank_t>
     bool ITask<rank_t>::updateRank() {
