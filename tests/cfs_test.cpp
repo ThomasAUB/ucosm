@@ -2,27 +2,15 @@
 
 #include "doctest.h"
 
-#include "ucosm/scheduler.hpp"
-#include "icfs_task.hpp"
+#include "cfs/cfs_scheduler.hpp"
 
 #include <chrono>
 
-
 void cfsTaskTests() {
-
-    ucosm::ICFSTask::setTickFunction(
-        +[] () {
-            static auto start = std::chrono::steady_clock::now();
-            auto end = std::chrono::steady_clock::now();
-            return static_cast<ucosm::tick_t>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-                );
-        }
-    );
 
     struct Task : ucosm::ICFSTask {
 
-        void cfsRun() override {
+        void run() override {
 
             for (volatile uint32_t i = 0; i < mLength; i++) {}
 
@@ -38,7 +26,15 @@ void cfsTaskTests() {
         uint32_t mLength;
     };
 
-    ucosm::Scheduler<ucosm::tick_t, uint8_t> sched(ucosm::ICFSTask::getTick);
+    ucosm::CFSScheduler<uint8_t> sched(
+        +[] () {
+            static auto start = std::chrono::steady_clock::now();
+            auto end = std::chrono::steady_clock::now();
+            return static_cast<ucosm::ICFSTask::tick_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+                );
+        }
+    );
 
     Task t1;
     Task t2;

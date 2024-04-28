@@ -27,69 +27,87 @@
 
 #pragma once
 
-#include "itask.hpp"
-#include <stdint.h>
+#include "core/ischeduler.hpp"
+#include "icfs_task.hpp"
 
 namespace ucosm {
 
     /**
      * @brief Completely fair scheduler.
+     *
+     * @tparam sched_rank_t Scheduler rank type.
      */
-    struct ICFSTask : ITask<uint32_t> {
+    template<typename sched_rank_t>
+    struct CFSScheduler : IScheduler<ICFSTask, sched_rank_t> {
 
-        using tick_t = uint32_t;
+        using get_tick_t = ICFSTask::tick_t(*)();
 
-        using get_tick_t = tick_t(*)();
-
-        using priority_t = uint8_t;
-
-        /**
-         * @brief Set the task priority.
-         *
-         * @param inPriority Priority value between 0 (highest) and 16 (lowest)
-         */
-        void setPriority(priority_t inPriority) {
-            if (inPriority > 16) {
-                inPriority = 16;
-            }
-            mPriority = inPriority;
-        }
+        CFSScheduler(get_tick_t inGetTick) : mGetTick(inGetTick) {}
 
         /**
-         * @brief Get the task priority.
-         *
-         * @return priority_t Priority value.
+         * @brief Runs the task that has the lower execution time.
          */
-        priority_t getPriority() const { return mPriority; }
-
-        /**
-         * @brief Set the tick function.
-         *
-         * @param inGetTick Get tick function pointer.
-         */
-        static void setTickFunction(get_tick_t inGetTick) { sGetTick = inGetTick; }
+        void run() override;
 
     private:
 
-        virtual void cfsRun() = 0;
+        get_tick_t mGetTick;
 
-        void run() override {
+    };
 
-            auto timeStamp = sGetTick();
+    template<typename sched_rank_t>
+    void CFSScheduler<sched_rank_t>::run() {
 
-            cfsRun();
+        using iterator_t =
+            typename IScheduler<ICFSTask, sched_rank_t>::iterator_t;
 
-            tick_t duration = 1 + sGetTick() - timeStamp;
-            duration <<= mPriority;
 
-            duration += this->getRank();
-
-            this->setRank(duration);
+        if (this->empty()) {
+            // no task to run
+            if (this->mIdleFunction) {
+                this->mIdleFunction();
+            }
+            return;
         }
 
-        priority_t mPriority = 2;
+        iterator_t it(&this->mCursorTask);
+        ++it;
 
-        inline static get_tick_t sGetTick = +[] { return tick_t(); };
-    };
+        if (it == this->mTasks.end()) {
+            it = this->mTasks.begin();
+        }
+
+        this->mCurrentTask = static_cast<ICFSTask*>(&(*it));
+
+        auto rank = mGetTick();
+
+        this->mCurrentTask->run();
+
+        rank = mGetTick() - rank;
+
+        if (!this->mCurrentTask->isLinked()) {
+            // task is not linked anymore : don't move the cursor task
+            this->mCurrentTask = nullptr;
+            return;
+        }
+
+        rank <<= this->mCurrentTask->getPriority();
+        rank += this->mCurrentTask->getRank();
+
+        if (!this->mCurrentTask->setRank(rank)) {
+            // rank didn't change : don't move cursor task
+            this->mCurrentTask = nullptr;
+            return;
+        }
+
+        if (&this->mTasks.back() == &(*it)) {
+            this->mTasks.push_front(this->mCursorTask);
+        }
+        else {
+            this->mTasks.insert_after(it, this->mCursorTask);
+        }
+
+        this->mCurrentTask = nullptr;
+    }
 
 }

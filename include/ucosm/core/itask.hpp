@@ -114,7 +114,7 @@ namespace ucosm {
         if (this->isLinked()) {
             deinit();
         }
-        this->ulink::Node<ITask<rank_t>>::remove();
+        ulink::Node<ITask<rank_t>>::remove();
     }
 
     template<typename rank_t>
@@ -124,7 +124,9 @@ namespace ucosm {
     }
 
     template<typename rank_t>
-    rank_t ITask<rank_t>::getRank() const { return mRank; }
+    rank_t ITask<rank_t>::getRank() const {
+        return mRank;
+    }
 
     template<typename rank_t>
     bool ITask<rank_t>::updateRank() {

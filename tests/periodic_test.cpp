@@ -2,7 +2,7 @@
 
 #include "doctest.h"
 
-#include "periodic_scheduler.hpp"
+#include "periodic/periodic_scheduler.hpp"
 
 #include <chrono>
 

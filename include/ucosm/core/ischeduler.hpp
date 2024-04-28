@@ -39,7 +39,7 @@ namespace ucosm {
      * @tparam sched_rank_t Rank type if the scheduler.
      */
     template<typename task_t, typename sched_rank_t>
-    struct IScheduler : ITask<IScheduler<task_t, sched_rank_t>> {
+    struct IScheduler : ITask<sched_rank_t> {
 
         using idle_func_t = void(*)();
 
@@ -80,7 +80,7 @@ namespace ucosm {
 
         /**
          * @brief Tells if the scheduler contains any task.
-         *            //task_t* next() { return this->next; }
+         *
          * @return true if the scheduler doesn't contain any task.
          * @return false otherwise.
          */
@@ -114,15 +114,11 @@ namespace ucosm {
         using itask_t = ITask<task_rank_t>;
         using iterator_t = typename ulink::List<itask_t>::iterator;
 
-        virtual void postRun(task_rank_t inCurrentRank) = 0;
-
-        void runUntilCursor(task_rank_t inCurrentRank);
-
         ulink::List<itask_t> mTasks;
 
         idle_func_t mIdleFunction = nullptr;
 
-        itask_t* mCurrentTask = nullptr;
+        task_t* mCurrentTask = nullptr;
 
         struct CursorTask : itask_t {
             void run() final {}
@@ -133,93 +129,48 @@ namespace ucosm {
 
     };
 
-    template<typename task_rank_t, typename sched_rank_t>
-    void IScheduler<task_rank_t, sched_rank_t>::runUntilCursor(task_rank_t inCurrentRank) {
-
-        iterator_t it(&mCursorTask);
-
-        ++it;
-
-        if (!mCursorTask.setRank(inCurrentRank)) {
-            // no task to run
-            if (mIdleFunction) {
-                mIdleFunction();
-            }
-            return;
-        }
-
-        iterator_t it_rank(&mCursorTask);
-
-        while (it != it_rank && it != mTasks.end()) {
-            mCurrentTask = &(*it);
-            ++it;
-            mCurrentTask->run();
-            postRun(inCurrentRank);
-        }
-
-        mCurrentTask = nullptr;
-
-        if (it == it_rank) {
-            // no more task to run
-            return;
-        }
-
-        it = mTasks.begin();
-
-        while (it != it_rank) {
-            mCurrentTask = &(*it);
-            ++it;
-            mCurrentTask->run();
-            postRun(inCurrentRank);
-        }
-
-        mCurrentTask = nullptr;
-    }
-
-    template<typename task_rank_t, typename sched_rank_t>
-    bool IScheduler<task_rank_t, sched_rank_t>::addTask(task_t& inTask) {
+    template<typename task_t, typename sched_rank_t>
+    bool IScheduler<task_t, sched_rank_t>::addTask(task_t& inTask) {
         if (!inTask.init()) {
             return false;
         }
         mTasks.insert_after(&mCursorTask, inTask);
-        //inTask.setRank(mGetCurrentRank());
         return true;
     }
 
-    template<typename task_rank_t, typename sched_rank_t>
-    typename IScheduler<task_rank_t, sched_rank_t>::task_t*
-        IScheduler<task_rank_t, sched_rank_t>::thisTask() {
+    template<typename task_t, typename sched_rank_t>
+    task_t* IScheduler<task_t, sched_rank_t>::thisTask() {
         return static_cast<task_t*>(mCurrentTask);
     }
 
-    template<typename task_rank_t, typename sched_rank_t>
-    bool IScheduler<task_rank_t, sched_rank_t>::empty() const {
+    template<typename task_t, typename sched_rank_t>
+    bool IScheduler<task_t, sched_rank_t>::empty() const {
         return (&mTasks.front() == &mTasks.back());
     }
 
-    template<typename task_rank_t, typename sched_rank_t>
-    void IScheduler<task_rank_t, sched_rank_t>::clear() {
+    template<typename task_t, typename sched_rank_t>
+    void IScheduler<task_t, sched_rank_t>::clear() {
         mTasks.clear();
         mTasks.push_front(mCursorTask);
     }
 
-    template<typename task_rank_t, typename sched_rank_t>
-    std::size_t IScheduler<task_rank_t, sched_rank_t>::size() const {
-        return (mTasks.size() - 1); // remove rank task
+    template<typename task_t, typename sched_rank_t>
+    std::size_t IScheduler<task_t, sched_rank_t>::size() const {
+        return (mTasks.size() - 1);
     }
 
-    template<typename task_rank_t, typename sched_rank_t>
-    void IScheduler<task_rank_t, sched_rank_t>::setIdleFunction(idle_func_t inIdleFunction) {
+    template<typename task_t, typename sched_rank_t>
+    void IScheduler<task_t, sched_rank_t>::setIdleFunction(idle_func_t inIdleFunction) {
         mIdleFunction = inIdleFunction;
     }
 
-    template<typename task_rank_t, typename sched_rank_t>
+    template<typename task_t, typename sched_rank_t>
     template<typename stream_t>
-    void IScheduler<task_rank_t, sched_rank_t>::list(
+    void IScheduler<task_t, sched_rank_t>::list(
         stream_t&& inStream,
         std::string_view inSeparator
     ) {
-        for (const auto& t : mTasks) {
+        for (auto& t : mTasks) {
             inStream << t.name() << inSeparator;
         }
     }
