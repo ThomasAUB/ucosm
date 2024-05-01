@@ -37,8 +37,8 @@ namespace ucosm {
      *
      * @tparam sched_rank_t Scheduler rank type.
      */
-    template<typename sched_rank_t>
-    struct CFSScheduler : IScheduler<ICFSTask, sched_rank_t> {
+    template<typename sched_task_t = ITask<int8_t>>
+    struct CFSScheduler : IScheduler<ICFSTask, sched_task_t> {
 
         using get_tick_t = ICFSTask::tick_t(*)();
 

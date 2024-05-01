@@ -38,8 +38,8 @@ namespace ucosm {
      * @tparam task_t Task type to schedule.
      * @tparam sched_rank_t Rank type if the scheduler.
      */
-    template<typename task_t, typename sched_rank_t>
-    struct IScheduler : ITask<sched_rank_t> {
+    template<typename task_t, typename sched_task_t>
+    struct IScheduler : sched_task_t {
 
         using idle_func_t = void(*)();
 

@@ -26,7 +26,7 @@ void periodicTaskTests() {
         bool mIsDeinit = false;
     };
 
-    ucosm::PeriodicScheduler<uint8_t> sched(
+    ucosm::PeriodicScheduler sched(
         +[] () {
             static auto start = std::chrono::steady_clock::now();
             auto end = std::chrono::steady_clock::now();

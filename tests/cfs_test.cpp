@@ -26,7 +26,7 @@ void cfsTaskTests() {
         uint32_t mLength;
     };
 
-    ucosm::CFSScheduler<uint8_t> sched(
+    ucosm::CFSScheduler sched(
         +[] () {
             static auto start = std::chrono::steady_clock::now();
             auto end = std::chrono::steady_clock::now();
