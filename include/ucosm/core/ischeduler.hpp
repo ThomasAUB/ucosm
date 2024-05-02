@@ -36,7 +36,7 @@ namespace ucosm {
      * @brief Scheduler.
      *
      * @tparam task_t Task type to schedule.
-     * @tparam sched_rank_t Rank type if the scheduler.
+     * @tparam sched_task_t Scheduler task type
      */
     template<typename task_t, typename sched_task_t>
     struct IScheduler : sched_task_t {

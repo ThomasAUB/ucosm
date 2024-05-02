@@ -35,7 +35,7 @@ namespace ucosm {
     /**
      * @brief Completely fair scheduler.
      *
-     * @tparam sched_rank_t Scheduler rank type.
+     * @tparam sched_task_t Scheduler task type
      */
     template<typename sched_task_t = ITask<int8_t>>
     struct CFSScheduler : IScheduler<ICFSTask, sched_task_t> {

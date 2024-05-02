@@ -12,7 +12,6 @@ Lightweight cooperative scheduler for microcontrollers.
 - customizable scheduling policy
 
 ```mermaid
-
 flowchart LR
 
 scheduler(Scheduler)
@@ -71,7 +70,7 @@ static ucosm::IPeriodicTask::tick_t getTick_ms() {
 
 int main() {
 
-    ucosm::PeriodicScheduler<uint8_t> sched(getTick_ms);
+    ucosm::PeriodicScheduler sched(getTick_ms);
 
     Task t1;
     Task t2;
@@ -113,18 +112,7 @@ struct Task final : ucosm::ICFSTask {
 
 int main() {
 
-    ucosm::CFSScheduler<uint8_t> sched(
-        +[] () {
-            // get tick in microseconds
-            static auto start = std::chrono::steady_clock::now();
-            auto end = std::chrono::steady_clock::now();
-            return static_cast<ucosm::ICFSTask::tick_t>(
-                std::chrono::duration_cast<
-                    std::chrono::microseconds
-                >(end - start).count()
-            );
-        }
-    );
+    ucosm::CFSScheduler sched(getTick_us);
 
     Task t1;
     Task t2;
@@ -141,6 +129,24 @@ int main() {
 
     return 0;
 }
+```
+
+# Scheduler tree
+
+In this library, the schedulers are also tasks. The task type can be passed as a template parameter to the scheduler.
+
+Here we declare a periodic scheduler that schedules a CFS scheduler that schedules a periodic scheduler.
+
+```cpp
+ucosm::PeriodicScheduler<ucosm::ICFSTask> periodicScheduler(getTick_ms);
+
+ucosm::CFSScheduler<ucosm::IPeriodicTask> cfsScheduler(getTick_us);
+
+ucosm::PeriodicScheduler periodicScheduler2(getTick_ms);
+
+cfsScheduler.addTask(periodicScheduler);
+
+periodicScheduler2.addTask(cfsScheduler);
 ```
 
 # Notes
