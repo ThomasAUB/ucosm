@@ -3,7 +3,7 @@
 
 # uCosm
 
-Lightweight cooperative scheduler for microcontrollers.
+Lightweight C++17 cooperative scheduler for microcontrollers.
 
 - no heap allocation
 - no task number limitation or pre-allocation
@@ -59,12 +59,10 @@ struct Task final : ucosm::IPeriodicTask {
 #include "periodic/periodic_scheduler.hpp"
 
 static ucosm::IPeriodicTask::tick_t getTick_ms() {
-    static auto start = std::chrono::steady_clock::now();
-    auto end = std::chrono::steady_clock::now();
     return static_cast<ucosm::IPeriodicTask::tick_t>(
-        std::chrono::duration_cast<
-            std::chrono::milliseconds
-        >(end - start).count()
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count()
     );
 }
 
@@ -157,5 +155,5 @@ The tasks storage is based on [ulink](https://github.com/ThomasAUB/ulink) and pr
 void foo() {
     Task tempTask;
     sched.addTask(tempTask);
-}// tempTask removes itself on deletion
+}// tempTask removes itself from the scheduler at the end of the scope
 ```

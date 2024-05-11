@@ -28,10 +28,10 @@ void cfsTaskTests() {
 
     ucosm::CFSScheduler sched(
         +[] () {
-            static auto start = std::chrono::steady_clock::now();
-            auto end = std::chrono::steady_clock::now();
             return static_cast<ucosm::ICFSTask::tick_t>(
-                std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()
+                ).count()
                 );
         }
     );
