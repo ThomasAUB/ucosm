@@ -53,6 +53,56 @@ namespace ucosm {
             inTask.setRank(mGetTick() + inDelay);
         }
 
+        bool hasWork() const {
+
+            using iterator_t = typename decltype(this->mTasks)::iterator;
+
+            if (this->empty()) {
+                return false;
+            }
+
+            iterator_t it(nullptr);
+
+            if (this->mCurrentTask) {
+
+                // a task is currently running
+                // check if next task must be run
+
+                it = this->mCurrentTask;
+
+                ++it;
+
+                if (it == this->mTasks.end()) {
+                    it = this->mTasks.begin();
+                }
+
+                if (it != &this->mCursorTask) {
+                    // at least one other task is waiting
+                    return true;
+                }
+
+                // it is equal to cursor task
+
+            }
+            else {
+
+                // no task is running
+                // check against cursor task
+
+                it = &this->mCursorTask;
+            }
+
+            ++it;
+
+            if (it == this->mTasks.end()) {
+                it = this->mTasks.begin();
+            }
+
+            const auto currentTick = mGetTick();
+
+            return currentTick > (*it).getRank();
+        }
+
         /**
          * @brief Runs every ready tasks.
          */

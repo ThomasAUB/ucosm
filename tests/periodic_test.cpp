@@ -6,6 +6,8 @@
 
 #include <chrono>
 
+#include <iostream>
+
 void periodicTaskTests() {
 
 
@@ -64,6 +66,10 @@ void periodicTaskTests() {
     CHECK(!sched.empty());
     CHECK(!t1.mIsDeinit);
     CHECK(!t2.mIsDeinit);
+
+    if (sched.hasWork()) {
+        std::cout << "has work !" << std::endl;
+    }
 
     while (!sched.empty()) {
         sched.run();
