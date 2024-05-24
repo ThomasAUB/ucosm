@@ -165,8 +165,7 @@ namespace ucosm {
             // check for tick overflow
             return
                 (currentTick < this->mCursorTask.getRank()) &&      // tick overflow
-                (currentTick >= this->mTasks.front().getRank())     // next task is ready
-                );
+                (currentTick >= this->mTasks.front().getRank());    // next task is ready
         }
 
         return (currentTick >= (*it).getRank());
