@@ -140,7 +140,7 @@ namespace ucosm {
 
             auto* prevTask = this->prev->prev;
 
-            while (prevTask->prev && mRank < prevTask->mRank) {
+            while (prevTask->prev && mRank <= prevTask->mRank) {
                 prevTask = prevTask->prev;
             }
 
@@ -159,7 +159,7 @@ namespace ucosm {
 
             auto* nextTask = this->next->next;
 
-            while (nextTask->next && nextTask->mRank < mRank) {
+            while (nextTask->next && nextTask->mRank <= mRank) {
                 nextTask = nextTask->next;
             }
 

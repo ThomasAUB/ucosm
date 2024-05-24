@@ -68,6 +68,36 @@ namespace ucosm {
             return;
         }
 
+        {
+            iterator_t it(&this->mCursorTask);
+            ++it;
+
+            if (it == this->mTasks.end()) {
+                it = this->mTasks.begin();
+            }
+
+            this->mCurrentTask = static_cast<ICFSTask*>(&(*it));
+
+            auto rank = mGetTick();
+
+            this->mCurrentTask->run();
+
+            rank = mGetTick() - rank;
+
+            rank <<= this->mCurrentTask->getPriority();
+            rank += this->mCurrentTask->getRank();
+
+            if (!this->mCurrentTask->setRank(rank)) {
+                // task is not linked anymore or
+                // rank didn't change
+                // -> don't move cursor task
+                this->mCurrentTask = nullptr;
+                return;
+            }
+
+        }
+
+        // move cursor task right after the one that has been executed
         iterator_t it(&this->mCursorTask);
         ++it;
 
@@ -75,32 +105,7 @@ namespace ucosm {
             it = this->mTasks.begin();
         }
 
-        this->mCurrentTask = static_cast<ICFSTask*>(&(*it));
-
-        auto rank = mGetTick();
-
-        this->mCurrentTask->run();
-
-        rank = mGetTick() - rank;
-
-        rank <<= this->mCurrentTask->getPriority();
-        rank += this->mCurrentTask->getRank();
-
-        if (!this->mCurrentTask->setRank(rank)) {
-            // task is not linked anymore or
-            // rank didn't change
-            // -> don't move cursor task
-            this->mCurrentTask = nullptr;
-            return;
-        }
-
-        if (&this->mTasks.back() == &(*it)) {
-            this->mTasks.push_front(this->mCursorTask);
-        }
-        else {
-            this->mTasks.insert_after(it, this->mCursorTask);
-        }
-
+        this->mCursorTask.setRank(static_cast<ICFSTask*>(&(*it))->getRank());
         this->mCurrentTask = nullptr;
     }
 

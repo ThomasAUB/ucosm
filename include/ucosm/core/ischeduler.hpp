@@ -134,6 +134,7 @@ namespace ucosm {
             return false;
         }
         mTasks.insert_after(&mCursorTask, inTask);
+        inTask.setRank(mCursorTask.getRank());
         return true;
     }
 
