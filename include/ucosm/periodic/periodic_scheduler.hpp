@@ -54,6 +54,14 @@ namespace ucosm {
         }
 
         /**
+         * @brief Tells if other tasks are ready to be executed
+         *
+         * @return true if other tasks are ready.
+         * @return false otherwise.
+         */
+        bool hasWork() const;
+
+        /**
          * @brief Runs every ready tasks.
          */
         void run() override;
@@ -110,6 +118,58 @@ namespace ucosm {
 
         this->mCurrentTask = nullptr;
 
+    }
+
+    template<typename sched_rank_t>
+    bool PeriodicScheduler<sched_rank_t>::hasWork() const {
+
+        using iterator_t = typename decltype(this->mTasks)::const_iterator;
+
+        if (this->empty()) {
+            return false;
+        }
+
+        if (this->mCurrentTask) {
+
+            // a task is currently running
+            // check if next task must be run
+
+            if (this->mTasks.size() == 1) {
+                // current task is the only one and is being executed
+                return false;
+            }
+
+            iterator_t it(this->mCurrentTask);
+
+            ++it;
+
+            if (it == this->mTasks.end()) {
+                it = this->mTasks.begin();
+            }
+
+            if (it != &this->mCursorTask) {
+                // at least one other task is waiting
+                return true;
+            }
+
+        }
+
+        // check from cursor task
+
+        iterator_t it(&this->mCursorTask);
+        ++it;
+
+        const auto currentTick = mGetTick();
+
+        if (it == this->mTasks.end()) {
+            // check for tick overflow
+            return
+                (currentTick < this->mCursorTask.getRank()) &&      // tick overflow
+                (currentTick >= this->mTasks.front().getRank())     // next task is ready
+                );
+        }
+
+        return (currentTick >= (*it).getRank());
     }
 
 }
