@@ -2,7 +2,7 @@
 
 #include "doctest.h"
 
-#include "cfs/cfs_scheduler.hpp"
+#include "ucosm/cfs/cfs_scheduler.hpp"
 
 #include <chrono>
 

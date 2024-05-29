@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "core/ischeduler.hpp"
+#include "ucosm/core/ischeduler.hpp"
 #include "icfs_task.hpp"
 
 namespace ucosm {

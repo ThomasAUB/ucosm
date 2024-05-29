@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "core/itask.hpp"
+#include "ucosm/core/itask.hpp"
 #include <stdint.h>
 
 namespace ucosm {
