@@ -1,7 +1,7 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * MIT License                                                                     *
  *                                                                                 *
- * Copyright (c) 2020 Thomas AUBERT                                                *
+ * Copyright (c) 2024 Thomas AUBERT                                                *
  *                                                                                 *
  * Permission is hereby granted, free of charge, to any person obtaining a copy    *
  * of this software and associated documentation files (the "Software"), to deal   *
@@ -20,111 +20,50 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
  * SOFTWARE.                                                                       *
+ *                                                                                 *
+ * github : https://github.com/ThomasAUB/ucosm                                     *
+ *                                                                                 *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #pragma once
 
-// allows to create process execution queues,
-// as you can chose to single or double link process,
-// you can  elaborate complex execution start patterns
+#include "core/itask.hpp"
+#include <stdint.h>
 
-struct ProcessQ_M {
+namespace ucosm {
 
-    void setFirst() {
-        // parse previous
-        if (!mPrev) {
-            return;
+    /**
+     * @brief Completely fair scheduler.
+     */
+    struct ICFSTask : ITask<uint32_t> {
+
+        using tick_t = uint32_t;
+
+        using priority_t = uint8_t;
+
+        /**
+         * @brief Set the task priority.
+         *
+         * @param inPriority Priority value between 0 (highest) and 16 (lowest)
+         */
+        void setPriority(priority_t inPriority) {
+            if (inPriority > 16) {
+                inPriority = 16;
+            }
+            mPriority = inPriority;
         }
 
-        mPrev->mNext = mNext;
-        mNext->mPrev = mPrev;
+        /**
+         * @brief Get the task priority.
+         *
+         * @return priority_t Priority value.
+         */
+        priority_t getPriority() const { return mPriority; }
 
-        ProcessQ_M *t = mPrev;
+    private:
 
-        while (t->mPrev) {
-            t = t->mPrev;
-        }
+        priority_t mPriority = 2;
 
-        mNext = t;
-        t->mPrev = this;
+    };
 
-        mPrev = nullptr;
-    }
-
-    void setLast() {
-        // parse nexts
-        if (!mNext) {
-            return;
-        }
-
-        mNext->mPrev = mPrev;
-        mPrev->mNext = mNext;
-
-        ProcessQ_M *t = mNext;
-
-        while (t->mNext) {
-            t = t->mNext;
-        }
-
-        mPrev = t;
-        t->mNext = this;
-
-        mNext = nullptr;
-    }
-
-    void executeBefore(ProcessQ_M *inNext) {
-        if (!inNext) {
-            return;
-        }
-        mNext = inNext;
-        mNext->mPrev = this;
-    }
-
-    void executeAfter(ProcessQ_M *inPrev) {
-        if (!inPrev) {
-            return;
-        }
-        mPrev = inPrev;
-        mPrev->mNext = this;
-    }
-
-    void init() {
-        mPrev = nullptr;
-        mNext = nullptr;
-    }
-
-    bool isExeReady() const {
-        return (mPrev == nullptr);
-    }
-
-    bool isDelReady() const {
-        return true;
-    }
-
-    void makePreExe() {
-    }
-
-    void makePreDel() {
-        if (mPrev && mNext) {
-            mPrev->mNext = mNext;
-            mNext->mPrev = mPrev;
-        } else if (mPrev) {
-            mPrev->mNext = nullptr;
-        } else if (mNext) {
-            mNext->mPrev = nullptr;
-        }
-    }
-
-    void makePostExe() {
-        if (mNext) {
-            mNext->mPrev = nullptr;
-        }
-    }
-
-private:
-
-    ProcessQ_M *mPrev;
-    ProcessQ_M *mNext;
-
-};
-
+}

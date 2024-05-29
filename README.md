@@ -1,224 +1,159 @@
-[![Build Status](https://travis-ci.com/ThomasAUB/uCoSM.svg?branch=master)](https://travis-ci.com/ThomasAUB/uCoSM)
-[![License](https://img.shields.io/github/license/ThomasAUB/ucosm.svg)](LICENSE)
-# uCoSM
-Module based cooperative scheduler for microcontrollers
+![build status](https://github.com/ThomasAUB/ucosm/actions/workflows/build.yml/badge.svg)
+[![License](https://img.shields.io/github/license/ThomasAUB/ucosm)](LICENSE)
 
-  uCoSM is a lightweight and modular C++ embedded dynamic scheduler (c++14 or above). 
-  
-## Its features are :
-  
- - Dynamically add and remove schedulable items such as function and class.
- - No use of heap memory.
- - Creation of custom task and handler properties called "modules".
- - TaskHandle management.
- - Minimal use of virtual functions.
-   
-  
-  Schedulable items can be functions or objects. 
-  Modules can be added to those in order to add features.
-  
-### uCoSM is divided into several entities which are :
-  
- - ***Modules***     : The properties of a schedulable item.
- - ***TaskObject***      : Contains ITask pointers and their specified modules.
- - ***TaskObjectAllocator***      : Contains ITask instances and their specified modules.
- - ***TaskFunction*** : Contains function pointers and their specified modules.
+# uCosm
 
-#### note : 
-#### The tasks contained in TaskObject are supposed unique, i.e. only one task per object pointer
-#### The tasks contained in TaskFunction are not supposed unique, i.e. multiple task per function pointer is possible
+Lightweight C++17 cooperative scheduler for microcontrollers.
 
+- no heap allocation
+- no task number limitation or pre-allocation
+- platform independent
+- scheduling tree
+- customizable scheduling policy
 
+```mermaid
+flowchart LR
 
-## Modules
-      
- - **Conditional_M** : Associates a free function as "bool foo()" to each task telling if the function should be executed.
-    
- - **Coroutine_M** : Implementation of coroutine allowing to yield and loop (Inspired by protothread).
-    
- - **Coroutine_ctx_M** : Implementation of coroutine allowing to yield, loop and save context.
-    
-    
- - **CPU_Usage_M** : Measures the CPU usage of tasks.
-    
-    
- - **Creator_M**        : Dynamically allocates an object in a shared fixed size buffer.
-    
-    
- - **Delay_M**          : Delays the execution of a task.
-    
-    
- - **Interval_M**       : Delays and set an execution period of a task.
-    
-    
- - **Module_Hub_M**     : Defines several modules per tasks.
-    
-    
- - **Module_Mix_M**     : Defines several modules per tasks using mixins.
-    
-    
- - **Parent_M**         : Sets a Parent/Child relationship between two tasks, will forbid the deletion of the parent task if the child task is alive. 
-                          
-        
- - **ProcessQ_M**       : Defines an execution sequence of active tasks.
-    
-    
- - **Signal_M**         : Sends data from one task to another.
-    
-    
- - **Stack_Usage_M**      : Measures the count of bytes written on the stack after the execution of a task.
-    
-    
- - **Status_M**         : Contains the status of the task (Running, Started, Suspended, Locked).
-            
-            
- - **LinkedList_M**     : Automatically updated linked list of chronologically executed active tasks.
-    
-   
-   
-  
-## TaskObject
+scheduler(Scheduler)
 
-### Tasks defined as ITask pointers
+task1(Task)
+task2(Task)
+task3(Task)
+schedTask(Scheduler)
+schedTask
+subTask1(Task)
+subTask2(Task)
 
-```cpp
-struct MyTask : ITask {
-  bool schedule() override final {
-    // do stuff...
-    return true;
-  }
-};
+scheduler --> task1
+scheduler --> task2
+scheduler --> task3
+scheduler --> schedTask
 
-MyTask sTask;
-
-// max simultaneous handler count
-const uint8_t kHandlerCount = 1;
-TaskObject<kHandlerCount> sKernel;
-
-int main(){
-
-  // add handler to kernel
-  sKernel.addTask(&sTask);
-  
-  while(1){
-    sKernel.schedule();
-  }
-  
-  return 0;
-}
+schedTask --> subTask1
+schedTask --> subTask2
 ```
 
+This library provides a basic skeleton implementation in the _core_ directory, and two specialisations contained in the _periodic_ and _cfs_ (Completely Fair Scheduler) directories.
 
+# Examples
 
-
-## TaskFunction
-
-### Tasks defined as function pointers
+## Periodic
 
 ```cpp
+#include <iostream>
+#include "periodic/iperiodic_task.hpp"
 
-// task modules
-using task_modules_t = ModuleMix_M< Interval_M, Conditional_M >;
-
-bool isReady() {
-  return true;
-}
-
-// max simultaneous task count
-const uint8_t kTaskCount = 1;
-
-class MyTaskClass : public TaskFunction<MyTaskClass, kTaskCount, task_modules_t>
-{
-
-  public:
-  
-    MyTaskClass() : mDelay(true), mExeCount(0) {
-      
-      // create task handle
-      TaskHandle h;
-      
-      // create task execution
-      if(this->createTask(&MyTaskClass::myTaskFunction, &h)) {
-      
-        // access to Interval_M module
-        // myTaskFunction will try to execute every 5 ticks
-        h->setPeriod(5);
-        
-        // access to Conditional_M
-        // myTaskFunction will try to execute when isReady returns true 
-        h->setCondition(isReady);
-        
-        // myTaskFunction will execute when both modules are ready
-      }
+struct Task final : ucosm::IPeriodicTask {
+    void run() override {
+        std::cout << "run " << this->getPeriod() << std::endl;
+        if(mCounter++ == 10) {
+            this->remove();
+        }
     }
-  
-  private:
-  
-    void myTaskFunction(TaskHandle h){
-    
-      // do stuff
-      if(mDelay) {
-        h->setDelay(50);
-      }
-      
-      mDelay = !mDelay;
-      
-      if(mExeCount++ == 200) {
-        this->deleteTask(h);
-      }
-      
-    }
-    
-    bool mDelay;
-    uint8_t mExeCount;
+    int mCounter = 0;
 };
+```
 
-MyTaskClass sTask;
+```cpp
+#include <chrono>
+#include "periodic/periodic_scheduler.hpp"
 
-// max simultaneous handler count
-const uint8_t kHandlerCount = 1;
-TaskObject<kHandlerCount> sKernel;
-
+static ucosm::IPeriodicTask::tick_t getTick_ms() {
+    return static_cast<ucosm::IPeriodicTask::tick_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count()
+    );
+}
 
 int main() {
 
-  sKernel.addTask(&sTask);
+    ucosm::PeriodicScheduler sched(getTick_ms);
 
-  while(1) {
-    sKernel.schedule();
-  }
-  return 0;
+    Task t1;
+    Task t2;
+
+    t1.setPeriod(50);    // execute every 50 milliseconds
+    t2.setPeriod(1000);  // execute every seconds
+
+    sched.addTask(t1);
+    sched.addTask(t2);
+
+    while(!sched.empty()) {
+        sched.run();
+    }
+
+    return 0;
 }
 ```
 
-
-## Custom module
-
-#### To create your own module, the simplest approach is to start from void_M.
-#### It's the minimal mandatory definition.
-#### From here, you can add functions and members you need for your program.
-#### An instance of module is associtated to every tasks.
+## CFS
 
 ```cpp
-struct void_M {
+#include <iostream>
+#include "cfs/icfs_task.hpp"
 
-  // will be called each time the task is created or added
-  void init() {}
-
-  // the result of this call will tell if the task must be executed or not
-  bool isExeReady() const { return true; }
-
-  // the result of this call will tell if the deletion of the task is allowed or not
-  bool isDelReady() const { return true; }
-
-  // called right before every executions of the task
-  void makePreExe() {}
-
-  // called right before the deletion of the task
-  void makePreDel() {}
-
-  // called right after every executions of the task
-  void makePostExe() {}
-
+struct Task final : ucosm::ICFSTask {
+    void run() override {
+        std::cout << "run " << (uint16_t)this->getPriority() << std::endl;
+        if(mCounter++ == 10) {
+            this->remove();
+        }
+    }
+    int mCounter = 0;
 };
+```
+
+```cpp
+#include <chrono>
+#include "cfs/cfs_scheduler.hpp"
+
+int main() {
+
+    ucosm::CFSScheduler sched(getTick_us);
+
+    Task t1;
+    Task t2;
+
+    t1.setPriority(2);
+    t2.setPriority(4);
+
+    sched.addTask(t1);
+    sched.addTask(t2);
+
+    while(!sched.empty()) {
+        sched.run();
+    }
+
+    return 0;
+}
+```
+
+# Scheduler tree
+
+In this library, the schedulers are also tasks. The task type can be passed as a template parameter to the scheduler.
+
+Here we declare a periodic scheduler that schedules a CFS scheduler that schedules a periodic scheduler.
+
+```cpp
+ucosm::PeriodicScheduler<ucosm::ICFSTask> periodicScheduler(getTick_ms);
+
+ucosm::CFSScheduler<ucosm::IPeriodicTask> cfsScheduler(getTick_us);
+
+ucosm::PeriodicScheduler periodicScheduler2(getTick_ms);
+
+cfsScheduler.addTask(periodicScheduler);
+
+periodicScheduler2.addTask(cfsScheduler);
+```
+
+# Notes
+
+The tasks storage is based on [ulink](https://github.com/ThomasAUB/ulink) and provides object lifetime safety which means that a task that is deleted will remove itself from its scheduler :
+
+```cpp
+void foo() {
+    Task tempTask;
+    sched.addTask(tempTask);
+}// tempTask removes itself from the scheduler at the end of the scope
 ```
