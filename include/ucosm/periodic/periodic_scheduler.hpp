@@ -42,7 +42,9 @@ namespace ucosm {
 
         using get_tick_t = IPeriodicTask::tick_t(*)();
 
-        PeriodicScheduler(get_tick_t inGetTick) : mGetTick(inGetTick) {}
+        PeriodicScheduler(get_tick_t inGetTick, idle_task_t inIdleTask = nullptr) :
+            IScheduler(inIdleTask),
+            mGetTick(inGetTick) {}
 
         /**
          * @brief Delay the task.
@@ -85,8 +87,8 @@ namespace ucosm {
 
         if (!this->mCursorTask.setRank(tick)) {
             // no task to run
-            if (this->mIdleFunction) {
-                this->mIdleFunction();
+            if (this->mIdleTask) {
+                this->mIdleTask();
             }
             return;
         }

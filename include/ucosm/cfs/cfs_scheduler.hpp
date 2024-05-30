@@ -42,7 +42,9 @@ namespace ucosm {
 
         using get_tick_t = ICFSTask::tick_t(*)();
 
-        CFSScheduler(get_tick_t inGetTick) : mGetTick(inGetTick) {}
+        CFSScheduler(get_tick_t inGetTick, idle_task_t inIdleTask = nullptr) :
+            IScheduler(inIdleTask),
+            mGetTick(inGetTick) {}
 
         /**
          * @brief Runs the task that has the lower execution time.
@@ -62,8 +64,8 @@ namespace ucosm {
 
         if (this->empty()) {
             // no task to run
-            if (this->mIdleFunction) {
-                this->mIdleFunction();
+            if (this->mIdleTask) {
+                this->mIdleTask();
             }
             return;
         }

@@ -32,6 +32,8 @@
 
 namespace ucosm {
 
+    using idle_task_t = void(*)();
+
     /**
      * @brief Scheduler.
      *
@@ -41,15 +43,13 @@ namespace ucosm {
     template<typename task_t, typename sched_task_t>
     struct IScheduler : sched_task_t {
 
-        using idle_func_t = void(*)();
-
         /**
-         * @brief Constructs a new scheduler object.
+         * @brief Construct a new scheduler object.
          *
-         * @param inPolicy Function pointer of the policy to follow
-         * for task execution.
+         * @param inIdleTask Function to execute when there is no task to run.
          */
-        IScheduler() {
+        IScheduler(idle_task_t inIdleTask = nullptr) :
+            mIdleTask(inIdleTask) {
             mTasks.push_front(mCursorTask);
         }
 
@@ -92,11 +92,11 @@ namespace ucosm {
         void clear();
 
         /**
-         * @brief Set the idle function object.
+         * @brief Set the idle function.
          *
-         * @param inIdleUntil Function to call on idle.
+         * @param inIdleTask Function to call on idle.
          */
-        void setIdleFunction(idle_func_t inIdleFunction);
+        void setIdleTask(idle_task_t inIdleTask);
 
         /**
          * @brief Pushes task names into a given stream.
@@ -115,7 +115,7 @@ namespace ucosm {
 
         ulink::List<itask_t> mTasks;
 
-        idle_func_t mIdleFunction = nullptr;
+        idle_task_t mIdleTask;
 
         task_t* mCurrentTask = nullptr;
 
@@ -160,8 +160,8 @@ namespace ucosm {
     }
 
     template<typename task_t, typename sched_rank_t>
-    void IScheduler<task_t, sched_rank_t>::setIdleFunction(idle_func_t inIdleFunction) {
-        mIdleFunction = inIdleFunction;
+    void IScheduler<task_t, sched_rank_t>::setIdleTask(idle_task_t inIdleTask) {
+        mIdleTask = inIdleTask;
     }
 
     template<typename task_t, typename sched_rank_t>
