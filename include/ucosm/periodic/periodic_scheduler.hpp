@@ -43,7 +43,7 @@ namespace ucosm {
         using get_tick_t = IPeriodicTask::tick_t(*)();
 
         PeriodicScheduler(get_tick_t inGetTick, idle_task_t inIdleTask = nullptr) :
-            IScheduler(inIdleTask),
+            IScheduler<IPeriodicTask, sched_task_t>(inIdleTask),
             mGetTick(inGetTick) {}
 
         /**

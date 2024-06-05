@@ -43,7 +43,7 @@ namespace ucosm {
         using get_tick_t = ICFSTask::tick_t(*)();
 
         CFSScheduler(get_tick_t inGetTick, idle_task_t inIdleTask = nullptr) :
-            IScheduler(inIdleTask),
+            IScheduler<ICFSTask, sched_task_t>(inIdleTask),
             mGetTick(inGetTick) {}
 
         /**
