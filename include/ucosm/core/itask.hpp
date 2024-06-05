@@ -99,11 +99,6 @@ namespace ucosm {
          */
         rank_t getRank() const;
 
-        /**
-         * @brief Destroys the ITask object.
-         */
-        ~ITask();
-
     private:
         using ulink::Node<ITask<rank_t>>::remove;
         rank_t mRank = rank_t();
@@ -178,13 +173,6 @@ namespace ucosm {
         }
 
         return true;
-    }
-
-    template<typename rank_t>
-    ITask<rank_t>::~ITask() {
-        if (this->isLinked()) {
-            deinit();
-        }
     }
 
 }
