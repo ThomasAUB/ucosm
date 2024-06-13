@@ -119,8 +119,8 @@ namespace ucosm {
 
         task_t* mCurrentTask = nullptr;
 
-        struct CursorTask : itask_t {
-            void run() final {}
+        struct CursorTask final : itask_t {
+            void run() override {}
             std::string_view name() override { return ">"; }
         };
 
