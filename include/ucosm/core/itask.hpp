@@ -66,7 +66,7 @@ namespace ucosm {
         /**
          * @brief Removes the task from the scheduler.
          */
-        void remove();
+        void removeTask();
 
         /**
          * @brief Returns the name of the task.
@@ -100,12 +100,17 @@ namespace ucosm {
         rank_t getRank() const;
 
     private:
+
+        template<typename T>
+        friend class ulink::List;
+
         using ulink::Node<ITask<rank_t>>::remove;
+
         rank_t mRank = rank_t();
     };
 
     template<typename rank_t>
-    void ITask<rank_t>::remove() {
+    void ITask<rank_t>::removeTask() {
         if (this->isLinked()) {
             deinit();
         }
@@ -135,7 +140,7 @@ namespace ucosm {
 
             auto* prevTask = this->prev->prev;
 
-            while (prevTask->prev && mRank <= prevTask->mRank) {
+            while (prevTask->prev && mRank < prevTask->mRank) {
                 prevTask = prevTask->prev;
             }
 
@@ -154,7 +159,7 @@ namespace ucosm {
 
             auto* nextTask = this->next->next;
 
-            while (nextTask->next && nextTask->mRank <= mRank) {
+            while (nextTask->next && nextTask->mRank < mRank) {
                 nextTask = nextTask->next;
             }
 
