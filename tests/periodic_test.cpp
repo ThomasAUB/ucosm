@@ -19,7 +19,7 @@ void periodicTaskTests() {
 
         void run() override {
             if (mCounter++ == count) {
-                this->remove();
+                this->removeTask();
             }
         }
 
