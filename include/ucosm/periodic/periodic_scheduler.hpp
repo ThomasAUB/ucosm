@@ -115,7 +115,7 @@ namespace ucosm {
 
                     const auto taskPeriod = this->mCurrentTask->getPeriod();
 
-                    if (std::numeric_limits<rank_t>::max() - tick < taskPeriod) {
+                    if (std::numeric_limits<IPeriodicTask::rank_t>::max() - tick < taskPeriod) {
                         // rank overflow : place task to front
                         this->mTasks.push_front(*this->mCurrentTask);
                     }
