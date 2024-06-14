@@ -15,7 +15,7 @@ void cfsTaskTests() {
             for (volatile uint32_t i = 0; i < mLength; i++) {}
 
             if (mCounter++ == count) {
-                this->remove();
+                this->removeTask();
             }
         }
 

@@ -29,6 +29,7 @@
 
 #include "ucosm/core/ischeduler.hpp"
 #include "iperiodic_task.hpp"
+#include <limits>
 
 namespace ucosm {
 
@@ -93,33 +94,56 @@ namespace ucosm {
             return;
         }
 
-        iterator_t it_rank(&this->mCursorTask);
+        iterator_t cursor(&this->mCursorTask);
 
-        while (it != it_rank && it != this->mTasks.end()) {
-            this->mCurrentTask = static_cast<IPeriodicTask*>(&(*it));
-            ++it;
-            this->mCurrentTask->run();
-            this->mCurrentTask->setRank(tick + this->mCurrentTask->getPeriod());
-        }
+        auto runAll = [&] () {
+
+            auto end = this->mTasks.end();
+
+            while (it != cursor && it != end) {
+
+                this->mCurrentTask = static_cast<IPeriodicTask*>(&(*it));
+
+                ++it;
+
+                this->mCurrentTask->run();
+
+                if (this->mCurrentTask->isLinked()) {
+
+                    // reinsertion optim
+                    // insert task where it should have the least work to reorder
+
+                    const auto taskPeriod = this->mCurrentTask->getPeriod();
+
+                    if (std::numeric_limits<rank_t>::max() - tick < taskPeriod) {
+                        // rank overflow : place task to front
+                        this->mTasks.push_front(*this->mCurrentTask);
+                    }
+                    else {
+                        // place task after the cursor
+                        this->mTasks.insert_after(&this->mCursorTask, *this->mCurrentTask);
+                    }
+
+                    this->mCurrentTask->setRank(tick + taskPeriod);
+                }
+            }
+
+            };
+
+        runAll();
 
         this->mCurrentTask = nullptr;
 
-        if (it == it_rank) {
+        if (it == cursor) {
             // no more task to run
             return;
         }
 
         it = this->mTasks.begin();
 
-        while (it != it_rank) {
-            this->mCurrentTask = static_cast<IPeriodicTask*>(&(*it));
-            ++it;
-            this->mCurrentTask->run();
-            this->mCurrentTask->setRank(tick + this->mCurrentTask->getPeriod());
-        }
+        runAll();
 
         this->mCurrentTask = nullptr;
-
     }
 
     template<typename sched_rank_t>
