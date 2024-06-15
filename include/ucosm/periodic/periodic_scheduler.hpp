@@ -128,11 +128,11 @@ namespace ucosm {
                 }
             }
 
+            this->mCurrentTask = nullptr;
+
             };
 
         runAll();
-
-        this->mCurrentTask = nullptr;
 
         if (it == cursor) {
             // no more task to run
@@ -142,8 +142,6 @@ namespace ucosm {
         it = this->mTasks.begin();
 
         runAll();
-
-        this->mCurrentTask = nullptr;
     }
 
     template<typename sched_rank_t>
