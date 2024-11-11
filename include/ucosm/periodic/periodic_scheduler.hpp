@@ -57,19 +57,13 @@ namespace ucosm {
         }
 
         /**
-         * @brief Tells if other tasks are ready to be executed
-         *
-         * @return true if other tasks are ready.
-         * @return false otherwise.
-         */
-        bool hasWork() const;
-
-        /**
-         * @brief Runs every ready tasks.
+         * @brief Runs the next ready tasks.
          */
         void run() override;
 
-    private:
+    protected:
+
+        IPeriodicTask* getNextReadyTask();
 
         get_tick_t mGetTick;
 
@@ -78,15 +72,9 @@ namespace ucosm {
     template<typename sched_rank_t>
     void PeriodicScheduler<sched_rank_t>::run() {
 
-        using iterator_t = typename decltype(this->mTasks)::iterator;
+        this->mCurrentTask = getNextReadyTask();
 
-        iterator_t it(&this->mCursorTask);
-
-        ++it;
-
-        const auto tick = mGetTick();
-
-        if (!this->mCursorTask.setRank(tick)) {
+        if (!this->mCurrentTask) {
             // no task to run
             if (this->mIdleTask) {
                 this->mIdleTask();
@@ -94,105 +82,67 @@ namespace ucosm {
             return;
         }
 
-        iterator_t cursor(&this->mCursorTask);
+        // store the rank in case the task edits it during execution
+        const auto taskRank = this->mCurrentTask->getRank();
 
-        auto runAll = [&] () {
+        this->mCurrentTask->run();
 
-            auto end = this->mTasks.end();
+        // set the cursor task's rank to the current one
+        this->mCursorTask.setRank(taskRank);
 
-            while (it != cursor && it != end) {
+        if (this->mCurrentTask->isLinked()) {
 
-                this->mCurrentTask = static_cast<IPeriodicTask*>(&(*it));
+            // the task is still in the list
+            // update the task rank
 
-                ++it;
+            const auto tick = mGetTick();
 
-                this->mCurrentTask->run();
+            const auto taskPeriod = this->mCurrentTask->getPeriod();
 
-                if (this->mCurrentTask->isLinked()) {
-
-                    // reinsertion optim
-                    // insert task where it should have the least work to reorder
-
-                    const auto taskPeriod = this->mCurrentTask->getPeriod();
-
-                    if (std::numeric_limits<IPeriodicTask::rank_t>::max() - tick < taskPeriod) {
-                        // rank overflow : place task to front
-                        this->mTasks.push_front(*this->mCurrentTask);
-                    }
-                    else {
-                        // place task after the cursor
-                        this->mTasks.insert_after(&this->mCursorTask, *this->mCurrentTask);
-                    }
-
-                    this->mCurrentTask->setRank(tick + taskPeriod);
-                }
+            // insert task where it should have the least work to reorder
+            if (std::numeric_limits<IPeriodicTask::rank_t>::max() - tick < taskPeriod) {
+                // rank overflow : place task to front
+                this->mTasks.push_front(*this->mCurrentTask);
             }
 
-            this->mCurrentTask = nullptr;
-
-            };
-
-        runAll();
-
-        if (it == cursor) {
-            // no more task to run
-            return;
+            this->mCurrentTask->setRank(tick + taskPeriod);
         }
 
-        it = this->mTasks.begin();
-
-        runAll();
+        this->mCurrentTask = nullptr;
     }
 
     template<typename sched_rank_t>
-    bool PeriodicScheduler<sched_rank_t>::hasWork() const {
-
-        using iterator_t = typename decltype(this->mTasks)::const_iterator;
+    IPeriodicTask* PeriodicScheduler<sched_rank_t>::getNextReadyTask() {
 
         if (this->empty()) {
-            return false;
+            return nullptr;
         }
 
-        if (this->mCurrentTask) {
-
-            // a task is currently running
-            // check if next task must be run
-
-            if (this->mTasks.size() == 1) {
-                // current task is the only one and is being executed
-                return false;
-            }
-
-            iterator_t it(this->mCurrentTask);
-
-            ++it;
-
-            if (it == this->mTasks.end()) {
-                it = this->mTasks.begin();
-            }
-
-            if (it != &this->mCursorTask) {
-                // at least one other task is waiting
-                return true;
-            }
-
-        }
-
-        // check from cursor task
+        using iterator_t = typename decltype(this->mTasks)::iterator;
 
         iterator_t it(&this->mCursorTask);
+
         ++it;
 
         const auto currentTick = mGetTick();
 
         if (it == this->mTasks.end()) {
+
             // check for tick overflow
-            return
-                (currentTick < this->mCursorTask.getRank()) &&      // tick overflow
-                (currentTick >= this->mTasks.front().getRank());    // next task is ready
+
+            if (currentTick >= this->mCursorTask.getRank()) {
+                // tick didn't overflow
+                return nullptr;
+            }
+
+            it = this->mTasks.begin();
         }
 
-        return (currentTick >= (*it).getRank());
+        if (currentTick < (*it).getRank()) {
+            return nullptr;
+        }
+
+        return static_cast<IPeriodicTask*>(&(*it));
     }
 
 }
