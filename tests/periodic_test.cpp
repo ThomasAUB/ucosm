@@ -8,21 +8,38 @@
 
 #include <iostream>
 
+auto getMS() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
+}
+
 void periodicTaskTests() {
 
-
     struct Task : ucosm::IPeriodicTask {
+
+        bool init() override {
+            mTimer = getMS() - this->getPeriod();
+            return true;
+        }
 
         void deinit() override {
             mIsDeinit = true;
         }
 
         void run() override {
+
+            // check that the period is right
+            CHECK((getMS() - mTimer) == this->getPeriod());
+
+            mTimer = getMS();
+
             if (mCounter++ == count) {
                 this->removeTask();
             }
         }
 
+        uint64_t mTimer = 0;
         uint8_t count = 0;
         uint8_t mCounter = 0;
         bool mIsDeinit = false;
