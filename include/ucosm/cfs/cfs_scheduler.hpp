@@ -99,7 +99,7 @@ namespace ucosm {
 
         }
 
-        // move cursor task right after the one that has been executed
+        // move cursor task right before the next one
         iterator_t it(&this->mCursorTask);
         ++it;
 
