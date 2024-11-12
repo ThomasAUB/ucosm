@@ -85,6 +85,8 @@ namespace ucosm {
         // store the rank in case the task edits it during execution
         const auto taskRank = this->mCurrentTask->getRank();
 
+        const auto tick = mGetTick();
+
         this->mCurrentTask->run();
 
         // set the cursor task's rank to the current one
@@ -94,9 +96,6 @@ namespace ucosm {
 
             // the task is still in the list
             // update the task rank
-
-            const auto tick = mGetTick();
-
             const auto taskPeriod = this->mCurrentTask->getPeriod();
 
             // insert task where it should have the least work to reorder
@@ -124,13 +123,12 @@ namespace ucosm {
 
         ++it;
 
-        const auto currentTick = mGetTick();
+        const auto tick = mGetTick();
 
         if (it == this->mTasks.end()) {
 
             // check for tick overflow
-
-            if (currentTick >= this->mCursorTask.getRank()) {
+            if (tick >= this->mCursorTask.getRank()) {
                 // tick didn't overflow
                 return nullptr;
             }
@@ -138,7 +136,7 @@ namespace ucosm {
             it = this->mTasks.begin();
         }
 
-        if (currentTick < (*it).getRank()) {
+        if (tick < (*it).getRank()) {
             return nullptr;
         }
 
