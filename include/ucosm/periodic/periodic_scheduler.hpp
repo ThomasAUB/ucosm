@@ -63,7 +63,7 @@ namespace ucosm {
 
     protected:
 
-        IPeriodicTask* getNextReadyTask();
+        IPeriodicTask* updateCursor(IPeriodicTask::tick_t inTick);
 
         get_tick_t mGetTick;
 
@@ -72,7 +72,13 @@ namespace ucosm {
     template<typename sched_rank_t>
     void PeriodicScheduler<sched_rank_t>::run() {
 
-        this->mCurrentTask = getNextReadyTask();
+        if (this->mTasks.empty()) {
+            return;
+        }
+
+        const auto tick = mGetTick();
+
+        this->mCurrentTask = updateCursor(tick);
 
         if (!this->mCurrentTask) {
             // no task to run
@@ -82,15 +88,7 @@ namespace ucosm {
             return;
         }
 
-        // store the rank in case the task edits it during execution
-        const auto taskRank = this->mCurrentTask->getRank();
-
-        const auto tick = mGetTick();
-
         this->mCurrentTask->run();
-
-        // set the cursor task's rank to the current one
-        this->mCursorTask.setRank(taskRank);
 
         if (this->mCurrentTask->isLinked()) {
 
@@ -111,36 +109,33 @@ namespace ucosm {
     }
 
     template<typename sched_rank_t>
-    IPeriodicTask* PeriodicScheduler<sched_rank_t>::getNextReadyTask() {
+    IPeriodicTask* PeriodicScheduler<sched_rank_t>::updateCursor(
+        IPeriodicTask::tick_t inTick
+    ) {
 
-        if (this->empty()) {
-            return nullptr;
+        // cursor is last, move to front
+        if (&this->mCursorTask == &this->mTasks.back()) {
+            this->mTasks.push_front(this->mCursorTask);
+            this->mCursorTask.setRank(0);
         }
 
         using iterator_t = typename decltype(this->mTasks)::iterator;
-
         iterator_t it(&this->mCursorTask);
-
         ++it;
 
-        const auto tick = mGetTick();
+        IPeriodicTask* nextTask = static_cast<IPeriodicTask*>(&(*it));
 
-        if (it == this->mTasks.end()) {
-
-            // check for tick overflow
-            if (tick >= this->mCursorTask.getRank()) {
-                // tick didn't overflow
-                return nullptr;
-            }
-
-            it = this->mTasks.begin();
-        }
-
-        if (tick < (*it).getRank()) {
+        if (
+            inTick >= this->mCursorTask.getRank() &&
+            inTick < nextTask->getRank()
+            ) {
             return nullptr;
         }
 
-        return static_cast<IPeriodicTask*>(&(*it));
+        // set the cursor task's rank to the current one
+        this->mCursorTask.setRank(nextTask->getRank());
+
+        return nextTask;
     }
 
 }
