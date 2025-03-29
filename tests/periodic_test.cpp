@@ -14,7 +14,103 @@ auto getMS() {
     ).count();
 }
 
+void basicTest();
+
+void timerOverflowTest();
+
 void periodicTaskTests() {
+
+    basicTest();
+
+    timerOverflowTest();
+
+}
+
+void timerOverflowTest() {
+
+    struct Task : ucosm::IPeriodicTask {
+
+        void run() override {
+            mRunCounter++;
+        }
+
+        uint32_t mRunCounter = 0;
+
+    };
+
+    static uint32_t sClock = 0;
+
+    ucosm::PeriodicScheduler sched(
+        +[] () {
+            return sClock;
+        }
+    );
+
+    Task t1;
+    Task t2;
+    Task t3;
+
+    sched.addTask(t1);
+    sched.addTask(t2);
+    sched.addTask(t3);
+
+    t1.setPeriod(0xFFFFFFFE);
+    t2.setPeriod(0xFF);
+    t3.setPeriod(0xFF);
+
+    t1.setRank(0x000000FF);
+    t2.setRank(0xFFFFFFFF - 10);
+    t3.setRank(0xFFFFFFFF - 1);
+
+    sched.run();
+
+    CHECK(t1.mRunCounter == 0);
+    CHECK(t2.mRunCounter == 0);
+    CHECK(t3.mRunCounter == 0);
+
+    sClock = 256;
+
+    sched.run();
+
+    CHECK(t1.mRunCounter == 1);
+    CHECK(t2.mRunCounter == 0);
+    CHECK(t3.mRunCounter == 0);
+
+    sClock = 0xFFFFFFFF - 9;
+
+    sched.run();
+
+    CHECK(t1.mRunCounter == 1);
+    CHECK(t2.mRunCounter == 1);
+    CHECK(t3.mRunCounter == 0);
+
+    // scheduler got stuck for a while
+    sClock = 5;
+
+    sched.run();
+
+    CHECK(t1.mRunCounter == 1);
+    CHECK(t2.mRunCounter == 1);
+    CHECK(t3.mRunCounter == 1);
+
+    sClock = 244;
+
+    sched.run();
+
+    CHECK(t1.mRunCounter == 1);
+    CHECK(t2.mRunCounter == 1);
+    CHECK(t3.mRunCounter == 1);
+
+    sClock = 245;
+
+    sched.run();
+
+    CHECK(t1.mRunCounter == 1);
+    CHECK(t2.mRunCounter == 2);
+    CHECK(t3.mRunCounter == 1);
+}
+
+void basicTest() {
 
     struct Task : ucosm::IPeriodicTask {
 
@@ -92,5 +188,3 @@ void periodicTaskTests() {
     CHECK(t2.mIsDeinit);
 
 }
-
-
