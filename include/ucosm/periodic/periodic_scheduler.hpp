@@ -52,9 +52,7 @@ namespace ucosm {
          *
          * @param inDelay Delay value.
          */
-        void setDelay(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay) {
-            inTask.setRank(mGetTick() + inDelay);
-        }
+        void setDelay(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay);
 
         /**
          * @brief Runs the next ready tasks.
@@ -70,9 +68,17 @@ namespace ucosm {
     };
 
     template<typename sched_rank_t>
+    void PeriodicScheduler<sched_rank_t>::setDelay(
+        IPeriodicTask& inTask,
+        IPeriodicTask::tick_t inDelay
+    ) {
+        inTask.setRank(mGetTick() + inDelay);
+    }
+
+    template<typename sched_rank_t>
     void PeriodicScheduler<sched_rank_t>::run() {
 
-        if (this->mTasks.empty()) {
+        if (this->empty()) {
             return;
         }
 
