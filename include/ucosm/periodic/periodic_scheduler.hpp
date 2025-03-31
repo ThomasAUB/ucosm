@@ -78,10 +78,6 @@ namespace ucosm {
     template<typename sched_rank_t>
     void PeriodicScheduler<sched_rank_t>::run() {
 
-        if (this->empty()) {
-            return;
-        }
-
         const auto tick = mGetTick();
 
         this->mCurrentTask = updateCursor(tick);
@@ -118,6 +114,10 @@ namespace ucosm {
     IPeriodicTask* PeriodicScheduler<sched_rank_t>::updateCursor(
         IPeriodicTask::tick_t inTick
     ) {
+
+        if (this->empty()) {
+            return nullptr;
+        }
 
         // cursor is last, move to front
         if (&this->mCursorTask == &this->mTasks.back()) {
