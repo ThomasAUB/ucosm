@@ -108,7 +108,15 @@ namespace ucosm {
         template<typename stream_t>
         void list(stream_t&& inStream, std::string_view inSeparator = "\n");
 
+        /**
+         * @brief Get the rank of the next task to be run.
+         *
+         * @return task_t::rank_t Rank value.
+         */
+        typename task_t::rank_t getNextRank() const;
+
     protected:
+
 
         using task_rank_t = typename task_t::rank_t;
         using itask_t = ITask<task_rank_t>;
@@ -173,6 +181,25 @@ namespace ucosm {
         for (auto& t : mTasks) {
             inStream << t.name() << inSeparator;
         }
+    }
+
+    template<typename task_t, typename sched_rank_t>
+    typename task_t::rank_t IScheduler<task_t, sched_rank_t>::getNextRank() const {
+
+        if (mTasks.empty()) {
+            return 0;
+        }
+
+        if (&this->mCursorTask == &this->mTasks.back()) {
+            return this->mTasks.front().getRank();
+        }
+        else {
+            using iterator_t = typename decltype(this->mTasks)::iterator;
+            iterator_t it(&this->mCursorTask);
+            ++it;
+            return it->getRank();
+        }
+
     }
 
 }
