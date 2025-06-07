@@ -124,13 +124,12 @@ namespace ucosm {
         // cursor is last
         if (&this->mCursorTask == &this->mTasks.back()) {
 
-            if (inTick >= this->mCursorTask.getRank()) {
-                return nullptr;
-            }
-
             nextTask = static_cast<IPeriodicTask*>(&this->mTasks.front());
 
-            if (inTick < nextTask->getRank()) {
+            if (
+                inTick >= this->mCursorTask.getRank() ||
+                inTick < nextTask->getRank()
+                ) {
                 return nullptr;
             }
 
