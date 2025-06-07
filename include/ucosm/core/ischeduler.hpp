@@ -117,9 +117,9 @@ namespace ucosm {
 
     protected:
 
-
         using task_rank_t = typename task_t::rank_t;
         using itask_t = ITask<task_rank_t>;
+        using const_task_iterator = typename ulink::List<itask_t>::const_iterator;
 
         ulink::List<itask_t> mTasks;
 
@@ -130,6 +130,8 @@ namespace ucosm {
         struct CursorTask final : itask_t {
             void run() override {}
             std::string_view name() override { return ">"; }
+            auto* next() { return static_cast<task_t*>(this->itask_t::next); }
+            const auto* next() const { return static_cast<const task_t*>(this->itask_t::next); }
         };
 
         CursorTask mCursorTask;
@@ -153,7 +155,10 @@ namespace ucosm {
 
     template<typename task_t, typename sched_rank_t>
     bool IScheduler<task_t, sched_rank_t>::empty() const {
-        return (&mTasks.front() == &mTasks.back());
+        return (
+            const_task_iterator(&mCursorTask) == mTasks.begin() &&
+            const_task_iterator(mCursorTask.next()) == mTasks.end()
+            );
     }
 
     template<typename task_t, typename sched_rank_t>
@@ -186,7 +191,7 @@ namespace ucosm {
     template<typename task_t, typename sched_rank_t>
     typename task_t::rank_t IScheduler<task_t, sched_rank_t>::getNextRank() const {
 
-        if (mTasks.empty()) {
+        if (this->empty()) {
             return 0;
         }
 
@@ -194,10 +199,7 @@ namespace ucosm {
             return this->mTasks.front().getRank();
         }
         else {
-            using iterator_t = typename decltype(this->mTasks)::iterator;
-            iterator_t it(&this->mCursorTask);
-            ++it;
-            return it->getRank();
+            return this->mCursorTask.next().getRank();
         }
 
     }

@@ -71,14 +71,12 @@ namespace ucosm {
         }
 
         {
-            iterator_t it(&this->mCursorTask);
-            ++it;
-
-            if (it == this->mTasks.end()) {
-                it = this->mTasks.begin();
+            if (&this->mCursorTask == &this->mTasks.back()) {
+                this->mCurrentTask = static_cast<ICFSTask*>(&this->mTasks.front());
             }
-
-            this->mCurrentTask = static_cast<ICFSTask*>(&(*it));
+            else {
+                this->mCurrentTask = this->mCursorTask.next();
+            }
 
             auto rank = mGetTick();
 

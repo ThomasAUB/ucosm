@@ -119,28 +119,39 @@ namespace ucosm {
             return nullptr;
         }
 
-        // cursor is last, move to front
+        IPeriodicTask* nextTask;
+
+        // cursor is last
         if (&this->mCursorTask == &this->mTasks.back()) {
+
+            if (inTick >= this->mCursorTask.getRank()) {
+                return nullptr;
+            }
+
+            nextTask = static_cast<IPeriodicTask*>(&this->mTasks.front());
+
+            if (inTick < nextTask->getRank()) {
+                return nullptr;
+            }
+
+            // next task is ready : move to front
             this->mTasks.push_front(this->mCursorTask);
-            this->mCursorTask.setRank(0);
+        }
+        else {
+
+            nextTask = this->mCursorTask.next();
+
+            if (
+                inTick >= this->mCursorTask.getRank() &&
+                inTick < nextTask->getRank()
+                ) {
+                // inTick is in the interval [cursorTask ; nextTask[ -> not ready
+                return nullptr;
+            }
+
         }
 
-        using iterator_t = typename decltype(this->mTasks)::iterator;
-        iterator_t it(&this->mCursorTask);
-        ++it;
-
-        IPeriodicTask* nextTask = static_cast<IPeriodicTask*>(&(*it));
-
-        if (
-            inTick >= this->mCursorTask.getRank() &&
-            inTick < nextTask->getRank()
-            ) {
-            return nullptr;
-        }
-
-        // set the cursor task's rank to the current one
         this->mCursorTask.setRank(nextTask->getRank());
-
         return nextTask;
     }
 
