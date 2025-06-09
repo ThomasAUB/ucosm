@@ -199,7 +199,7 @@ namespace ucosm {
             return this->mTasks.front().getRank();
         }
         else {
-            return this->mCursorTask.next().getRank();
+            return this->mCursorTask.next()->getRank();
         }
 
     }
