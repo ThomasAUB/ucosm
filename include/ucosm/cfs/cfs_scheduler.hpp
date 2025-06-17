@@ -86,8 +86,9 @@ namespace ucosm {
 
             rank <<= this->mCurrentTask->getPriority();
             rank += this->mCurrentTask->getRank();
+            this->mCurrentTask->setRank(rank);
 
-            if (!this->mCurrentTask->setRank(rank)) {
+            if (!this->sortTask(*this->mCurrentTask)) {
                 // task is not linked anymore or
                 // rank didn't change
                 // -> don't move cursor task
@@ -108,6 +109,7 @@ namespace ucosm {
         }
 
         this->mCursorTask.setRank(newRank);
+        this->sortTask(this->mCursorTask);
         this->mCurrentTask = nullptr;
     }
 

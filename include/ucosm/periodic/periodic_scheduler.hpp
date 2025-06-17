@@ -29,7 +29,6 @@
 
 #include "ucosm/core/ischeduler.hpp"
 #include "iperiodic_task.hpp"
-#include <limits>
 
 namespace ucosm {
 
@@ -73,6 +72,7 @@ namespace ucosm {
         IPeriodicTask::tick_t inDelay
     ) {
         inTask.setRank(mGetTick() + inDelay);
+        this->sortTask(inTask);
     }
 
     template<typename sched_rank_t>
@@ -96,15 +96,11 @@ namespace ucosm {
 
             // the task is still in the list
             // update the task rank
-            const auto taskPeriod = this->mCurrentTask->getPeriod();
+            const auto newRank = tick + this->mCurrentTask->getPeriod();
 
-            // insert task where it should have the least work to reorder
-            if (std::numeric_limits<IPeriodicTask::rank_t>::max() - tick < taskPeriod) {
-                // rank overflow : place task to front
-                this->mTasks.push_front(*this->mCurrentTask);
-            }
+            this->mCurrentTask->setRank(newRank);
+            this->sortTask(*this->mCurrentTask);
 
-            this->mCurrentTask->setRank(tick + taskPeriod);
         }
 
         this->mCurrentTask = nullptr;
