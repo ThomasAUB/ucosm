@@ -87,10 +87,8 @@ namespace ucosm {
          * @brief Sets the task rank value.
          *
          * @param inRank inRank New rank value.
-         * @return true if the task was moved in the list
-         * @return false otherwise.
          */
-        bool setRank(rank_t inRank);
+        void setRank(rank_t inRank);
 
         /**
          * @brief Gets the task rank value.
@@ -118,9 +116,8 @@ namespace ucosm {
     }
 
     template<typename rank_t>
-    bool ITask<rank_t>::setRank(rank_t inRank) {
+    void ITask<rank_t>::setRank(rank_t inRank) {
         mRank = inRank;
-        return updateRank();
     }
 
     template<typename rank_t>

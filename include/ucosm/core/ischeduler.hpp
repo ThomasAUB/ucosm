@@ -121,6 +121,8 @@ namespace ucosm {
         using itask_t = ITask<task_rank_t>;
         using const_task_iterator = typename ulink::List<itask_t>::const_iterator;
 
+        bool sortTask(itask_t& inTask);
+
         ulink::List<itask_t> mTasks;
 
         idle_task_t mIdleTask;
@@ -145,6 +147,7 @@ namespace ucosm {
         }
         mTasks.insert_after(&mCursorTask, inTask);
         inTask.setRank(mCursorTask.getRank());
+        this->sortTask(inTask);
         return true;
     }
 
@@ -201,6 +204,33 @@ namespace ucosm {
         else {
             return this->mCursorTask.next()->getRank();
         }
+
+    }
+
+    template<typename task_t, typename sched_rank_t>
+    bool IScheduler<task_t, sched_rank_t>::sortTask(itask_t& inTask) {
+
+        if (!inTask.isLinked()) {
+            return false;
+        }
+
+        const auto rank = inTask.getRank();
+
+        if (rank < this->mTasks.front().getRank()) {
+
+            this->mTasks.push_front(inTask);
+
+        }
+        else if (rank > this->mTasks.back().getRank()) {
+
+            this->mTasks.push_back(inTask);
+
+        }
+        else {
+            return inTask.updateRank();
+        }
+
+        return true;
 
     }
 

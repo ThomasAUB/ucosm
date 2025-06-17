@@ -62,9 +62,9 @@ void timerOverflowTest() {
     t2.setPeriod(0xFF);
     t3.setPeriod(0xFF);
 
-    t1.setRank(0x000000FF);
-    t2.setRank(0xFFFFFFFF - 10);
-    t3.setRank(0xFFFFFFFF - 1);
+    sched.setDelay(t1, 0x000000FF);
+    sched.setDelay(t2, 0xFFFFFFFF - 10);
+    sched.setDelay(t3, 0xFFFFFFFF - 1);
 
     sched.run();
 
