@@ -18,11 +18,15 @@ void basicTest();
 
 void timerOverflowTest();
 
+void sortBenchmak();
+
 void periodicTaskTests() {
 
     basicTest();
 
     timerOverflowTest();
+
+    sortBenchmak();
 
 }
 
@@ -186,5 +190,62 @@ void basicTest() {
 
     CHECK(t1.mIsDeinit);
     CHECK(t2.mIsDeinit);
+
+}
+
+void sortBenchmak() {
+
+    struct Task : ucosm::IPeriodicTask {
+
+        Task(uint32_t inPeriod = 5) : ucosm::IPeriodicTask(inPeriod) {}
+
+        void run() override {
+
+        }
+
+    };
+
+    ucosm::PeriodicScheduler sched(
+        +[] () {
+            return static_cast<ucosm::IPeriodicTask::tick_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()
+                ).count()
+                );
+        }
+    );
+
+    auto getMicros = [] () {
+        return static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+            ).count()
+            );
+        };
+
+    constexpr uint16_t task_count = 512;
+    Task taskArray[task_count];
+
+    for (int i = 0; i < task_count; i++) {
+        sched.addTask(taskArray[i]);
+    }
+
+    CHECK(sched.size() == task_count);
+
+    Task longPeriodTask(500);
+    sched.addTask(longPeriodTask);
+
+    uint64_t durationSum = 0;
+
+    for (uint32_t i = 0; i < 10000; i++) {
+
+        auto start = getMicros();
+        sched.run();
+        auto end = getMicros();
+
+        durationSum += end - start;
+    }
+
+    std::cout << "relocation benchmark : " << durationSum << std::endl;
 
 }
