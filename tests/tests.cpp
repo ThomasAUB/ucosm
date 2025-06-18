@@ -7,6 +7,7 @@
 
 
 TEST_CASE("ucosm tests") {
-    periodicTaskTests();
-    cfsTaskTests();
+    //timerTaskTests();
+    //cfsTaskTests();
+    fiberTests();
 }

@@ -28,22 +28,22 @@
 #pragma once
 
 #include "ucosm/core/ischeduler.hpp"
-#include "iperiodic_task.hpp"
+#include "itimer_task.hpp"
 
 namespace ucosm {
 
     /**
-     * @brief Periodic scheduler.
+     * @brief Timer scheduler.
      *
      * @tparam sched_task_t Scheduler task type
      */
     template<typename sched_task_t = ITask<int8_t>>
-    struct PeriodicScheduler : IScheduler<IPeriodicTask, sched_task_t> {
+    struct TimerScheduler : IScheduler<ITimerTask, sched_task_t> {
 
-        using get_tick_t = IPeriodicTask::tick_t(*)();
+        using get_tick_t = ITimerTask::tick_t(*)();
 
-        PeriodicScheduler(get_tick_t inGetTick, idle_task_t inIdleTask = nullptr) :
-            IScheduler<IPeriodicTask, sched_task_t>(inIdleTask),
+        TimerScheduler(get_tick_t inGetTick, idle_task_t inIdleTask = nullptr) :
+            IScheduler<ITimerTask, sched_task_t>(inIdleTask),
             mGetTick(inGetTick) {}
 
         /**
@@ -51,7 +51,7 @@ namespace ucosm {
          *
          * @param inDelay Delay value.
          */
-        void setDelay(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay);
+        void setDelay(ITimerTask& inTask, ITimerTask::tick_t inDelay);
 
         /**
          * @brief Runs the next ready tasks.
@@ -60,27 +60,29 @@ namespace ucosm {
 
     protected:
 
-        IPeriodicTask* updateCursor(IPeriodicTask::tick_t inTick);
+        ITimerTask* updateCursor();
 
         get_tick_t mGetTick;
 
     };
 
     template<typename sched_rank_t>
-    void PeriodicScheduler<sched_rank_t>::setDelay(
-        IPeriodicTask& inTask,
-        IPeriodicTask::tick_t inDelay
+    void TimerScheduler<sched_rank_t>::setDelay(
+        ITimerTask& inTask,
+        ITimerTask::tick_t inDelay
     ) {
         inTask.setRank(mGetTick() + inDelay);
         this->sortTask(inTask);
     }
 
     template<typename sched_rank_t>
-    void PeriodicScheduler<sched_rank_t>::run() {
+    void TimerScheduler<sched_rank_t>::run() {
 
-        const auto tick = mGetTick();
+        if (this->empty()) {
+            return;
+        }
 
-        this->mCurrentTask = updateCursor(tick);
+        this->mCurrentTask = updateCursor();
 
         if (!this->mCurrentTask) {
             // no task to run
@@ -96,9 +98,11 @@ namespace ucosm {
 
             // the task is still in the list
             // update the task rank
-            const auto newRank = tick + this->mCurrentTask->getPeriod();
 
-            this->mCurrentTask->setRank(newRank);
+            this->mCurrentTask->setRank(
+                mGetTick() + this->mCurrentTask->getPeriod()
+            );
+
             this->sortTask(*this->mCurrentTask);
 
         }
@@ -107,24 +111,20 @@ namespace ucosm {
     }
 
     template<typename sched_rank_t>
-    IPeriodicTask* PeriodicScheduler<sched_rank_t>::updateCursor(
-        IPeriodicTask::tick_t inTick
-    ) {
+    ITimerTask* TimerScheduler<sched_rank_t>::updateCursor() {
 
-        if (this->empty()) {
-            return nullptr;
-        }
+        const auto tick = mGetTick();
 
-        IPeriodicTask* nextTask;
+        ITimerTask* nextTask;
 
         // cursor is last
         if (&this->mCursorTask == &this->mTasks.back()) {
 
-            nextTask = static_cast<IPeriodicTask*>(&this->mTasks.front());
+            nextTask = static_cast<ITimerTask*>(&this->mTasks.front());
 
             if (
-                inTick >= this->mCursorTask.getRank() ||
-                inTick < nextTask->getRank()
+                tick >= this->mCursorTask.getRank() ||
+                tick < nextTask->getRank()
                 ) {
                 return nullptr;
             }
@@ -137,8 +137,8 @@ namespace ucosm {
             nextTask = this->mCursorTask.next();
 
             if (
-                inTick >= this->mCursorTask.getRank() &&
-                inTick < nextTask->getRank()
+                tick >= this->mCursorTask.getRank() &&
+                tick < nextTask->getRank()
                 ) {
                 // inTick is in the interval [cursorTask ; nextTask[ -> not ready
                 return nullptr;

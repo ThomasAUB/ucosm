@@ -1,3 +1,6 @@
 [submodule "ulink"]
 	path = ulink
 	url = https://github.com/ThomasAUB/ulink.git
+[submodule "Tina"]
+	path = Tina
+	url = https://github.com/slembcke/Tina.git

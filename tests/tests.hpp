@@ -1,6 +1,8 @@
 #pragma once
 
 
-void periodicTaskTests();
+void timerTaskTests();
 
 void cfsTaskTests();
+
+void fiberTests();

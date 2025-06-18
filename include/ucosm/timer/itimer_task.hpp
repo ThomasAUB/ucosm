@@ -35,11 +35,11 @@ namespace ucosm {
     /**
      * @brief Periodic task.
      */
-    struct IPeriodicTask : ITask<uint32_t> {
+    struct ITimerTask : ITask<uint32_t> {
 
         using tick_t = uint32_t;
 
-        IPeriodicTask(tick_t inPeriod = 0) :
+        ITimerTask(tick_t inPeriod = 0) :
             mPeriod(inPeriod) {}
 
         /**
@@ -56,7 +56,7 @@ namespace ucosm {
          */
         tick_t getPeriod() const { return mPeriod; }
 
-    private:
+    protected:
 
         tick_t mPeriod;
 

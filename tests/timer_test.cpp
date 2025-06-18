@@ -2,7 +2,7 @@
 
 #include "doctest.h"
 
-#include "ucosm/periodic/periodic_scheduler.hpp"
+#include "ucosm/timer/timer_scheduler.hpp"
 
 #include <chrono>
 
@@ -32,7 +32,7 @@ void periodicTaskTests() {
 
 void timerOverflowTest() {
 
-    struct Task : ucosm::IPeriodicTask {
+    struct Task : ucosm::ITimerTask {
 
         void run() override {
             mRunCounter++;
@@ -44,7 +44,7 @@ void timerOverflowTest() {
 
     static uint32_t sClock = 0;
 
-    ucosm::PeriodicScheduler sched(
+    ucosm::TimerScheduler sched(
         +[] () {
             return sClock;
         }
@@ -116,7 +116,7 @@ void timerOverflowTest() {
 
 void basicTest() {
 
-    struct Task : ucosm::IPeriodicTask {
+    struct Task : ucosm::ITimerTask {
 
         bool init() override {
             mTimer = getMS() - this->getPeriod();
@@ -145,9 +145,9 @@ void basicTest() {
         bool mIsDeinit = false;
     };
 
-    ucosm::PeriodicScheduler sched(
+    ucosm::TimerScheduler sched(
         +[] () {
-            return static_cast<ucosm::IPeriodicTask::tick_t>(
+            return static_cast<ucosm::ITimerTask::tick_t>(
                 std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::system_clock::now().time_since_epoch()
                 ).count()
@@ -195,9 +195,9 @@ void basicTest() {
 
 void sortBenchmak() {
 
-    struct Task : ucosm::IPeriodicTask {
+    struct Task : ucosm::ITimerTask {
 
-        Task(uint32_t inPeriod = 5) : ucosm::IPeriodicTask(inPeriod) {}
+        Task(uint32_t inPeriod = 5) : ucosm::ITimerTask(inPeriod) {}
 
         void run() override {
 
@@ -205,9 +205,9 @@ void sortBenchmak() {
 
     };
 
-    ucosm::PeriodicScheduler sched(
+    ucosm::TimerScheduler sched(
         +[] () {
-            return static_cast<ucosm::IPeriodicTask::tick_t>(
+            return static_cast<ucosm::ITimerTask::tick_t>(
                 std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::system_clock::now().time_since_epoch()
                 ).count()
