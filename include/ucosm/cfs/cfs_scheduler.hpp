@@ -82,6 +82,12 @@ namespace ucosm {
 
             this->mCurrentTask->run();
 
+            // Check if task is still linked after execution
+            if (!this->mCurrentTask->isLinked()) {
+                this->mCurrentTask = nullptr;
+                return;
+            }
+
             rank = mGetTick() - rank;
 
             rank <<= this->mCurrentTask->getPriority();
@@ -89,8 +95,7 @@ namespace ucosm {
             this->mCurrentTask->setRank(rank);
 
             if (!this->sortTask(*this->mCurrentTask)) {
-                // task is not linked anymore or
-                // rank didn't change
+                // task is not linked anymore or rank didn't change
                 // -> don't move cursor task
                 this->mCurrentTask = nullptr;
                 return;

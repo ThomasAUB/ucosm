@@ -47,10 +47,7 @@ namespace ucosm {
          * @param inPriority Priority value between 0 (highest) and 16 (lowest)
          */
         void setPriority(priority_t inPriority) {
-            if (inPriority > 16) {
-                inPriority = 16;
-            }
-            mPriority = inPriority;
+            mPriority = (inPriority > 16) ? 16 : inPriority;
         }
 
         /**

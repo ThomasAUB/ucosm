@@ -92,6 +92,7 @@ namespace ucosm {
 
         this->mCurrentTask->run();
 
+        // Check if task is still linked after execution
         if (this->mCurrentTask->isLinked()) {
 
             // the task is still in the list

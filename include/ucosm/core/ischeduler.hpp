@@ -142,9 +142,15 @@ namespace ucosm {
 
     template<typename task_t, typename sched_rank_t>
     bool IScheduler<task_t, sched_rank_t>::addTask(task_t& inTask) {
+        // Check if task is already linked to prevent double-adding
+        if (inTask.isLinked()) {
+            return false;
+        }
+
         if (!inTask.init()) {
             return false;
         }
+
         mTasks.insert_after(&mCursorTask, inTask);
         inTask.setRank(mCursorTask.getRank());
         this->sortTask(inTask);
