@@ -104,17 +104,16 @@ namespace ucosm {
         }
 
         // move cursor task right before the next one
-        ICFSTask::rank_t newRank;
 
         if (&this->mCursorTask == &this->mTasks.back()) {
-            newRank = this->mTasks.front().getRank();
+            this->mCursorTask.setRank(this->mTasks.front().getRank());
+            this->mTasks.push_front(this->mCursorTask);
         }
         else {
-            newRank = this->mCursorTask.next()->getRank();
+            this->mCursorTask.setRank(this->mCursorTask.next()->getRank());
+            this->sortTask(this->mCursorTask);
         }
 
-        this->mCursorTask.setRank(newRank);
-        this->sortTask(this->mCursorTask);
         this->mCurrentTask = nullptr;
     }
 

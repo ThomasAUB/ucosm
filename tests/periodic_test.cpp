@@ -8,7 +8,7 @@
 
 #include <iostream>
 
-auto getMS() {
+static auto getMS() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()
     ).count();
@@ -246,6 +246,7 @@ void sortBenchmak() {
         durationSum += end - start;
     }
 
+    // about 510 us in release and 1351 in debug
     std::cout << "relocation benchmark : " << durationSum << std::endl;
 
 }
