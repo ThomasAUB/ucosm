@@ -9,4 +9,5 @@
 TEST_CASE("ucosm tests") {
     periodicTaskTests();
     cfsTaskTests();
+    rtTaskTests();
 }
