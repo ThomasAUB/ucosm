@@ -4,15 +4,13 @@
 
 #include "ucosm/cfs/cfs_scheduler.hpp"
 
-#include <chrono>
-
 void cfsTaskTests() {
 
     struct Task : ucosm::ICFSTask {
 
         void run() override {
 
-            for (volatile uint32_t i = 0; i < mLength; i++) {}
+            waitFor_ms(10);
 
             if (mCounter++ == count) {
                 this->removeTask();
@@ -26,15 +24,7 @@ void cfsTaskTests() {
         uint32_t mLength;
     };
 
-    ucosm::CFSScheduler sched(
-        +[] () {
-            return static_cast<ucosm::ICFSTask::tick_t>(
-                std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()
-                ).count()
-                );
-        }
-    );
+    ucosm::CFSScheduler sched(getMicros);
 
     Task t1;
     Task t2;

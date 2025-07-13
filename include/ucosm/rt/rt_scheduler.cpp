@@ -2,14 +2,25 @@
 
 namespace ucosm {
 
-    RTScheduler::RTScheduler(ITimer& inTimer) :
-        mTimer(inTimer) {
-        mTimer.mScheduler = this;
+    bool RTScheduler::setTimer(ITimer& inTimer) {
+
+        if (mTimer || !inTimer.setTask(*this)) {
+            // scheduler already has a timer
+            // or timer is not free
+            return false;
+        }
+
+        mTimer = &inTimer;
+        return true;
     }
 
     bool RTScheduler::addTask(IPeriodicTask& inTask) {
+        return this->addTask(inTask, 0);
+    }
 
-        if (inTask.getPeriod() == 0) {
+    bool RTScheduler::addTask(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay) {
+
+        if (inTask.getPeriod() == 0 || !mTimer) {
             // Invalid period
             return false;
         }
@@ -23,15 +34,20 @@ namespace ucosm {
             ~InterruptGuard() {
                 timer.enableInterruption();
             }
-        } guard(mTimer);
+        } guard(*mTimer);
 
         if (!base_t::addTask(inTask)) {
             return false;
         }
 
-        if (!mTimer.isRunning()) {
-            mTimer.setDuration(0);
-            mTimer.start();
+        if (inDelay) {
+            inTask.setRank(this->mCursorTask.getRank() + inDelay);
+            this->sortTask(inTask);
+        }
+
+        if (!mTimer->isRunning()) {
+            mTimer->setDuration(0);
+            mTimer->start();
         }
 
         return true;
@@ -42,7 +58,9 @@ namespace ucosm {
         this->mCurrentTask = this->getNextTask();
 
         if (!this->mCurrentTask) {
-            mTimer.stop();
+            // no task to execute
+            // scheduler is empty
+            mTimer->stop();
             return;
         }
 
@@ -70,16 +88,22 @@ namespace ucosm {
         }
         else if (this->empty()) {
             this->mCurrentTask = nullptr;
-            mTimer.stop();
+            mTimer->stop();
             return;
         }
 
         this->mCurrentTask = nullptr;
 
-        mTimer.setDuration(
+        mTimer->setDuration(
             this->getNextRank() -
             taskRank
         );
+    }
+
+    RTScheduler::~RTScheduler() {
+        if (mTimer) {
+            mTimer->stop();
+        }
     }
 
 }

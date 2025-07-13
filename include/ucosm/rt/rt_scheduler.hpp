@@ -28,6 +28,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "irt_timer.hpp"
 #include "ucosm/core/ischeduler.hpp"
 #include "ucosm/periodic/iperiodic_task.hpp"
 
@@ -38,35 +39,20 @@ namespace ucosm {
      */
     struct RTScheduler : IScheduler<IPeriodicTask, ITask<uint8_t>> {
 
-        struct ITimer {
+        using ITimer = IRTTimer<ITask<uint8_t>>;
 
-            virtual void start() = 0;
-            virtual void stop() = 0;
-            virtual bool isRunning() const = 0;
-            virtual void setDuration(uint32_t inDuration) = 0;
-
-            virtual void disableInterruption() = 0;
-            virtual void enableInterruption() = 0;
-
-            void processIT() {
-                if (mScheduler) {
-                    mScheduler->run();
-                }
-            }
-
-        private:
-            friend struct RTScheduler;
-            RTScheduler* mScheduler = nullptr;
-        };
-
-        RTScheduler(ITimer& inTimer);
+        bool setTimer(ITimer& inTimer);
 
         bool addTask(IPeriodicTask& inTask) override;
+
+        bool addTask(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay);
+
+        ~RTScheduler();
 
     protected:
         void run() override;
         using base_t = IScheduler<IPeriodicTask, ITask<uint8_t>>;
-        ITimer& mTimer;
+        ITimer* mTimer = nullptr;
     };
 
 }

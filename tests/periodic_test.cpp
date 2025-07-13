@@ -1,18 +1,10 @@
 #include "tests.hpp"
-
 #include "doctest.h"
 
 #include "ucosm/periodic/periodic_scheduler.hpp"
 
-#include <chrono>
-
 #include <iostream>
-
-static auto getMS() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()
-    ).count();
-}
+#include <iomanip>
 
 void basicTest();
 
@@ -118,10 +110,7 @@ void basicTest() {
 
     struct Task : ucosm::IPeriodicTask {
 
-        bool init() override {
-            mTimer = getMS() - this->getPeriod();
-            return true;
-        }
+        Task(int inID) : mID(inID) {}
 
         void deinit() override {
             mIsDeinit = true;
@@ -129,40 +118,64 @@ void basicTest() {
 
         void run() override {
 
-            // check that the period is right
-            CHECK((getMS() - mTimer) == this->getPeriod());
+            auto currentTime = getMillis();
 
-            mTimer = getMS();
+            if (mFirstExecution) {
+                mFirstExecution = false;
+            }
+            else {
+                double period = currentTime - mLastExecution;
+                double error = 100 - ((double) this->getPeriod() / period) * 100;
+                mAverageError += error;
+
+                std::cout
+                    << "Task " << mID << " "
+                    << "| period =" << getPeriod() << "ms "
+                    << "| actual =" << period << "ms "
+                    << "| error =" << std::fixed << std::setprecision(1) << error << "%" << std::endl;
+
+            }
+
+            mLastExecution = currentTime;
+
+            // simulate work
+            waitFor_ms(5);
 
             if (mCounter++ == count) {
+                std::cout << "Task " << mID << " completed" << std::endl;
                 this->removeTask();
             }
+
         }
 
-        uint64_t mTimer = 0;
+        int error() const {
+            if (mCounter < 2) {
+                return 0;
+            }
+            return mAverageError / (mCounter - 1);
+        }
+
         uint8_t count = 0;
-        uint8_t mCounter = 0;
         bool mIsDeinit = false;
+
+    private:
+        double mAverageError = 0;
+        bool mFirstExecution = true;
+        uint32_t mLastExecution = 0;
+        uint8_t mCounter = 0;
+        int mID;
     };
 
-    ucosm::PeriodicScheduler sched(
-        +[] () {
-            return static_cast<ucosm::IPeriodicTask::tick_t>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()
-                ).count()
-                );
-        }
-    );
+    ucosm::PeriodicScheduler sched(getMillis);
 
-    Task t1;
-    Task t2;
+    Task t1(1);
+    Task t2(2);
 
     CHECK(sched.size() == 0);
     CHECK(sched.empty());
 
     {
-        Task t3;
+        Task t3(3);
         sched.addTask(t3);
         CHECK(sched.size() == 1);
     }
@@ -171,7 +184,7 @@ void basicTest() {
     CHECK(sched.empty());
 
     t1.count = 6;
-    t1.setPeriod(100);
+    t1.setPeriod(125);
 
     t2.count = 10;
     t2.setPeriod(50);
@@ -184,13 +197,18 @@ void basicTest() {
     CHECK(!t1.mIsDeinit);
     CHECK(!t2.mIsDeinit);
 
+    std::cout << "=== Periodic Scheduler start ===" << std::endl;
+
     while (!sched.empty()) {
         sched.run();
     }
 
+    CHECK(t1.error() == 0);
+    CHECK(t2.error() == 0);
     CHECK(t1.mIsDeinit);
     CHECK(t2.mIsDeinit);
 
+    std::cout << "=== Periodic Scheduler end ===" << std::endl;
 }
 
 void sortBenchmak() {
@@ -205,23 +223,7 @@ void sortBenchmak() {
 
     };
 
-    ucosm::PeriodicScheduler sched(
-        +[] () {
-            return static_cast<ucosm::IPeriodicTask::tick_t>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()
-                ).count()
-                );
-        }
-    );
-
-    auto getMicros = [] () {
-        return static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-            ).count()
-            );
-        };
+    ucosm::PeriodicScheduler sched(getMillis);
 
     constexpr uint16_t task_count = 512;
     Task taskArray[task_count];

@@ -1,80 +1,32 @@
 #include "tests.hpp"
-
 #include "doctest.h"
 
 #include "ucosm/rt/rt_scheduler.hpp"
 
-#include <chrono>
 #include <iostream>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <atomic>
+#include <chrono>
 #include <iomanip>
-
-static uint32_t getMS() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()
-    ).count();
-}
+#include <cmath>
 
 class Timer : public ucosm::RTScheduler::ITimer {
-private:
-    std::atomic<bool> mRunning { false };
-    std::atomic<bool> mInterruptionsEnabled { true };
-    std::atomic<uint32_t> mDuration { 0 };
-    std::thread mTimerThread;
-    std::atomic<bool> mStopRequested { false };
 
-    // Absolute timer behavior: track when setDuration was called
-    std::chrono::steady_clock::time_point mSchedulerStartTime;
-    std::atomic<uint32_t> mCurrentRank { 0 };
-    std::mutex mTimerMutex;
-    std::condition_variable mTimerCV;
-    std::atomic<bool> mDurationSet { false };
+    std::atomic<bool> mRunning { false };
+    std::atomic<bool> mShutdown { false };
+    std::atomic<bool> mInterruptionsEnabled { true };
+    std::chrono::steady_clock::time_point mTimePoint;
+    std::thread mTimerThread;
 
     void timerISR() {
-        while (!mStopRequested.load()) {
-            if (mRunning.load()) {
-                std::unique_lock<std::mutex> lock(mTimerMutex);
-
-                // Wait for duration to be set
-                mTimerCV.wait(lock, [this] {
-                    return mDurationSet.load() || mStopRequested.load() || !mRunning.load();
-                    });
-
-                if (mStopRequested.load() || !mRunning.load()) {
-                    continue;
-                }
-
-                const uint32_t currentDuration = mDuration.load();
-                mDurationSet.store(false);
-                lock.unlock();
-
-                // If duration is 0, fire immediately and reset time base
-                if (currentDuration == 0) {
-                    mSchedulerStartTime = std::chrono::steady_clock::now();
-                    mCurrentRank.store(0);
-                    if (mInterruptionsEnabled.load()) {
-                        processIT();
-                    }
-                    continue;
-                }
-
-                // Update rank and calculate absolute fire time
-                mCurrentRank.fetch_add(currentDuration);
-                auto nextFireTime = mSchedulerStartTime + std::chrono::milliseconds(mCurrentRank.load());
-
-                // Sleep until the exact fire time
-                std::this_thread::sleep_until(nextFireTime);
-
-                // Fire the timer interrupt if still running and interruptions enabled
-                if (mRunning.load() && mInterruptionsEnabled.load()) {
-                    processIT();
-                }
+        while (!mShutdown.load()) {
+            if (mRunning.load() && mInterruptionsEnabled.load()) {
+                std::this_thread::sleep_until(mTimePoint);
+                mTimePoint = std::chrono::steady_clock::now();
+                processIT();
             }
             else {
-                // Timer is stopped, just wait
+                // Small delay to prevent busy waiting when not running
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
         }
@@ -87,16 +39,12 @@ public:
     }
 
     ~Timer() {
-        mStopRequested.store(true);
-        if (mTimerThread.joinable()) {
-            mTimerThread.join();
-        }
+        shutdown();
     }
 
     void start() override {
-        if (!mRunning.load()) {
-            mRunning.store(true);
-        }
+        mTimePoint = std::chrono::steady_clock::now();
+        mRunning.store(true);
     }
 
     void stop() override {
@@ -108,10 +56,7 @@ public:
     }
 
     void setDuration(uint32_t inDuration) override {
-        std::lock_guard<std::mutex> lock(mTimerMutex);
-        mDuration.store(inDuration);
-        mDurationSet.store(true);
-        mTimerCV.notify_one();
+        mTimePoint += std::chrono::milliseconds(inDuration);
     }
 
     void disableInterruption() override {
@@ -121,6 +66,18 @@ public:
     void enableInterruption() override {
         mInterruptionsEnabled.store(true);
     }
+
+    void shutdown() {
+        // Signal shutdown first
+        mShutdown.store(true);
+        mRunning.store(false);
+
+        // Wait for thread to finish
+        if (mTimerThread.joinable()) {
+            mTimerThread.join();
+        }
+    }
+
 };
 
 void rtTaskTests() {
@@ -132,75 +89,101 @@ void rtTaskTests() {
 
         void run() override {
 
-            auto currentTime = getMS();
+            auto currentTime = getMillis();
 
             if (mFirstExecution) {
-                //std::cout << "Task " << mID << " first execution" << std::endl;
                 mFirstExecution = false;
             }
             else {
+                double period = currentTime - mLastExecution;
+                double error = 100 - ((double) this->getPeriod() / period) * 100;
+                mAverageError += error;
 
-                auto timeSinceLastRun = currentTime - mLastExecution;
-                double accuracy = (double) timeSinceLastRun / (double) getPeriod() * 100.0;
+                std::cout
+                    << "Task " << mID << " "
+                    << "| period =" << getPeriod() << "ms "
+                    << "| actual =" << period << "ms "
+                    << "| error =" << std::fixed << std::setprecision(1) << error << "%" << std::endl;
 
-                std::cout << "Task " << mID << " period=" << getPeriod() << "ms "
-                    << "actual=" << timeSinceLastRun << "ms "
-                    << "accuracy=" << std::fixed << std::setprecision(1) << accuracy << "%" << std::endl;
-
-                mAverageAccuracy += accuracy;
             }
 
             mLastExecution = currentTime;
 
             // Simulate work
-            auto start = getMS();
-            while (getMS() - start < 10);
+            waitFor_ms(10);
 
             if (mCounter++ == 5) {
-                std::cout << "Task " << mID << " completed, removing itself" << std::endl;
+                std::cout << "Task " << mID << " completed" << std::endl;
                 this->removeTask();
             }
         }
 
-        uint8_t accuracy() const {
+        int error() const {
             if (mCounter < 2) {
                 return 0;
             }
-            return mAverageAccuracy / (mCounter - 1);
+            return mAverageError / (mCounter - 1);
         }
 
     private:
 
-        double mAverageAccuracy = 0;
+        double mAverageError = 0;
         bool mFirstExecution = true;
         uint32_t mLastExecution;
         int mCounter = 0;
         int mID;
     };
 
-    RTTask task1(1, 100);
-    RTTask task2(2, 250);
+    std::cout << "=== RT Scheduler start ===" << std::endl;
+
+    //////////////////////////////
 
     Timer tim;
-
-    ucosm::RTScheduler sched(tim);
-
-    std::cout << "=== RT Scheduler Test Starting ===" << std::endl;
-
+    ucosm::RTScheduler sched;
+    sched.setTimer(tim);
+    RTTask task1(1, 100);
+    RTTask task2(2, 250);
     sched.addTask(task1);
     sched.addTask(task2);
 
-    CHECK(tim.isRunning());
+    //////////////////////////////
 
-    const auto startTimeout = getMS();
-    while (tim.isRunning() && (getMS() - startTimeout) < 20'000);
+    Timer tim2;
+    ucosm::RTScheduler sched2;
+    sched2.setTimer(tim2);
+    RTTask task3(3, 50);
+    sched2.addTask(task3);
+
+    //////////////////////////////
+
+    CHECK(tim.isRunning());
+    CHECK(tim2.isRunning());
+
+
+
+    {
+        const auto startTimeout = getMillis();
+        while ((tim.isRunning() || tim2.isRunning()) && (getMillis() - startTimeout) < 30'000);
+    }
 
     CHECK(!tim.isRunning());
-    CHECK(task1.accuracy() == 100);
-    CHECK(task2.accuracy() == 100);
+    CHECK(!tim2.isRunning());
 
-    std::cout << "Task 1 accuracy: " << (int) task1.accuracy() << "%" << std::endl;
-    std::cout << "Task 2 accuracy: " << (int) task2.accuracy() << "%" << std::endl;
+    int t1AbsError = std::abs(task1.error());
+    int t2AbsError = std::abs(task2.error());
+    int t3AbsError = std::abs(task3.error());
 
-    std::cout << "=== RT Scheduler Test Completed ===" << std::endl;
+    // check that the error is <= to 1 %
+    CHECK(t1AbsError <= 1);
+    CHECK(t2AbsError <= 1);
+    CHECK(t3AbsError == 0);
+
+    std::cout << "Task 1 accuracy: " << (int) task1.error() << "%" << std::endl;
+    std::cout << "Task 2 accuracy: " << (int) task2.error() << "%" << std::endl;
+    std::cout << "Task 3 accuracy: " << (int) task3.error() << "%" << std::endl;
+
+    tim.shutdown();
+    tim2.shutdown();
+
+    std::cout << "=== RT Scheduler end ===" << std::endl;
 }
