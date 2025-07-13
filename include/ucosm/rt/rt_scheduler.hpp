@@ -18,6 +18,9 @@ namespace ucosm {
             virtual bool isRunning() const = 0;
             virtual void setDuration(uint32_t inDuration) = 0;
 
+            virtual void disableInterruption() = 0;
+            virtual void enableInterruption() = 0;
+
             void processIT() {
                 if (mScheduler) {
                     mScheduler->run();
@@ -44,7 +47,6 @@ namespace ucosm {
         void run() override;
         using base_t = IScheduler<IPeriodicTask, ITask<uint8_t>>;
         ITimer& mTimer;
-        volatile bool mISCriticalSection = false;
     };
 
 }

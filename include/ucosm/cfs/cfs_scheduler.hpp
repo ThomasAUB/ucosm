@@ -60,9 +60,9 @@ namespace ucosm {
     template<typename sched_rank_t>
     void CFSScheduler<sched_rank_t>::run() {
 
-        using iterator_t = typename decltype(this->mTasks)::iterator;
+        this->mCurrentTask = this->getNextTask();
 
-        if (this->empty()) {
+        if (!this->mCurrentTask) {
             // no task to run
             if (this->mIdleTask) {
                 this->mIdleTask();
@@ -70,48 +70,22 @@ namespace ucosm {
             return;
         }
 
-        {
-            if (&this->mCursorTask == &this->mTasks.back()) {
-                this->mCurrentTask = static_cast<ICFSTask*>(&this->mTasks.front());
-            }
-            else {
-                this->mCurrentTask = this->mCursorTask.next();
-            }
+        const auto startTimeStamp = mGetTick();
+        const auto currentRank = this->mCurrentTask->getRank();
 
-            auto rank = mGetTick();
+        this->mCursorTask.setRank(currentRank);
+        this->mCurrentTask->run();
 
-            this->mCurrentTask->run();
+        // Check if task is still linked after execution
+        if (this->mCurrentTask->isLinked()) {
 
-            // Check if task is still linked after execution
-            if (!this->mCurrentTask->isLinked()) {
-                this->mCurrentTask = nullptr;
-                return;
-            }
+            auto taskDuration = mGetTick() - startTimeStamp;
 
-            rank = mGetTick() - rank;
+            taskDuration <<= this->mCurrentTask->getPriority();
+            taskDuration += currentRank;
 
-            rank <<= this->mCurrentTask->getPriority();
-            rank += this->mCurrentTask->getRank();
-            this->mCurrentTask->setRank(rank);
-
-            if (!this->sortTask(*this->mCurrentTask)) {
-                // task is not linked anymore or rank didn't change
-                // -> don't move cursor task
-                this->mCurrentTask = nullptr;
-                return;
-            }
-
-        }
-
-        // move cursor task right before the next one
-
-        if (&this->mCursorTask == &this->mTasks.back()) {
-            this->mCursorTask.setRank(this->mTasks.front().getRank());
-            this->mTasks.push_front(this->mCursorTask);
-        }
-        else {
-            this->mCursorTask.setRank(this->mCursorTask.next()->getRank());
-            this->sortTask(this->mCursorTask);
+            this->mCurrentTask->setRank(taskDuration);
+            this->sortTask(*this->mCurrentTask);
         }
 
         this->mCurrentTask = nullptr;

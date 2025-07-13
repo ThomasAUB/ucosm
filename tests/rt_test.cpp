@@ -33,21 +33,38 @@ void rtTaskTests() {
             mDuration = inDuration;
         }
 
+        void disableInterruption() override {
+
+        }
+
+        void enableInterruption() override {
+
+        }
+
         void runTimer() {
 
             auto start = getMS();
 
             while (mIsStarted) {
+
                 if (start != getMS()) {
+                    // increase of at least 1 ms
+
+                    // increase counter
                     mCounter += getMS() - start;
+
                     start = getMS();
-                    if (mCounter >= mDuration) {
-                        mCounter -= mDuration;
-                        this->processIT();
-                    }
+
+                }
+
+                if (mCounter >= mDuration) {
+                    //mCounter -= mDuration;
+                    mCounter = 0;
+                    this->processIT();
                 }
             }
         }
+
     private:
         bool mIsStarted = false;
         uint32_t mCounter = 0;
@@ -64,7 +81,14 @@ void rtTaskTests() {
 
         void run() override {
 
+            //if (mFirst) {
+            //    std::cout << "run task " << mID << " first" << std::endl;
+            //    mFirst = false;
+            //}
+            //else {
             std::cout << "run task " << mID << " time : " << getMS() - mPrevTimeStamp << std::endl;
+            //}
+
             mPrevTimeStamp = getMS();
 
             // simulate work
@@ -76,7 +100,7 @@ void rtTaskTests() {
             }
 
         }
-
+        bool mFirst = true;
         uint32_t mPrevTimeStamp = 0;
         int mCounter = 0;
         int mID;

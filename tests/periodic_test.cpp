@@ -246,7 +246,7 @@ void sortBenchmak() {
         durationSum += end - start;
     }
 
-    // about 510 us in release and 1351 in debug
+    // about 500 us in release and 1200 in debug
     std::cout << "relocation benchmark : " << durationSum << std::endl;
 
 }

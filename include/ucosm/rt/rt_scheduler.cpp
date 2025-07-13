@@ -14,39 +14,27 @@ namespace ucosm {
             return false;
         }
 
-        mISCriticalSection = true;
+        mTimer.disableInterruption();
 
-        if (!base_t::addTask(inTask)) {
-            mISCriticalSection = false;
-            return false;
-        }
+        const bool isTaskAdded = base_t::addTask(inTask);
 
-        mISCriticalSection = false;
-
-        if (!mTimer.isRunning()) {
+        if (isTaskAdded && !mTimer.isRunning()) {
+            mTimer.setDuration(0);
             mTimer.start();
         }
 
-        return true;
+        mTimer.enableInterruption();
+
+        return isTaskAdded;
     }
 
     void RTScheduler::run() {
 
-        if (mISCriticalSection) {
-            return;
-        }
+        this->mCurrentTask = this->getNextTask();
 
-        if (this->empty()) {
+        if (!this->mCurrentTask) {
             mTimer.stop();
             return;
-        }
-
-        // cursor is last
-        if (&this->mCursorTask == &this->mTasks.back()) {
-            this->mCurrentTask = static_cast<IPeriodicTask*>(&this->mTasks.front());
-        }
-        else {
-            this->mCurrentTask = this->mCursorTask.next();
         }
 
         const auto taskRank = this->mCurrentTask->getRank();
@@ -63,7 +51,11 @@ namespace ucosm {
 
             // the task is still in the list
             // update the task rank
-            this->mCurrentTask->setRank(taskRank + taskPeriod);
+            this->mCurrentTask->setRank(
+                taskRank +
+                taskPeriod
+            );
+
             this->sortTask(*this->mCurrentTask);
 
         }
@@ -74,18 +66,7 @@ namespace ucosm {
         }
 
         this->mCurrentTask = nullptr;
-
-        // find the future task to reprogram the timer duration
-        IPeriodicTask* futureTask;
-
-        if (&this->mCursorTask == &this->mTasks.back()) {
-            futureTask = static_cast<IPeriodicTask*>(&this->mTasks.front());
-        }
-        else {
-            futureTask = this->mCursorTask.next();
-        }
-
-        mTimer.setDuration(futureTask->getRank() - taskRank);
+        mTimer.setDuration(this->getNextRank() - taskRank);
     }
 
 }
