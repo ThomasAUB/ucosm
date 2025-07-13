@@ -237,7 +237,7 @@ void sortBenchmak() {
 
     uint64_t durationSum = 0;
 
-    for (uint32_t i = 0; i < 10000; i++) {
+    for (uint32_t i = 0; i < 10'000; i++) {
 
         auto start = getMicros();
         sched.run();

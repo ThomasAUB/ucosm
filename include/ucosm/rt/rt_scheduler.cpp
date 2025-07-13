@@ -14,18 +14,27 @@ namespace ucosm {
             return false;
         }
 
-        mTimer.disableInterruption();
+        struct InterruptGuard {
+            ITimer& timer;
+            InterruptGuard(ITimer& t) :
+                timer(t) {
+                timer.disableInterruption();
+            }
+            ~InterruptGuard() {
+                timer.enableInterruption();
+            }
+        } guard(mTimer);
 
-        const bool isTaskAdded = base_t::addTask(inTask);
+        if (!base_t::addTask(inTask)) {
+            return false;
+        }
 
-        if (isTaskAdded && !mTimer.isRunning()) {
+        if (!mTimer.isRunning()) {
             mTimer.setDuration(0);
             mTimer.start();
         }
 
-        mTimer.enableInterruption();
-
-        return isTaskAdded;
+        return true;
     }
 
     void RTScheduler::run() {
@@ -66,7 +75,11 @@ namespace ucosm {
         }
 
         this->mCurrentTask = nullptr;
-        mTimer.setDuration(this->getNextRank() - taskRank);
+
+        mTimer.setDuration(
+            this->getNextRank() -
+            taskRank
+        );
     }
 
 }
