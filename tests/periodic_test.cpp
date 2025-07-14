@@ -184,10 +184,10 @@ void basicTest() {
     CHECK(sched.empty());
 
     t1.count = 6;
-    t1.setPeriod(1250);
+    t1.setPeriod(125);
 
     t2.count = 10;
-    t2.setPeriod(500);
+    t2.setPeriod(50);
 
     sched.addTask(t1);
     sched.addTask(t2);

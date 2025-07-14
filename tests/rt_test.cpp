@@ -14,9 +14,6 @@
 #include <windows.h>
 #include <mmsystem.h>
 #pragma comment(lib, "winmm.lib")
-#else
-#include <pthread.h>
-#include <sched.h>
 #endif
 
 class Timer : public ucosm::RTScheduler::ITimer {
@@ -25,43 +22,18 @@ private:
     std::atomic<bool> mShutdown { false };
     std::atomic<bool> mEnabled { true };
     std::chrono::high_resolution_clock::time_point mNextWakeup;
-    std::atomic<uint32_t> mDuration { 0 };
     std::thread mTimerThread;
 
     void timerISR() {
 #ifdef _WIN32
         // Set high priority for this thread on Windows
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
-#else
-        // Set high priority for this thread on Unix/Linux
-        struct sched_param param;
-        param.sched_priority = sched_get_priority_max(SCHED_FIFO);
-        pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
 #endif
 
         while (!mShutdown.load(std::memory_order_acquire)) {
             if (mRunning.load(std::memory_order_acquire) && mEnabled.load(std::memory_order_acquire)) {
-
-                // High precision sleep until next wakeup
-                auto now = std::chrono::high_resolution_clock::now();
-                if (now < mNextWakeup) {
-                    std::this_thread::sleep_until(mNextWakeup);
-                }
-
-                // Check again after sleep to prevent race conditions
-                if (!mShutdown.load(std::memory_order_acquire) &&
-                    mRunning.load(std::memory_order_acquire) &&
-                    mEnabled.load(std::memory_order_acquire)) {
-
-                    // Calculate next wakeup time before calling run() to minimize jitter
-                    uint32_t duration = mDuration.load(std::memory_order_acquire);
-                    if (duration > 0) {
-                        mNextWakeup += std::chrono::milliseconds(duration);
-                    }
-
-                    // Execute the timer callback
-                    run();
-                }
+                std::this_thread::sleep_until(mNextWakeup);
+                run();
             }
             else {
                 // Use shorter sleep when not running to be more responsive
@@ -80,9 +52,7 @@ public:
     }
 
     void start() override {
-        auto now = std::chrono::high_resolution_clock::now();
-        uint32_t duration = mDuration.load(std::memory_order_acquire);
-        mNextWakeup = now + std::chrono::milliseconds(duration);
+        mNextWakeup = std::chrono::high_resolution_clock::now();
         mRunning.store(true, std::memory_order_release);
     }
 
@@ -95,11 +65,7 @@ public:
     }
 
     void setDuration(uint32_t inDuration) override {
-        mDuration.store(inDuration, std::memory_order_release);
-        // If timer is running, update next wakeup immediately
-        if (mRunning.load(std::memory_order_acquire)) {
-            mNextWakeup = std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(inDuration);
-        }
+        mNextWakeup += std::chrono::milliseconds(inDuration);
     }
 
     void disable() override {
@@ -157,7 +123,7 @@ void rtTaskTests() {
             mLastExecution = currentTime;
 
             // Simulate work
-            waitFor_ms(10);
+            waitFor_ms(std::rand() % 20);
 
             if (mCounter++ == 5) {
                 std::cout << "Task " << mID << " completed" << std::endl;
@@ -181,15 +147,15 @@ void rtTaskTests() {
         int mID;
     };
 
-    std::cout << "=== RT Scheduler start ===" << std::endl;
+    std::cout << "\n=== RT Scheduler start ===\n" << std::endl;
 
     //////////////////////////////
 
     Timer tim;
     ucosm::RTScheduler sched;
     sched.setTimer(tim);
-    RTTask task1(1, 1000);
-    RTTask task2(2, 2500);
+    RTTask task1(1, 100);
+    RTTask task2(2, 250);
     sched.addTask(task1);
     sched.addTask(task2);
 
@@ -198,15 +164,13 @@ void rtTaskTests() {
     Timer tim2;
     ucosm::RTScheduler sched2;
     sched2.setTimer(tim2);
-    RTTask task3(3, 500);
+    RTTask task3(3, 50);
     sched2.addTask(task3);
 
     //////////////////////////////
 
     CHECK(tim.isRunning());
     CHECK(tim2.isRunning());
-
-
 
     {
         const auto startTimeout = getMillis();
@@ -222,7 +186,7 @@ void rtTaskTests() {
 
     CHECK(t1AbsError <= 2);
     CHECK(t2AbsError <= 2);
-    CHECK(t3AbsError <= 2);  // Even fast tasks can have 1-2% error due to system load
+    CHECK(t3AbsError <= 2);
 
     std::cout << "Task 1 average error: " << (int) task1.error() << "%" << std::endl;
     std::cout << "Task 2 average error: " << (int) task2.error() << "%" << std::endl;
