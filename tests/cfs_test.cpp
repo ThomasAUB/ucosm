@@ -98,6 +98,6 @@ void cfsTaskTests() {
     std::cout << "Task 1 period: " << t1.period() << "ms" << std::endl;
     std::cout << "Task 2 period: " << t2.period() << "ms" << std::endl;
 
-    std::cout << "\n=== CFS Scheduler start ===\n" << std::endl;
+    std::cout << "\n=== CFS Scheduler end ===\n" << std::endl;
 
 }

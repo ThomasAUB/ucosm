@@ -141,8 +141,8 @@ void rtTaskTests() {
     Timer tim;
     ucosm::RTScheduler sched;
     sched.setTimer(tim);
-    RTTask task1(1, 100);
-    RTTask task2(2, 250);
+    RTTask task1(1, 1000);
+    RTTask task2(2, 2500);
     sched.addTask(task1);
     sched.addTask(task2);
 
