@@ -178,12 +178,12 @@ void rtTaskTests() {
     CHECK(t2AbsError <= 1);
     CHECK(t3AbsError == 0);
 
-    std::cout << "Task 1 accuracy: " << (int) task1.error() << "%" << std::endl;
-    std::cout << "Task 2 accuracy: " << (int) task2.error() << "%" << std::endl;
-    std::cout << "Task 3 accuracy: " << (int) task3.error() << "%" << std::endl;
+    std::cout << "Task 1 average error: " << (int) task1.error() << "%" << std::endl;
+    std::cout << "Task 2 average error: " << (int) task2.error() << "%" << std::endl;
+    std::cout << "Task 3 average error: " << (int) task3.error() << "%" << std::endl;
 
     tim.shutdown();
     tim2.shutdown();
 
-    std::cout << "=== RT Scheduler end ===" << std::endl;
+    std::cout << "\n=== RT Scheduler end ===\n" << std::endl;
 }

@@ -197,7 +197,7 @@ void basicTest() {
     CHECK(!t1.mIsDeinit);
     CHECK(!t2.mIsDeinit);
 
-    std::cout << "=== Periodic Scheduler start ===" << std::endl;
+    std::cout << "\n=== Periodic Scheduler start ===\n" << std::endl;
 
     while (!sched.empty()) {
         sched.run();
@@ -208,7 +208,7 @@ void basicTest() {
     CHECK(t1.mIsDeinit);
     CHECK(t2.mIsDeinit);
 
-    std::cout << "=== Periodic Scheduler end ===" << std::endl;
+    std::cout << "\n=== Periodic Scheduler end ===\n" << std::endl;
 }
 
 void sortBenchmak() {
