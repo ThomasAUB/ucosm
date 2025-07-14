@@ -32,88 +32,76 @@
 namespace ucosm {
 
     /**
-     * @brief Real-time timer interface template.
+     * @brief Real-time timer interface for platform abstraction.
      *
-     * This class provides a hardware abstraction layer for real-time timers
-     * that can execute tasks at precise intervals. The timer manages a single
-     * task and provides interrupt-based execution.
+     * Provides a unified interface for hardware timers or threads
+     * used by the real-time scheduler.
      *
-     * @tparam task_t The type of task this timer can execute (must have run() method)
+     * @tparam task_t Task type that must implement run() method
      */
     template<typename task_t>
     struct IRTTimer {
 
-        /**
-         * @brief Virtual destructor for proper cleanup of derived classes.
-         */
         virtual ~IRTTimer() = default;
-
-        // Core timer control interface
         /**
-         * @brief Start the timer.
-         * Timer will begin counting and trigger interrupts.
+         * @brief Start timer counting and enable task management.
          */
         virtual void start() = 0;
 
         /**
-         * @brief Stop the timer.
-         * Timer will stop counting and disable interrupts.
+         * @brief Stop timer and disable task management.
          */
         virtual void stop() = 0;
 
         /**
-         * @brief Check if timer is currently running.
-         * @return true if timer is active, false otherwise
+         * @brief Check if timer is actively running.
+         * @return true if timer is counting
          */
         virtual bool isRunning() const = 0;
 
         /**
-         * @brief Set the timer duration/period.
-         * @param inDuration Duration in implementation-defined units (typically milliseconds)
+         * @brief Set timer period for task execution.
+         * @param inDuration User-defined period unit.
          */
         virtual void setDuration(uint32_t inDuration) = 0;
 
         /**
-         * @brief Disable timer interrupts.
-         * Timer continues counting but won't trigger task execution.
+         * @brief Temporarily disable timer.
+         * Timer continues but won't execute tasks.
          */
-        virtual void disableInterruption() = 0;
+        virtual void disable() = 0;
 
         /**
-         * @brief Enable timer interrupts.
-         * Timer will trigger task execution when counter expires.
+         * @brief Re-enable timer.
          */
-        virtual void enableInterruption() = 0;
+        virtual void enable() = 0;
 
-        // Task management interface
         /**
          * @brief Check if timer is available for task assignment.
-         * @return true if no task is currently assigned, false otherwise
+         * @return true if no task assigned
          */
         bool isFree() const;
 
         /**
          * @brief Assign a task to this timer.
-         * @param inTask Reference to the task to be executed
-         * @return true if task was successfully assigned, false if timer is busy
+         * @param inTask Task to execute periodically
+         * @return true if successfully assigned
          */
         bool setTask(task_t& inTask);
 
         /**
-         * @brief Remove the currently assigned task.
-         * Timer will stop if it's running and no task will be executed.
+         * @brief Remove assigned task and stop timer.
          */
         void removeTask();
 
         /**
-         * @brief Process timer interrupt.
-         * This method should be called from the timer ISR.
-         * Executes the assigned task or stops the timer if no task is assigned.
+         * @brief Execute assigned task.
+         * Runs task or stops timer if no task assigned.
          */
-        void processIT();
+        void run();
 
     private:
-        task_t* mTask = nullptr;  ///< Currently assigned task (thread-safe)
+        task_t* mTask = nullptr;
     };
 
     template<typename task_t>
@@ -132,14 +120,14 @@ namespace ucosm {
 
     template<typename task_t>
     void IRTTimer<task_t>::removeTask() {
-        if (this->mIsRunning()) {
+        if (this->isRunning()) {
             this->stop();
         }
         mTask = nullptr;
     }
 
     template<typename task_t>
-    void IRTTimer<task_t>::processIT() {
+    void IRTTimer<task_t>::run() {
         if (mTask) {
             mTask->run();
         }

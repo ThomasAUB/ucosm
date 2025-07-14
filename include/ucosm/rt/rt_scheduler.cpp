@@ -29,10 +29,10 @@ namespace ucosm {
             ITimer& timer;
             InterruptGuard(ITimer& t) :
                 timer(t) {
-                timer.disableInterruption();
+                timer.disable();
             }
             ~InterruptGuard() {
-                timer.enableInterruption();
+                timer.enable();
             }
         } guard(*mTimer);
 
@@ -103,6 +103,7 @@ namespace ucosm {
     RTScheduler::~RTScheduler() {
         if (mTimer) {
             mTimer->stop();
+            mTimer->removeTask();
         }
     }
 

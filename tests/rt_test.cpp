@@ -14,16 +14,16 @@ class Timer : public ucosm::RTScheduler::ITimer {
 
     std::atomic<bool> mRunning { false };
     std::atomic<bool> mShutdown { false };
-    std::atomic<bool> mInterruptionsEnabled { true };
+    std::atomic<bool> mEnabled { true };
     std::chrono::steady_clock::time_point mTimePoint;
     std::thread mTimerThread;
 
     void timerISR() {
         while (!mShutdown.load()) {
-            if (mRunning.load() && mInterruptionsEnabled.load()) {
+            if (mRunning.load() && mEnabled.load()) {
                 std::this_thread::sleep_until(mTimePoint);
                 mTimePoint = std::chrono::steady_clock::now();
-                processIT();
+                run();
             }
             else {
                 // Small delay to prevent busy waiting when not running
@@ -59,12 +59,12 @@ public:
         mTimePoint += std::chrono::milliseconds(inDuration);
     }
 
-    void disableInterruption() override {
-        mInterruptionsEnabled.store(false);
+    void disable() override {
+        mEnabled.store(false);
     }
 
-    void enableInterruption() override {
-        mInterruptionsEnabled.store(true);
+    void enable() override {
+        mEnabled.store(true);
     }
 
     void shutdown() {

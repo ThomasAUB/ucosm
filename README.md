@@ -3,13 +3,15 @@
 
 # uCosm
 
-Lightweight C++17 cooperative scheduler for microcontrollers.
+Lightweight C++17 scheduler library for microcontrollers supporting cooperative and real-time scheduling.
 
-- no heap allocation
-- no task number limitation or pre-allocation
-- platform independent
-- scheduling tree
-- customizable scheduling policy
+**Key Features:**
+- No heap allocation
+- No task number limitations
+- Platform independent
+- Hierarchical scheduling trees
+- Multiple scheduling policies: Cooperative, Fair, and Real-time
+- Customizable scheduling algorithms
 
 ```mermaid
 flowchart LR
@@ -33,11 +35,24 @@ schedTask --> subTask1
 schedTask --> subTask2
 ```
 
-This library provides a basic skeleton implementation in the _core_ directory, and two specialisations contained in the _periodic_ and _cfs_ (Completely Fair Scheduler) directories.
+This library provides a modular scheduling framework with three main implementations:
+
+| Scheduler | Type | Execution | Use Case |
+|-----------|------|-----------|----------|
+| **Periodic** | Cooperative | Time-based intervals | Regular maintenance tasks |
+| **CFS** | Cooperative | Priority-based fair sharing | CPU-intensive workloads |
+| **RT** | Real-time | Hardware timer interrupts | Deterministic real-time systems |
+
+- **Core**: Basic cooperative scheduler foundation
+- **Periodic**: Time-based cooperative task scheduling  
+- **CFS**: Completely Fair Scheduler with priority-based execution
+- **RT**: Real-time scheduler with hardware timer integration
 
 # Examples
 
-## Periodic
+## Periodic Scheduler
+
+Time-based cooperative scheduling where tasks execute at defined intervals.
 
 ```cpp
 #include <iostream>
@@ -87,7 +102,9 @@ int main() {
 }
 ```
 
-## CFS
+## CFS (Completely Fair Scheduler)
+
+Priority-based cooperative scheduling with automatic time-slicing for fair execution.
 
 ```cpp
 #include <iostream>
@@ -129,11 +146,70 @@ int main() {
 }
 ```
 
-# Scheduler tree
+## Real-Time (RT) Scheduler
 
-In this library, the schedulers are also tasks. The task type can be passed as a template parameter to the scheduler.
+Interrupt timer-based scheduling for real-time applications.
 
-Here we declare a periodic scheduler that schedules a CFS scheduler that schedules a periodic scheduler.
+The RT scheduler provides deterministic task execution using platform-specific timers. On microcontrollers, it uses dedicated hardware timers with interrupt priorities. On desktop platforms, the same interface can be implemented using high-resolution threads for development and testing purposes.
+
+Timing accuracy depends on the collective workload of all tasks within a scheduler. For maximum determinism, multiple schedulers can be created with timers of different interrupt priorities.
+
+```cpp
+#include <iostream>
+#include "ucosm/periodic/iperiodic_task.hpp"
+
+struct RTTask final : ucosm::IPeriodicTask {
+    RTTask(uint32_t period_ms) : ucosm::IPeriodicTask(period_ms) {}
+    
+    void run() override {
+        std::cout << "RT task executed at " << getPeriod() << "ms period\n";
+        if(mCounter++ == 10) {
+            this->removeTask();
+        }
+    }
+    int mCounter = 0;
+};
+```
+
+```cpp
+#include "ucosm/rt/rt_scheduler.hpp"
+
+// Hardware timer or thread implementation (platform-specific)
+class Timer : public ucosm::RTScheduler::ITimer {
+    // Implement virtual methods for your platform
+    void start() override { /* Start timer */ }
+    void stop() override { /* Stop timer */ }
+    bool isRunning() const override { /* Check timer status */ }
+    void setDuration(uint32_t duration) override { /* Set timer period */ }
+    void disable() override { /* Disable timer */ }
+    void enable() override { /* Enable timer */ }
+};
+
+int main() {
+    Timer timer;
+    ucosm::RTScheduler scheduler;
+    scheduler.setTimer(timer);
+
+    RTTask task1(100);  // Execute every 100ms
+    RTTask task2(500);  // Execute every 500ms
+
+    scheduler.addTask(task1);
+    scheduler.addTask(task2);
+
+    // Tasks execute automatically via timer interrupts
+    while(!scheduler.empty()) {
+        // Main loop can handle other work
+    }
+
+    return 0;
+}
+```
+
+# Hierarchical Scheduling
+
+Schedulers can be nested as tasks within other schedulers, creating flexible scheduling hierarchies.
+
+**Example**: Periodic scheduler containing a CFS scheduler containing another periodic scheduler.
 
 ```cpp
 ucosm::PeriodicScheduler<ucosm::ICFSTask> periodicScheduler(getTick_ms);
@@ -147,9 +223,9 @@ cfsScheduler.addTask(periodicScheduler);
 periodicScheduler2.addTask(cfsScheduler);
 ```
 
-# Notes
+# Memory Safety
 
-The tasks storage is based on [ulink](https://github.com/ThomasAUB/ulink) and provides object lifetime safety which means that a task that is deleted will remove itself from its scheduler :
+Task storage uses [ulink](https://github.com/ThomasAUB/ulink) for automatic lifetime management. Tasks automatically remove themselves from schedulers when destroyed.
 
 ```cpp
 void foo() {
