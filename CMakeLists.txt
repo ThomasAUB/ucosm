@@ -27,17 +27,17 @@ endif()
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/ulink/include)
 
+# Create a library for ucosm implementation files
+add_library(ucosm_impl 
+    include/ucosm/rt/rt_scheduler.cpp
+)
+target_include_directories(ucosm_impl PUBLIC include)
+
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
 
-# if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+include(CTest)
 
-    enable_testing()
+enable_testing()
 
-    add_subdirectory(tests)
-
-    # add_test(ucosm_tests  ucosm_tests)
-    
-    # add_test(NAME ucosmTests COMMAND $<TARGET_FILE:tests/tests.cpp>)
-    
-# endif()
+add_subdirectory(tests)
