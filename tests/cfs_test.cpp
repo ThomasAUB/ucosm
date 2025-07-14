@@ -1,49 +1,73 @@
 #include "tests.hpp"
-
 #include "doctest.h"
 
 #include "ucosm/cfs/cfs_scheduler.hpp"
 
-#include <chrono>
+#include <iostream>
 
 void cfsTaskTests() {
 
     struct Task : ucosm::ICFSTask {
 
+        Task(int id, uint32_t inWorkDuration_ms) :
+            mID(id),
+            mWork_ms(inWorkDuration_ms) {}
+
         void run() override {
 
-            for (volatile uint32_t i = 0; i < mLength; i++) {}
+            auto currentTime = getMillis();
+
+            if (mFirstExecution) {
+                mFirstExecution = false;
+            }
+            else {
+                uint32_t period = currentTime - mLastExecution;
+                mAveragePeriod += period;
+
+                std::cout
+                    << "Task " << mID << " "
+                    << "| period =" << period << "ms "
+                    << std::endl;
+
+            }
+
+            mLastExecution = currentTime;
+
+            waitFor_ms(mWork_ms);
 
             if (mCounter++ == count) {
                 this->removeTask();
             }
         }
 
-        void setLength(uint32_t io) { mLength = io; }
+        uint32_t period() const {
+            if (mCounter < 2) {
+                return 0;
+            }
+            return mAveragePeriod / (mCounter - 1);
+        }
 
         uint8_t count = 0;
+
+    private:
+        bool mFirstExecution = true;
+        uint32_t mLastExecution;
+        uint32_t mAveragePeriod = 0;
         uint8_t mCounter = 0;
-        uint32_t mLength;
+        uint32_t mWork_ms;
+        int mID;
     };
 
-    ucosm::CFSScheduler sched(
-        +[] () {
-            return static_cast<ucosm::ICFSTask::tick_t>(
-                std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()
-                ).count()
-                );
-        }
-    );
+    ucosm::CFSScheduler sched(getMicros);
 
-    Task t1;
-    Task t2;
+    Task t1(1, 10);
+    Task t2(2, 10);
 
     CHECK(sched.size() == 0);
     CHECK(sched.empty());
 
     {
-        Task t3;
+        Task t3(3, 500);
         sched.addTask(t3);
         CHECK(sched.size() == 1);
     }
@@ -53,11 +77,9 @@ void cfsTaskTests() {
 
     t1.count = 6;
     t1.setPriority(4);
-    t1.setLength(1000);
 
     t2.count = 10;
     t2.setPriority(6);
-    t2.setLength(1000);
 
     sched.addTask(t1);
     sched.addTask(t2);
@@ -65,8 +87,17 @@ void cfsTaskTests() {
     CHECK(sched.size() == 2);
     CHECK(!sched.empty());
 
+    std::cout << "\n=== CFS Scheduler start ===\n" << std::endl;
+
     while (!sched.empty()) {
         sched.run();
     }
+
+    CHECK(t1.period() < t2.period());
+
+    std::cout << "Task 1 period: " << t1.period() << "ms" << std::endl;
+    std::cout << "Task 2 period: " << t2.period() << "ms" << std::endl;
+
+    std::cout << "\n=== CFS Scheduler start ===\n" << std::endl;
 
 }

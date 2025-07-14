@@ -132,10 +132,11 @@ namespace ucosm {
             return false;
         }
 
-        if (this->prev->prev && mRank < this->prev->mRank) {
-            // move task to the left
+        auto* prevTask = this->prev->prev;
+        auto* nextTask = this->next->next;
 
-            auto* prevTask = this->prev->prev;
+        if (prevTask && mRank < this->prev->mRank) {
+            // move task to the left
 
             while (prevTask->prev && mRank < prevTask->mRank) {
                 prevTask = prevTask->prev;
@@ -151,10 +152,8 @@ namespace ucosm {
             this->next->prev = this;
 
         }
-        else if (this->next->next && this->next->mRank < mRank) {
+        else if (nextTask && this->next->mRank < mRank) {
             // move task to the right
-
-            auto* nextTask = this->next->next;
 
             while (nextTask->next && nextTask->mRank < mRank) {
                 nextTask = nextTask->next;

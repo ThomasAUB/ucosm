@@ -27,68 +27,32 @@
 
 #pragma once
 
+#include <stdint.h>
+#include "irt_timer.hpp"
 #include "ucosm/core/ischeduler.hpp"
-#include "icfs_task.hpp"
+#include "ucosm/periodic/iperiodic_task.hpp"
 
 namespace ucosm {
 
     /**
-     * @brief Completely fair scheduler.
-     *
-     * @tparam sched_task_t Scheduler task type
+     * @brief Real-time scheduler.
      */
-    template<typename sched_task_t = ITask<int8_t>>
-    struct CFSScheduler : IScheduler<ICFSTask, sched_task_t> {
+    struct RTScheduler : IScheduler<IPeriodicTask, ITask<uint8_t>> {
 
-        using get_tick_t = ICFSTask::tick_t(*)();
+        using ITimer = IRTTimer<ITask<uint8_t>>;
 
-        CFSScheduler(get_tick_t inGetTick, idle_task_t inIdleTask = nullptr) :
-            IScheduler<ICFSTask, sched_task_t>(inIdleTask),
-            mGetTick(inGetTick) {}
+        bool setTimer(ITimer& inTimer);
 
-        /**
-         * @brief Runs the task that has the lower execution time.
-         */
+        bool addTask(IPeriodicTask& inTask) override;
+
+        bool addTask(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay);
+
+        ~RTScheduler();
+
+    protected:
         void run() override;
-
-    private:
-
-        get_tick_t mGetTick;
-
+        using base_t = IScheduler<IPeriodicTask, ITask<uint8_t>>;
+        ITimer* mTimer = nullptr;
     };
-
-    template<typename sched_rank_t>
-    void CFSScheduler<sched_rank_t>::run() {
-
-        this->mCurrentTask = this->getNextTask();
-
-        if (!this->mCurrentTask) {
-            // no task to run
-            if (this->mIdleTask) {
-                this->mIdleTask();
-            }
-            return;
-        }
-
-        const auto startTimeStamp = mGetTick();
-        const auto currentRank = this->mCurrentTask->getRank();
-
-        this->mCursorTask.setRank(currentRank);
-        this->mCurrentTask->run();
-
-        // Check if task is still linked after execution
-        if (this->mCurrentTask->isLinked()) {
-
-            auto taskDuration = mGetTick() - startTimeStamp;
-
-            taskDuration <<= this->mCurrentTask->getPriority();
-            taskDuration += currentRank;
-
-            this->mCurrentTask->setRank(taskDuration);
-            this->sortTask(*this->mCurrentTask);
-        }
-
-        this->mCurrentTask = nullptr;
-    }
 
 }

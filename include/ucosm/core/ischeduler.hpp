@@ -123,6 +123,8 @@ namespace ucosm {
 
         bool sortTask(itask_t& inTask);
 
+        task_t* getNextTask();
+
         ulink::List<itask_t> mTasks;
 
         idle_task_t mIdleTask;
@@ -164,10 +166,7 @@ namespace ucosm {
 
     template<typename task_t, typename sched_rank_t>
     bool IScheduler<task_t, sched_rank_t>::empty() const {
-        return (
-            const_task_iterator(&mCursorTask) == mTasks.begin() &&
-            const_task_iterator(mCursorTask.next()) == mTasks.end()
-            );
+        return (&mTasks.front() == &mTasks.back());
     }
 
     template<typename task_t, typename sched_rank_t>
@@ -200,11 +199,15 @@ namespace ucosm {
     template<typename task_t, typename sched_rank_t>
     typename task_t::rank_t IScheduler<task_t, sched_rank_t>::getNextRank() const {
 
-        if (this->empty()) {
+        auto& front = mTasks.front();
+        auto& back = mTasks.back();
+
+        if (&front == &back) {
+            // only the cursor task is in the list
             return 0;
         }
 
-        if (&this->mCursorTask == &this->mTasks.back()) {
+        if (&this->mCursorTask == &back) {
             return this->mTasks.front().getRank();
         }
         else {
@@ -214,22 +217,41 @@ namespace ucosm {
     }
 
     template<typename task_t, typename sched_rank_t>
-    bool IScheduler<task_t, sched_rank_t>::sortTask(itask_t& inTask) {
+    task_t* IScheduler<task_t, sched_rank_t>::getNextTask() {
 
-        if (!inTask.isLinked()) {
-            return false;
+        auto& front = mTasks.front();
+        auto& back = mTasks.back();
+
+        if (&front == &back) {
+            // only the cursor task is in the list
+            return nullptr;
         }
+
+        if (&mCursorTask == &back) {
+            // cursor is last
+            // update cursor
+            mTasks.push_front(mCursorTask);
+            return static_cast<task_t*>(&front);
+        }
+        else {
+            return mCursorTask.next();
+        }
+
+    }
+
+    template<typename task_t, typename sched_rank_t>
+    bool IScheduler<task_t, sched_rank_t>::sortTask(itask_t& inTask) {
 
         const auto rank = inTask.getRank();
 
-        if (rank < this->mTasks.front().getRank()) {
+        if (rank < mTasks.front().getRank()) {
 
-            this->mTasks.push_front(inTask);
+            mTasks.push_front(inTask);
 
         }
-        else if (rank > this->mTasks.back().getRank()) {
+        else if (rank > mTasks.back().getRank()) {
 
-            this->mTasks.push_back(inTask);
+            mTasks.push_back(inTask);
 
         }
         else {
