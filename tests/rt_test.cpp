@@ -2,6 +2,8 @@
 #include "doctest.h"
 
 #include "ucosm/rt/rt_scheduler.hpp"
+#include "ucosm/rt/rt_message_queue.hpp"
+#include "ucosm/rt/rt_communication_example.hpp"
 
 #include <iostream>
 #include <thread>
@@ -201,4 +203,209 @@ void rtTaskTests() {
 #endif
 
     std::cout << "\n=== RT Scheduler end ===\n" << std::endl;
+}
+
+TEST_CASE("RT Message Queue") {
+    using namespace ucosm;
+
+    SUBCASE("Basic send/receive") {
+        RTMessageQueue<int, 4> queue;
+
+        // Test empty queue
+        CHECK(queue.empty());
+        CHECK(queue.size() == 0);
+
+        int value;
+        CHECK_FALSE(queue.tryReceive(value));
+
+        // Test sending
+        CHECK(queue.trySend(42));
+        CHECK_FALSE(queue.empty());
+        CHECK(queue.size() == 1);
+
+        // Test receiving
+        CHECK(queue.tryReceive(value));
+        CHECK(value == 42);
+        CHECK(queue.empty());
+    }
+
+    SUBCASE("Queue capacity") {
+        RTMessageQueue<int, 4> queue;  // Changed from 3 to 4 (power of 2)
+
+        // Fill queue (capacity is actually Size-1 = 3)
+        CHECK(queue.trySend(1));
+        CHECK(queue.trySend(2));
+        CHECK(queue.trySend(3));
+        CHECK(queue.size() == 3);
+
+        // Queue should be full
+        CHECK_FALSE(queue.trySend(4));
+
+        // Receive one
+        int value;
+        CHECK(queue.tryReceive(value));
+        CHECK(value == 1);
+
+        // Should be able to send again
+        CHECK(queue.trySend(4));
+    }
+
+    SUBCASE("FIFO order") {
+        RTMessageQueue<int, 8> queue;
+
+        // Send sequence
+        for (int i = 1; i <= 5; ++i) {
+            CHECK(queue.trySend(i));
+        }
+
+        // Receive in same order
+        for (int i = 1; i <= 5; ++i) {
+            int value;
+            CHECK(queue.tryReceive(value));
+            CHECK(value == i);
+        }
+    }
+}
+
+TEST_CASE("RT Shared Variable") {
+    using namespace ucosm;
+
+    SUBCASE("Basic operations") {
+        RTSharedVariable<float> var(3.14f);
+
+        CHECK(var.load() == 3.14f);
+
+        var.store(2.71f);
+        CHECK(var.load() == 2.71f);
+    }
+
+    SUBCASE("Version tracking") {
+        RTSharedVariable<int> var(100);
+
+        int value;
+        uint32_t version1 = var.loadWithVersion(value);
+        CHECK(value == 100);
+
+        var.store(200);
+        uint32_t version2 = var.loadWithVersion(value);
+        CHECK(value == 200);
+        CHECK(version2 != version1);
+
+        // Same value, version should not change
+        var.store(200);
+        uint32_t version3 = var.loadWithVersion(value);
+        CHECK(value == 200);
+        CHECK(version3 == version2);
+    }
+
+    SUBCASE("Compare and swap") {
+        RTSharedVariable<int> var(10);
+
+        int expected = 10;
+        CHECK(var.compareAndSwap(expected, 20));
+        CHECK(var.load() == 20);
+        CHECK(expected == 10); // Should not be modified on success
+
+        expected = 10; // Wrong expected value
+        CHECK_FALSE(var.compareAndSwap(expected, 30));
+        CHECK(var.load() == 20); // Should not change
+        CHECK(expected == 20); // Should be updated with current value
+    }
+}
+
+TEST_CASE("RT Event Flags") {
+    using namespace ucosm;
+
+    SUBCASE("Basic flag operations") {
+        RTEventFlags flags;
+
+        CHECK(flags.getFlags() == 0);
+        CHECK_FALSE(flags.testAny(0x01));
+        CHECK_FALSE(flags.testAll(0x01));
+
+        flags.setFlags(0x05); // Set bits 0 and 2
+        CHECK(flags.getFlags() == 0x05);
+        CHECK(flags.testAny(0x01)); // Test bit 0
+        CHECK(flags.testAny(0x04)); // Test bit 2
+        CHECK(flags.testAll(0x05)); // Test both bits
+        CHECK_FALSE(flags.testAll(0x07)); // Test missing bit
+
+        flags.clearFlags(0x01); // Clear bit 0
+        CHECK(flags.getFlags() == 0x04);
+        CHECK_FALSE(flags.testAny(0x01));
+        CHECK(flags.testAny(0x04));
+    }
+
+    SUBCASE("Wait operations") {
+        RTEventFlags flags;
+
+        // Test timeout on empty flags
+        CHECK_FALSE(flags.waitAny(0x01, 1)); // 1ms timeout
+        CHECK_FALSE(flags.waitAll(0x03, 1));
+
+        flags.setFlags(0x03);
+        CHECK(flags.waitAny(0x01, 1));
+        CHECK(flags.waitAll(0x03, 1));
+        CHECK_FALSE(flags.waitAll(0x07, 1)); // Missing bit
+    }
+}
+
+TEST_CASE("RT Communication Integration") {
+    using namespace ucosm;
+
+    SUBCASE("Message queue with complex types") {
+        struct TestMessage {
+            uint32_t id;
+            float value;
+            bool operator==(const TestMessage& other) const {
+                return id == other.id && value == other.value;
+            }
+        };
+
+        RTMessageQueue<TestMessage, 4> queue;
+
+        TestMessage msg1 { 1, 3.14f };
+        TestMessage msg2 { 2, 2.71f };
+
+        CHECK(queue.trySend(msg1));
+        CHECK(queue.trySend(msg2));
+
+        TestMessage received;
+        CHECK(queue.tryReceive(received));
+        CHECK(received == msg1);
+
+        CHECK(queue.tryReceive(received));
+        CHECK(received == msg2);
+    }
+
+    SUBCASE("Event-driven communication") {
+        RTMessageQueue<int, 4> queue;
+        RTEventFlags events;
+
+        const uint32_t DATA_READY = 0x01;
+
+        // Producer
+        CHECK(queue.trySend(42));
+        events.setFlags(DATA_READY);
+
+        // Consumer
+        if (events.testAny(DATA_READY)) {
+            int value;
+            if (queue.tryReceive(value)) {
+                CHECK(value == 42);
+                if (queue.empty()) {
+                    events.clearFlags(DATA_READY);
+                }
+            }
+        }
+
+        CHECK_FALSE(events.testAny(DATA_READY));
+    }
+}
+
+TEST_CASE("RT Communication Example") {
+    // This will run the demonstration example
+    std::cout << "\n--- Running RT Communication Demo ---\n";
+    demonstrateRTCommunication();
+    std::cout << "--- Demo Complete ---\n\n";
 }
