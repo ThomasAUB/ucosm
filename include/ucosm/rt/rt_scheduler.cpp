@@ -64,11 +64,28 @@ namespace ucosm {
             return;
         }
 
-        const auto taskRank = this->mCurrentTask->getRank();
-        const auto taskPeriod = this->mCurrentTask->getPeriod();
+        // check if the task to be executed hasn't been deleted since the timer has been programed
+        const auto cursorRank = this->mCursorTask.getRank();
+        const auto currentRank = this->mCurrentTask->getRank();
 
-        // update cursor's rank
-        this->mCursorTask.setRank(taskRank);
+        const auto deltaTask = currentRank - cursorRank;
+        const auto deltaTick = mCounter - cursorRank;
+
+        if (deltaTick < deltaTask) {
+
+            // task is not ready
+
+            if (auto* next = this->getNextTask()) {
+                delay(next->getRank() - mCounter);
+            }
+            else {
+                // no other task to execute
+                mTimer->stop();
+            }
+
+            this->mCurrentTask = nullptr;
+            return;
+        }
 
         // execute the task
         this->mCurrentTask->run();
@@ -79,25 +96,27 @@ namespace ucosm {
             // the task is still in the list
             // update the task rank
             this->mCurrentTask->setRank(
-                taskRank +
-                taskPeriod
+                currentRank +
+                this->mCurrentTask->getPeriod()
             );
 
             this->sortTask(*this->mCurrentTask);
 
         }
         else if (this->empty()) {
-            this->mCurrentTask = nullptr;
             mTimer->stop();
+            this->mCurrentTask = nullptr;
             return;
         }
 
         this->mCurrentTask = nullptr;
 
-        mTimer->setDuration(
-            this->getNextRank() -
-            taskRank
-        );
+        delay(this->getNextRank() - currentRank);
+    }
+
+    void RTScheduler::delay(uint32_t inDelay) {
+        mTimer->setDuration(inDelay);
+        mCounter += inDelay;
     }
 
     RTScheduler::~RTScheduler() {

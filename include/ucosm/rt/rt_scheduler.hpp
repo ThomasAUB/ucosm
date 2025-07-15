@@ -50,6 +50,10 @@ namespace ucosm {
         ~RTScheduler();
 
     protected:
+
+        void delay(uint32_t inDelay);
+
+        uint32_t mCounter = 0;
         void run() override;
         using base_t = IScheduler<IPeriodicTask, ITask<uint8_t>>;
         ITimer* mTimer = nullptr;
