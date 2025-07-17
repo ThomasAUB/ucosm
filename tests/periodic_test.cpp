@@ -3,6 +3,8 @@
 
 #include "ucosm/periodic/periodic_scheduler.hpp"
 
+#include "ucosm/periodic/icoroutine.hpp"
+
 #include <iostream>
 #include <iomanip>
 
@@ -12,6 +14,8 @@ void timerOverflowTest();
 
 void sortBenchmak();
 
+void resumableTask();
+
 void periodicTaskTests() {
 
     basicTest();
@@ -19,6 +23,8 @@ void periodicTaskTests() {
     timerOverflowTest();
 
     sortBenchmak();
+
+    resumableTask();
 
 }
 
@@ -252,3 +258,54 @@ void sortBenchmak() {
     std::cout << "relocation benchmark : " << durationSum << std::endl;
 
 }
+
+
+void resumableTask() {
+
+    struct Coroutine : ucosm::ICoroutine {
+
+        bool mB;
+        Coroutine(bool b) : mB(b) {}
+
+        void run() override {
+
+            UCOSM_START;
+
+            std::cout << "start" << std::endl;
+
+            UCOSM_YIELD;
+
+            std::cout << "yielded" << std::endl;
+
+            UCOSM_WAIT_UNTIL(mB, 100);
+
+            if (mB) {
+                std::cout << "see you in 5 sec" << std::endl;
+                UCOSM_WAIT(5000);
+                std::cout << "comme back !" << std::endl;
+            }
+
+            std::cout << "see you in 1 sec" << std::endl;
+
+            UCOSM_WAIT(1000);
+
+            std::cout << "comme back !" << std::endl;
+
+            std::cout << "ending task" << std::endl;
+
+            UCOSM_END;
+        }
+
+    };
+
+    ucosm::PeriodicScheduler sched(getMillis);
+
+    Coroutine t(false);
+
+    sched.addTask(t);
+
+    while (!sched.empty()) {
+        sched.run();
+    }
+}
+
