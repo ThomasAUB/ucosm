@@ -24,7 +24,9 @@ private:
     std::atomic<bool> mShutdown { false };
     std::atomic<bool> mEnabled { true };
     std::chrono::high_resolution_clock::time_point mNextWakeup;
+    uint32_t mCounter;
     std::thread mTimerThread;
+
 
     void timerISR() {
 #ifdef _WIN32
@@ -35,6 +37,7 @@ private:
         while (!mShutdown.load(std::memory_order_acquire)) {
             if (mRunning.load(std::memory_order_acquire) && mEnabled.load(std::memory_order_acquire)) {
                 std::this_thread::sleep_until(mNextWakeup);
+                mCounter = getMillis();
                 run();
             }
             else {
@@ -147,7 +150,7 @@ void rtTaskTests() {
         uint32_t mLastExecution;
         int mCounter = 0;
         int mID;
-    };
+};
 
     std::cout << "\n=== RT Scheduler start ===\n" << std::endl;
 
@@ -157,7 +160,7 @@ void rtTaskTests() {
     ucosm::RTScheduler sched;
     sched.setTimer(tim);
     RTTask task1(1, 100);
-    RTTask task2(2, 250);
+    RTTask task2(2, 225);
     sched.addTask(task1);
     sched.addTask(task2);
 

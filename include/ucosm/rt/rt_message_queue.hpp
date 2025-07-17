@@ -31,8 +31,6 @@
 #include <stddef.h>
 #include <atomic>
 #include <type_traits>
-#include <chrono>
-#include <thread>
 
 namespace ucosm {
 
@@ -149,10 +147,10 @@ namespace ucosm {
         }
 
     private:
-        // Cache line padding to prevent false sharing
-        alignas(sizeof(uintptr_t)) std::atomic<size_t> mReadIndex;
-        alignas(sizeof(uintptr_t)) std::atomic<size_t> mWriteIndex;
-        alignas(sizeof(uintptr_t)) T mBuffer[Size];
+        // Platform-optimized alignment to prevent false sharing
+        alignas(std::max_align_t) std::atomic<size_t> mReadIndex;
+        alignas(std::max_align_t) std::atomic<size_t> mWriteIndex;
+        alignas(std::max_align_t) T mBuffer[Size];
     };
 
     /**
@@ -169,6 +167,8 @@ namespace ucosm {
             "Type must be trivially copyable");
         static_assert(sizeof(T) <= sizeof(uint64_t),
             "Type too large for atomic operations");
+        static_assert(std::atomic<T>::is_always_lock_free,
+            "Type must be lock-free on this platform (use smaller types on MCU)");
 
     public:
         /**
@@ -184,10 +184,15 @@ namespace ucosm {
          * @note Version is only incremented if value actually changes
          */
         void store(const T& newValue) {
-            T currentValue = mValue.load(std::memory_order_acquire);
-            if (currentValue != newValue) {
-                mValue.store(newValue, std::memory_order_release);
-                mVersion.fetch_add(1, std::memory_order_release);
+            T expected = mValue.load(std::memory_order_relaxed);
+            while (expected != newValue) {
+                if (mValue.compare_exchange_weak(expected, newValue,
+                    std::memory_order_release,
+                    std::memory_order_relaxed)) {
+                    mVersion.fetch_add(1, std::memory_order_release);
+                    break;
+                }
+                // expected is updated by compare_exchange_weak on failure
             }
         }
 
@@ -203,10 +208,16 @@ namespace ucosm {
          * @brief Read value and version atomically.
          * @param value Reference to store current value
          * @return Current version number
+         * @note Ensures consistent version-value pair reading
          */
         uint32_t loadWithVersion(T& value) const {
-            value = mValue.load(std::memory_order_acquire);
-            return mVersion.load(std::memory_order_acquire);
+            uint32_t version1, version2;
+            do {
+                version1 = mVersion.load(std::memory_order_acquire);
+                value = mValue.load(std::memory_order_acquire);
+                version2 = mVersion.load(std::memory_order_acquire);
+            } while (version1 != version2);
+            return version2;
         }
 
         /**
@@ -242,8 +253,8 @@ namespace ucosm {
         }
 
     private:
-        std::atomic<uint32_t> mVersion;
-        std::atomic<T> mValue;
+        alignas(std::max_align_t) std::atomic<uint32_t> mVersion;
+        alignas(std::max_align_t) std::atomic<T> mValue;
     };
 
     /**
@@ -318,21 +329,17 @@ namespace ucosm {
         /**
          * @brief Wait for any of the specified flags with timeout.
          * @param flags Flags to wait for
-         * @param timeoutMs Timeout in milliseconds
+         * @param timeout Timeout
          * @return true if flags were set within timeout
+         * @note On microcontrollers, this does limited polling to avoid blocking
          */
-        bool waitAny(flags_t flags, uint32_t timeoutMs) const {
-            // Simple timeout-based polling implementation
-            // In real RT system, this would use hardware events
-            auto start = std::chrono::steady_clock::now();
-            auto timeout = std::chrono::milliseconds(timeoutMs);
-
-            while (std::chrono::steady_clock::now() - start < timeout) {
+        bool waitAny(flags_t flags, uint32_t timeout) const {
+            for (uint32_t i = 0; i < timeout; ++i) {
                 if (testAny(flags)) {
                     return true;
                 }
-                // Small delay to prevent busy waiting
-                std::this_thread::sleep_for(std::chrono::microseconds(100));
+                // Minimal delay - in real MCU this would be hardware-specific
+                for (volatile int j = 0; j < 1000; ++j) {} // Simple delay loop
             }
             return false;
         }
@@ -340,20 +347,17 @@ namespace ucosm {
         /**
          * @brief Wait for all of the specified flags with timeout.
          * @param flags Flags to wait for
-         * @param timeoutMs Timeout in milliseconds
+         * @param timeout Timeout
          * @return true if all flags were set within timeout
+         * @note On microcontrollers, this does limited polling to avoid blocking
          */
-        bool waitAll(flags_t flags, uint32_t timeoutMs) const {
-            // Simple timeout-based polling implementation
-            auto start = std::chrono::steady_clock::now();
-            auto timeout = std::chrono::milliseconds(timeoutMs);
-
-            while (std::chrono::steady_clock::now() - start < timeout) {
+        bool waitAll(flags_t flags, uint32_t timeout) const {
+            for (uint32_t i = 0; i < timeout; ++i) {
                 if (testAll(flags)) {
                     return true;
                 }
-                // Small delay to prevent busy waiting
-                std::this_thread::sleep_for(std::chrono::microseconds(100));
+                // Minimal delay - in real MCU this would be hardware-specific
+                for (volatile int j = 0; j < 1000; ++j) {} // Simple delay loop
             }
             return false;
         }
