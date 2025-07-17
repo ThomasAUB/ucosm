@@ -59,6 +59,8 @@ namespace ucosm {
          */
         virtual bool isRunning() const = 0;
 
+        virtual uint32_t getCounter() const = 0;
+
         /**
          * @brief Set timer period for task execution.
          * @param inDuration User-defined period unit.

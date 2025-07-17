@@ -1,5 +1,5 @@
 #include "rt_scheduler.hpp"
-
+#include <iostream>
 namespace ucosm {
 
     bool RTScheduler::setTimer(ITimer& inTimer) {
@@ -41,12 +41,17 @@ namespace ucosm {
         }
 
         if (inDelay) {
-            inTask.setRank(this->mCursorTask.getRank() + inDelay);
-            this->sortTask(inTask);
+            //inTask.setRank(this->mCursorTask.getRank() + inDelay);
+            inTask.setRank(mTimer->getCounter() + inDelay);
+        }
+        else {
+            inTask.setRank(mTimer->getCounter());
         }
 
+        this->sortTask(inTask);
+
         if (!mTimer->isRunning()) {
-            mTimer->setDuration(0);
+            mTimer->setDuration(inDelay);
             mTimer->start();
         }
 
@@ -70,24 +75,26 @@ namespace ucosm {
 
         const auto deltaTask = currentRank - cursorRank;
         const auto deltaTick = mCounter - cursorRank;
+        /*
+                        if (deltaTick < deltaTask) {
 
-        if (deltaTick < deltaTask) {
+                            // task is not ready
 
-            // task is not ready
+                            if (auto* next = this->getNextTask()) {
+                                delay(next->getRank() - mCounter);
+                            }
+                            else {
+                                // no other task to execute
+                                mTimer->stop();
+                            }
 
-            if (auto* next = this->getNextTask()) {
-                delay(next->getRank() - mCounter);
-            }
-            else {
-                // no other task to execute
-                mTimer->stop();
-            }
+                            std::cout << "empty IT" << std::endl;
 
-            this->mCurrentTask = nullptr;
-            return;
-        }
-
-        // execute the task
+                            this->mCurrentTask = nullptr;
+                            return;
+                        }
+                */
+                // execute the task
         this->mCurrentTask->run();
 
         // Check if task is still linked after execution
@@ -102,16 +109,23 @@ namespace ucosm {
 
             this->sortTask(*this->mCurrentTask);
 
+            delay(this->getNextRank() - currentRank);
+
         }
         else if (this->empty()) {
             mTimer->stop();
             this->mCurrentTask = nullptr;
             return;
         }
+        else {
+            std::cout << "catch UP !" << std::endl;
+
+            delay(this->getNextRank() - mTimer->getCounter());
+        }
 
         this->mCurrentTask = nullptr;
 
-        delay(this->getNextRank() - currentRank);
+
     }
 
     void RTScheduler::delay(uint32_t inDelay) {

@@ -23,8 +23,11 @@ private:
     std::atomic<bool> mRunning { false };
     std::atomic<bool> mShutdown { false };
     std::atomic<bool> mEnabled { true };
+    //std::atomic<uint32_t> mCounter { 0 };
     std::chrono::high_resolution_clock::time_point mNextWakeup;
+    std::chrono::high_resolution_clock::time_point mCounter;
     std::thread mTimerThread;
+
 
     void timerISR() {
 #ifdef _WIN32
@@ -35,6 +38,7 @@ private:
         while (!mShutdown.load(std::memory_order_acquire)) {
             if (mRunning.load(std::memory_order_acquire) && mEnabled.load(std::memory_order_acquire)) {
                 std::this_thread::sleep_until(mNextWakeup);
+                mCounter = std::chrono::high_resolution_clock::now();
                 run();
             }
             else {
@@ -64,6 +68,15 @@ public:
 
     bool isRunning() const override {
         return mRunning.load(std::memory_order_acquire);
+    }
+
+    uint32_t getCounter() const override {
+        using namespace std::chrono;
+        return static_cast<uint32_t>(
+            duration_cast<microseconds>(
+                high_resolution_clock::now() - mCounter
+            ).count()
+            );
     }
 
     void setDuration(uint32_t inDuration) override {
