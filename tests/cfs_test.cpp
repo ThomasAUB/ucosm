@@ -5,8 +5,6 @@
 
 #include <iostream>
 
-#include "doctest.h"
-
 TEST_CASE("CFS task test") {
 
     struct Task : ucosm::ICFSTask {
