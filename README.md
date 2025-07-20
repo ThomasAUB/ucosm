@@ -3,39 +3,20 @@
 
 # µCosm
 
-Lightweight C++17 scheduler library for microcontrollers supporting cooperative and real-time scheduling.
+A lightweight C++17 scheduler framework for microcontrollers that supports cooperative and real-time scheduling.
 
 **Key Features:**
-- No heap allocation
-- No task number limitations
-- Platform independent
-- Hierarchical scheduling trees
-- Multiple scheduling policies
-- Resumable tasks with coroutine-like behavior
-- Callable task wrappers for lambdas and functions
-- Customizable scheduling algorithms
+- **Zero heap allocation** - All operations use static memory
+- **Unlimited task count** - No arbitrary limits on task numbers  
+- **Platform independent** - Unified API for desktop and microcontrollers
+- **Hierarchical scheduling** - Nest schedulers within schedulers
+- **Multiple policies** - Periodic, CFS, and RT scheduling algorithms
+- **Resumable tasks** - Coroutine-like behavior with macro system
+- **Callable wrappers** - Lambda and function pointer support
+- **Real-time communication** - Lock-free inter-task messaging
+- **Memory safety** - Automatic task lifetime management
+- **High performance** - Optimized for embedded systems
 
-```mermaid
-flowchart LR
-
-scheduler(Scheduler)
-
-task1(Task)
-task2(Task)
-task3(Task)
-schedTask(Scheduler)
-schedTask
-subTask1(Task)
-subTask2(Task)
-
-scheduler --> task1
-scheduler --> task2
-scheduler --> task3
-scheduler --> schedTask
-
-schedTask --> subTask1
-schedTask --> subTask2
-```
 
 This library provides a modular scheduling framework with three main implementations:
 
@@ -45,15 +26,15 @@ This library provides a modular scheduling framework with three main implementat
 | **CFS** | Cooperative | Priority-based fair sharing | CPU-intensive workloads |
 | **RT** | Real-time | Hardware timer interrupts | Deterministic real-time systems |
 
-- **Core**: Basic cooperative scheduler foundation
-- **Periodic**: Time-based cooperative task scheduling  
-- **CFS**: Completely Fair Scheduler with priority-based execution
-- **RT**: Real-time scheduler with hardware timer integration
-- **Resumable Tasks**: Coroutine-like tasks that can yield execution and resume later
+**Additional Components:**
+- **Core**: Basic cooperative scheduler foundation with intrusive containers
+- **Resumable Tasks**: Macro-based coroutine system for stateful operations  
+- **Callable Tasks**: Type-erased wrappers for lambdas and function pointers
+- **RT Communication**: Lock-free message queues for inter-task communication
 
 # Examples
 
-## Periodic tasks
+## Periodic Tasks
 
 Time-based cooperative scheduling where tasks execute at defined intervals.
 
@@ -62,11 +43,22 @@ Time-based cooperative scheduling where tasks execute at defined intervals.
 #include "periodic/iperiodic_task.hpp"
 
 struct Task final : ucosm::IPeriodicTask {
+
     void run() override {
+
         std::cout << "run " << this->getPeriod() << std::endl;
-        if(mCounter++ == 10) {
-            this->remove();
+
+        if(mCounter == 5) {
+            // Dynamically change the execution period
+            this->setPeriod(10);
         }
+
+        if(mCounter == 10) {
+            // Remove the task from its scheduler
+            this->removeTask();
+        }
+
+        mCounter++;
     }
     int mCounter = 0;
 };
@@ -91,8 +83,8 @@ int main() {
     Task t1;
     Task t2;
 
-    t1.setPeriod(50);    // execute every 50 milliseconds
-    t2.setPeriod(1000);  // execute every seconds
+    t1.setPeriod(50);    // Execute every 50 milliseconds
+    t2.setPeriod(1000);  // Execute every second
 
     sched.addTask(t1);
     sched.addTask(t2);
@@ -105,9 +97,9 @@ int main() {
 }
 ```
 
-## CFS tasks
+## CFS Tasks
 
-Priority-based cooperative scheduling with automatic period computation based on the execution time and priority. Allows to equaly share the CPU time between tasks of same priority, i.e. longest tasks will be executed less often.
+Priority-based cooperative scheduling that automatically computes task periods based on execution time and priority. This ensures fair CPU usage among tasks of the same priority by executing longer-running tasks less frequently.
 
 ```cpp
 #include <iostream>
@@ -117,7 +109,7 @@ struct Task final : ucosm::ICFSTask {
     void run() override {
         std::cout << "run " << (uint16_t)this->getPriority() << std::endl;
         if(mCounter++ == 10) {
-            this->remove();
+            this->removeTask();
         }
     }
     int mCounter = 0;
@@ -152,7 +144,7 @@ int main() {
 
 ## Resumable Tasks
 
-Resumable tasks provide coroutine-like functionality, allowing tasks to yield execution and resume later at the same point. This is particularly useful for implementing complex state machines, protocols, or multi-step operations without blocking other tasks.
+Resumable tasks provide coroutine-like functionality, allowing tasks to yield execution and resume later at the same point. This is particularly useful for implementing complex state machines, communication protocols, or multi-step operations without blocking other tasks.
 
 **Key Features:**
 - Zero heap allocation
@@ -172,15 +164,15 @@ struct SequenceTask : ucosm::IResumableTask {
         UCOSM_START;
 
         std::cout << "Step 1: Initialize" << std::endl;
-            
-        UCOSM_YIELD;  // Yield to other tasks, resume next time
+
+        UCOSM_YIELD;  // Yield to other tasks, resume on next execution
 
         std::cout << "Step 2: Process" << std::endl;
-            
-        UCOSM_WAIT(1000)  // Wait 1 second, then continue
+
+        UCOSM_SLEEP_FOR(1000)  // Wait 1 second, then continue
 
         std::cout << "Step 3: Complete" << std::endl;
-            
+
         UCOSM_END;  // Task completes and removes itself
     }
 };
@@ -192,10 +184,6 @@ struct SequenceTask : ucosm::IResumableTask {
 ```cpp
 struct StateMachineTask : ucosm::IResumableTask {
 
-    enum State { IDLE, CONNECTING, SENDING, WAITING, DONE };
-
-    State currentState = IDLE;
-
     int mAttempts = 0;
     int mRetries = 0;
     
@@ -203,13 +191,11 @@ struct StateMachineTask : ucosm::IResumableTask {
 
         UCOSM_START;
 
-        mStateList.push_back(CONNECTING);
         std::cout << "Connecting..." << std::endl;
 
         UCOSM_SLEEP_FOR(500);  // Connection delay
 
         if (connectionSuccessful()) {
-            mStateList.push_back(SENDING);
             std::cout << "Sending data..." << std::endl;
         }
         else {
@@ -219,21 +205,18 @@ struct StateMachineTask : ucosm::IResumableTask {
 
         UCOSM_SLEEP_FOR(200);  // Send delay
 
-        mStateList.push_back(WAITING);
         std::cout << "Waiting for response..." << std::endl;
 
         mRetries = 0;
         mAttempts = 0;
 
-        UCOSM_SLEEP_UNTIL(responseReceived() || mRetries++ == 3, 100); // timeout at 300ms
+        UCOSM_SLEEP_UNTIL(responseReceived() || mRetries++ == 3, 100); // Timeout after 300ms
 
         if (responseReceived()) {
             std::cout << "Success!" << std::endl;
-            mStateList.push_back(DONE);
         }
         else if (++mAttempts < 3) {
             std::cout << "Timeout, retrying..." << std::endl;
-            mStateList.push_back(SENDING);
             UCOSM_RESTART;
         }
         else {
@@ -250,9 +233,9 @@ struct StateMachineTask : ucosm::IResumableTask {
 | Macro | Description |
 |-------|-------------|
 | `UCOSM_START` | Begin the resumable task (required first macro) |
-| `UCOSM_YIELD` | Yield execution, resume next time task runs |
+| `UCOSM_YIELD` | Yield execution, resume on next task execution |
 | `UCOSM_SLEEP_FOR(tick)` | Wait for specified scheduler ticks before continuing |
-| `UCOSM_SLEEP_UNTIL(condition, check_period)` | Wait here until the *condition* is true |
+| `UCOSM_SLEEP_UNTIL(condition, check_period)` | Wait until the condition becomes true |
 | `UCOSM_RESTART` | Restart task from the beginning |
 | `UCOSM_END` | End task and remove from scheduler |
 
@@ -283,11 +266,9 @@ int main() {
 
 ## Real-Time (RT) Scheduler
 
-Interrupt timer-based scheduling for real-time applications.
+The RT scheduler provides deterministic task execution using platform-specific timers. On microcontrollers, it uses dedicated hardware timers with configurable interrupt priorities. On desktop platforms, the same interface can be implemented using high-resolution threads for development and testing.
 
-The RT scheduler provides deterministic task execution using platform-specific timers. On microcontrollers, it uses dedicated hardware timers with interrupt priorities. On desktop platforms, the same interface can be implemented using high-resolution threads for development and testing purposes.
-
-Tasks within a same scheduler are scheduled cooperatively so the timing accuracy depends on the collective workload of all tasks within the scheduler. For maximum determinism, multiple schedulers can be created with timers of different interrupt priorities.
+Tasks within the same scheduler are executed cooperatively, so timing accuracy depends on the collective workload of all tasks within the scheduler. For maximum determinism, multiple schedulers can be created with timers using different interrupt priorities.
 
 ```cpp
 #include <iostream>
@@ -316,8 +297,8 @@ class Timer : public ucosm::RTScheduler::ITimer {
     void stop() override { /* Stop timer */ }
     bool isRunning() const override { /* Check timer status */ }
     void setDuration(uint32_t duration) override { /* Set timer period */ }
-    void disable() override { /* Disable timer */ }
-    void enable() override { /* Enable timer */ }
+    void disable() override { /* Disable timer interrupt */ }
+    void enable() override { /* Enable timer interrupt */ }
 };
 
 int main() {
@@ -340,33 +321,42 @@ int main() {
 }
 ```
 
-# Hierarchical Scheduling
+## Real-Time Communication
 
-Schedulers can be nested as tasks within other schedulers, creating flexible scheduling hierarchies.
-
-**Example**: Periodic scheduler containing a CFS scheduler containing another periodic scheduler.
+For inter-task communication, µCosm provides lock-free message queues optimized for real-time systems:
 
 ```cpp
-ucosm::PeriodicScheduler<ucosm::ICFSTask> periodicScheduler(getTick_ms);
+#include "ucosm/rt/rt_inter_task.hpp"
 
-ucosm::CFSScheduler<ucosm::IPeriodicTask> cfsScheduler(getTick_us);
+// Define message structure  
+struct SensorData {
+    uint32_t timestamp;
+    float temperature;
+    float humidity;
+};
 
-ucosm::PeriodicScheduler periodicScheduler2(getTick_ms);
+// Create lock-free queue (size must be power of 2)
+ucosm::RTMessageQueue<SensorData, 16> sensorQueue;
 
-cfsScheduler.addTask(periodicScheduler);
+// Producer task (high priority)
+struct SensorTask : ucosm::IPeriodicTask {
+    void run() override {
+        SensorData data = readSensors();
+        if (!sensorQueue.trySend(data)) {
+            // Queue full - handle overflow condition
+        }
+    }
+};
 
-periodicScheduler2.addTask(cfsScheduler);
-```
-
-# Memory Safety
-
-Task storage uses [ulink](https://github.com/ThomasAUB/ulink) for automatic lifetime management. Tasks automatically remove themselves from schedulers when destroyed.
-
-```cpp
-void foo() {
-    Task tempTask;
-    sched.addTask(tempTask);
-}// tempTask removes itself from the scheduler at the end of the scope
+// Consumer task (lower priority)  
+struct ProcessorTask : ucosm::IPeriodicTask {
+    void run() override {
+        SensorData data;
+        while (sensorQueue.tryReceive(data)) {
+            processSensorData(data);
+        }
+    }
+};
 ```
 
 ## Callable Tasks
@@ -375,7 +365,7 @@ For simple tasks that don't require full class definitions, `CallableTask` provi
 
 **Key Features:**
 - Small buffer optimization (no heap allocation for small callables)
-- Support for lambdas, function pointers, and member functions
+- Support for lambdas, function pointers, and member functions  
 - Safe empty callable handling
 
 ```cpp
@@ -390,9 +380,6 @@ int main() {
     ucosm::CallableTask<ucosm::IPeriodicTask> lambdaTask(
         [&counter]() {
             std::cout << "Counter: " << ++counter << std::endl;
-            if (counter >= 5) {
-               // Task removes itself when done
-            }
         }
     );
     
@@ -416,3 +403,81 @@ int main() {
     return 0;
 }
 ```
+
+# Hierarchical Scheduling
+
+Schedulers can be nested as tasks within other schedulers, enabling sophisticated scheduling topologies for complex systems.
+
+```mermaid
+flowchart LR
+
+scheduler(Scheduler)
+
+task1(Task)
+task2(Task)
+task3(Task)
+schedTask(Scheduler)
+schedTask
+subTask1(Task)
+subTask2(Task)
+
+scheduler --> task1
+scheduler --> task2
+scheduler --> task3
+scheduler --> schedTask
+
+schedTask --> subTask1
+schedTask --> subTask2
+```
+
+Schedulers can also be executed from the idle function of higher-priority schedulers.
+
+```cpp
+
+ucosm::PeriodicScheduler& lowPrioScheduler() {
+    static ucosm::PeriodicScheduler sLowSched(getTick_ms);
+    return sLowSched;
+}
+
+ucosm::PeriodicScheduler& mediumPrioScheduler() {
+    static ucosm::PeriodicScheduler sMediumSched(
+        getTick_ms,
+        +[]() { // idle function
+            lowPrioScheduler().run();
+        }
+    );
+    return sMediumSched;
+}
+
+ucosm::PeriodicScheduler& highPrioScheduler() {
+    static ucosm::PeriodicScheduler sHighSched(
+        getTick_ms,
+        +[]() { // idle function
+            mediumPrioScheduler().run();
+        }
+    );
+    return sHighSched;
+}
+
+int main() {
+
+    while(true) {
+        highPrioScheduler().run();
+    }
+
+    return 0;
+}
+
+```
+
+# Memory Safety
+
+Task storage uses [ulink](https://github.com/ThomasAUB/ulink) for automatic lifetime management. Tasks automatically remove themselves from schedulers when destroyed.
+
+```cpp
+void foo() {
+    Task tempTask;
+    sched.addTask(tempTask);
+} // tempTask removes itself from the scheduler at the end of the scope
+```
+
