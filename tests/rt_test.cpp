@@ -11,8 +11,6 @@
 #include <iomanip>
 #include <cmath>
 
-#include "doctest.h"
-
 #ifdef _WIN32
 #include <windows.h>
 #include <mmsystem.h>
