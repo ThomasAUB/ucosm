@@ -12,6 +12,7 @@ Lightweight C++17 scheduler library for microcontrollers supporting cooperative 
 - Hierarchical scheduling trees
 - Multiple scheduling policies: Cooperative, Fair, and Real-time
 - Resumable tasks with coroutine-like behavior
+- Callable task wrappers for lambdas and functions
 - Customizable scheduling algorithms
 
 ```mermaid
@@ -266,7 +267,7 @@ struct StateMachineTask : ucosm::IResumableTask {
             std::cout << "Connection failed, retrying..." << std::endl;
             UCOSM_RESTART;  // Restart from beginning
         }
-            
+
         UCOSM_WAIT(200);  // Send delay
 
         currentState = WAITING;
@@ -353,4 +354,52 @@ void foo() {
     Task tempTask;
     sched.addTask(tempTask);
 }// tempTask removes itself from the scheduler at the end of the scope
+```
+
+## Callable Tasks
+
+For simple tasks that don't require full class definitions, `CallableTask` provides a convenient wrapper that can store lambdas, function pointers, and member functions.
+
+**Key Features:**
+- Small buffer optimization (no heap allocation for small callables)
+- Support for lambdas, function pointers, and member functions
+- Safe empty callable handling
+
+```cpp
+#include "ucosm/core/callable_task.hpp"
+
+int main() {
+    ucosm::PeriodicScheduler sched(getTick_ms);
+    
+    int counter = 0;
+    
+    // Lambda task
+    ucosm::CallableTask<ucosm::IPeriodicTask> lambdaTask(
+        [&counter]() {
+            std::cout << "Counter: " << ++counter << std::endl;
+            if (counter >= 5) {
+               // Task removes itself when done
+            }
+        }
+    );
+    
+    // Member function task
+    struct MyClass {
+        void doWork() { std::cout << "Member function called" << std::endl; }
+    } myObject;
+    
+    ucosm::CallableTask<ucosm::IPeriodicTask> memberTask(&MyClass::doWork, myObject);
+    
+    lambdaTask.setPeriod(100);
+    memberTask.setPeriod(200);
+    
+    sched.addTask(lambdaTask);
+    sched.addTask(memberTask);
+    
+    while (!sched.empty()) {
+        sched.run();
+    }
+    
+    return 0;
+}
 ```
