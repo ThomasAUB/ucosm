@@ -11,6 +11,7 @@ Lightweight C++17 scheduler library for microcontrollers supporting cooperative 
 - Platform independent
 - Hierarchical scheduling trees
 - Multiple scheduling policies: Cooperative, Fair, and Real-time
+- Resumable tasks with coroutine-like behavior
 - Customizable scheduling algorithms
 
 ```mermaid
@@ -47,10 +48,11 @@ This library provides a modular scheduling framework with three main implementat
 - **Periodic**: Time-based cooperative task scheduling  
 - **CFS**: Completely Fair Scheduler with priority-based execution
 - **RT**: Real-time scheduler with hardware timer integration
+- **Resumable Tasks**: Coroutine-like tasks that can yield execution and resume later
 
 # Examples
 
-## Periodic Scheduler
+## Periodic tasks
 
 Time-based cooperative scheduling where tasks execute at defined intervals.
 
@@ -201,6 +203,125 @@ int main() {
         // Main loop can handle other work
     }
 
+    return 0;
+}
+```
+
+## Resumable Tasks
+
+Resumable tasks provide coroutine-like functionality, allowing tasks to yield execution and resume later at the same point. This is particularly useful for implementing complex state machines, protocols, or multi-step operations without blocking other tasks.
+
+**Key Features:**
+- Zero heap allocation
+- Minimal memory overhead (8 bytes per task)
+- Cooperative multitasking with explicit yield points
+- Time-based delays and waiting
+- Safe macro system for state management
+- Built on Duff's Device pattern for efficient state machines
+
+```cpp
+#include <iostream>
+#include "ucosm/periodic/ilong_task.hpp"
+
+struct SequenceTask : ucosm::IResumableTask {
+    SequenceTask() : ucosm::IResumableTask(10) {} // 10ms base period
+    
+    void run() override {
+        UCOSM_START;
+            std::cout << "Step 1: Initialize" << std::endl;
+            
+        UCOSM_YIELD;  // Yield to other tasks, resume next time
+            std::cout << "Step 2: Process" << std::endl;
+            
+        UCOSM_WAIT(1000)  // Wait 1 second, then continue
+            std::cout << "Step 3: Complete" << std::endl;
+            
+        UCOSM_END;  // Task completes and removes itself
+    }
+};
+```
+
+### Advanced Resumable Task Patterns
+
+**State Machine Example:**
+```cpp
+struct StateMachineTask : ucosm::IResumableTask {
+    enum State { IDLE, CONNECTING, SENDING, WAITING, DONE };
+    State currentState = IDLE;
+    int attempts = 0;
+    
+    void run() override {
+
+        UCOSM_START;
+
+        currentState = CONNECTING;
+        std::cout << "Connecting..." << std::endl;
+            
+        UCOSM_WAIT(500);  // Connection delay
+
+        if (connectionSuccessful()) {
+            currentState = SENDING;
+            std::cout << "Sending data..." << std::endl;
+        } else {
+            std::cout << "Connection failed, retrying..." << std::endl;
+            UCOSM_RESTART;  // Restart from beginning
+        }
+            
+        UCOSM_WAIT(200);  // Send delay
+
+        currentState = WAITING;
+        std::cout << "Waiting for response..." << std::endl;
+        
+        UCOSM_WAIT(1000);  // Response timeout
+
+        if (responseReceived()) {
+            std::cout << "Success!" << std::endl;
+            currentState = DONE;
+        } else if (++attempts < 3) {
+            std::cout << "Timeout, retrying..." << std::endl;
+            currentState = SENDING;
+            UCOSM_RESTART;
+        } else {
+            std::cout << "Max retries reached" << std::endl;
+        }
+            
+        UCOSM_END;
+    }
+};
+```
+
+### Resumable Task Macros
+
+| Macro | Description |
+|-------|-------------|
+| `UCOSM_START` | Begin the resumable task (required first macro) |
+| `UCOSM_YIELD` | Yield execution, resume next time task runs |
+| `UCOSM_WAIT(tick)` | Wait for specified scheduler ticks before continuing |
+| `UCOSM_WAIT_UNTIL(condition, check_period)` | Wait here until the *condition* is true |
+| `UCOSM_RESTART` | Restart task from the beginning |
+| `UCOSM_END` | End task and remove from scheduler |
+
+
+### Using Resumable Tasks with Schedulers
+
+Resumable tasks inherit from `IPeriodicTask`, so they can be used with any scheduler that accepts periodic tasks:
+
+```cpp
+#include "ucosm/periodic/periodic_scheduler.hpp"
+
+int main() {
+    ucosm::PeriodicScheduler sched(getTick_ms);
+    
+    SequenceTask task1;
+    StateMachineTask task2;
+    
+    sched.addTask(task1);
+    sched.addTask(task2);
+    
+    while(!sched.empty()) {
+        sched.run();
+    }
+    
     return 0;
 }
 ```

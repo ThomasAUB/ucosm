@@ -95,7 +95,6 @@ TEST_CASE("Periodic task test") {
     }
 
     SUBCASE("Basic test") {
-        //void basicTest() {
 
         struct Task : ucosm::IPeriodicTask {
 
@@ -201,7 +200,6 @@ TEST_CASE("Periodic task test") {
     }
 
     SUBCASE("Sort benchmark") {
-        //void sortBenchmak() {
 
         struct Task : ucosm::IPeriodicTask {
 

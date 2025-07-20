@@ -60,14 +60,9 @@
 
 
 
-#define UCOSM_LOOP(tick)                                    \
-            this->setPeriod(static_cast<tick_t>(tick));     \
+#define UCOSM_RESTART                                       \
             this->mLine = init_task_state;                  \
-            return;                                         \
-        }                                                   \
-        }                                                   \
-    } while(0);                                             \
-    return;
+            return;               
 
 
 
@@ -108,9 +103,7 @@ namespace ucosm {
      * };
      * @endcode
      */
-    struct ICoroutine : IPeriodicTask {
-
-        ICoroutine() = default;
+    struct IResumableTask : IPeriodicTask {
 
         /**
          * @brief Reset task to initial state.
