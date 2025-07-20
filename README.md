@@ -255,37 +255,43 @@ struct StateMachineTask : ucosm::IResumableTask {
 
         UCOSM_START;
 
-        currentState = CONNECTING;
+        mStateList.push_back(CONNECTING);
         std::cout << "Connecting..." << std::endl;
-            
+
         UCOSM_WAIT(500);  // Connection delay
 
         if (connectionSuccessful()) {
-            currentState = SENDING;
+            mStateList.push_back(SENDING);
             std::cout << "Sending data..." << std::endl;
-        } else {
+        }
+        else {
             std::cout << "Connection failed, retrying..." << std::endl;
             UCOSM_RESTART;  // Restart from beginning
         }
 
         UCOSM_WAIT(200);  // Send delay
 
-        currentState = WAITING;
+        mStateList.push_back(WAITING);
         std::cout << "Waiting for response..." << std::endl;
-        
-        UCOSM_WAIT(1000);  // Response timeout
+
+        mRetries = 0;
+        mAttempts = 0;
+
+        UCOSM_WAIT_UNTIL(responseReceived() || mRetries++ == 3, 100); // timeout at 300ms
 
         if (responseReceived()) {
             std::cout << "Success!" << std::endl;
-            currentState = DONE;
-        } else if (++attempts < 3) {
+            mStateList.push_back(DONE);
+        }
+        else if (++mAttempts < 3) {
             std::cout << "Timeout, retrying..." << std::endl;
-            currentState = SENDING;
+            mStateList.push_back(SENDING);
             UCOSM_RESTART;
-        } else {
+        }
+        else {
             std::cout << "Max retries reached" << std::endl;
         }
-            
+
         UCOSM_END;
     }
 };

@@ -18,11 +18,12 @@ TEST_CASE("Coroutine task test") {
 
         bool responseReceived() {
             static int sRX = 0;
-            return sRX++ >= 3;
+            return sRX++ >= 10;
         }
 
         enum State { IDLE, CONNECTING, SENDING, WAITING, DONE };
-        int attempts = 0;
+        int mAttempts = 0;
+        int mRetries = 0;
 
         std::vector<State> mStateList;
 
@@ -49,13 +50,16 @@ TEST_CASE("Coroutine task test") {
             mStateList.push_back(WAITING);
             std::cout << "Waiting for response..." << std::endl;
 
-            UCOSM_WAIT(1000);  // Response timeout
+            mRetries = 0;
+            mAttempts = 0;
+
+            UCOSM_WAIT_UNTIL(responseReceived() || mRetries++ == 3, 100); // timeout at 300ms
 
             if (responseReceived()) {
                 std::cout << "Success!" << std::endl;
                 mStateList.push_back(DONE);
             }
-            else if (++attempts < 3) {
+            else if (++mAttempts < 3) {
                 std::cout << "Timeout, retrying..." << std::endl;
                 mStateList.push_back(SENDING);
                 UCOSM_RESTART;
@@ -91,6 +95,7 @@ TEST_CASE("Coroutine task test") {
 
         StateMachineTask::State::SENDING,
         StateMachineTask::State::WAITING,
+
         StateMachineTask::State::SENDING,
         StateMachineTask::State::CONNECTING,
 
@@ -101,7 +106,9 @@ TEST_CASE("Coroutine task test") {
         StateMachineTask::State::CONNECTING,
 
         StateMachineTask::State::SENDING,
-        StateMachineTask::State::WAITING
+        StateMachineTask::State::WAITING,
+
+        StateMachineTask::State::DONE
     };
 
     CHECK(t.mStateList.size() == sizeof(checkStates) / sizeof(checkStates[0]));
