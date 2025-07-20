@@ -94,11 +94,6 @@ public:
 
 TEST_CASE("RT task test") {
 
-#ifdef _WIN32
-    // Improve timer resolution on Windows
-    timeBeginPeriod(1);
-#endif
-
     struct RTTask : ucosm::IPeriodicTask {
 
         RTTask(int id, uint32_t inPeriod) :
@@ -198,11 +193,6 @@ TEST_CASE("RT task test") {
 
     tim.shutdown();
     tim2.shutdown();
-
-#ifdef _WIN32
-    // Restore timer resolution on Windows
-    timeEndPeriod(1);
-#endif
 
     std::cout << "\n=== RT Scheduler end ===\n" << std::endl;
 }
