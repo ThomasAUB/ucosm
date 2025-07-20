@@ -46,7 +46,7 @@ namespace ucosm {
         }
 
         if (!mTimer->isRunning()) {
-            mTimer->setDuration(0);
+            mTimer->setDuration(inDelay);
             mTimer->start();
         }
 
@@ -88,6 +88,7 @@ namespace ucosm {
         }
 
         // execute the task
+        this->mCursorTask.setRank(currentRank);
         this->mCurrentTask->run();
 
         // Check if task is still linked after execution
@@ -101,7 +102,6 @@ namespace ucosm {
             );
 
             this->sortTask(*this->mCurrentTask);
-
         }
         else if (this->empty()) {
             mTimer->stop();
@@ -109,9 +109,8 @@ namespace ucosm {
             return;
         }
 
-        this->mCurrentTask = nullptr;
-
         delay(this->getNextRank() - currentRank);
+        this->mCurrentTask = nullptr;
     }
 
     void RTScheduler::delay(uint32_t inDelay) {
