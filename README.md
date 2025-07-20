@@ -148,7 +148,7 @@ Resumable tasks provide coroutine-like functionality, allowing tasks to yield ex
 
 **Key Features:**
 - Zero heap allocation
-- Minimal memory overhead (8 bytes per task)
+- Minimal memory overhead
 - Cooperative multitasking with explicit yield points
 - Time-based delays and waiting
 - Safe macro system for state management
@@ -210,7 +210,8 @@ struct StateMachineTask : ucosm::IResumableTask {
         mRetries = 0;
         mAttempts = 0;
 
-        UCOSM_SLEEP_UNTIL(responseReceived() || mRetries++ == 3, 100); // Timeout after 300ms
+        // Timeout after 300ms
+        UCOSM_SLEEP_UNTIL(responseReceived() || mRetries++ == 3, 100);
 
         if (responseReceived()) {
             std::cout << "Success!" << std::endl;

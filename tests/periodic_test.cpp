@@ -6,8 +6,6 @@
 #include <iostream>
 #include <iomanip>
 
-#include "doctest.h"
-
 TEST_CASE("Periodic task test") {
 
     SUBCASE("Timer overflow test") {
