@@ -36,7 +36,7 @@
 
 
 
-#define UCOSM_WAIT(tick)                                    \
+#define UCOSM_SLEEP_FOR(tick)                               \
             this->setPeriod(static_cast<tick_t>(tick));     \
             this->mLine = __LINE__;                         \
             return;                                         \
@@ -46,13 +46,13 @@
 
 
 
-#define UCOSM_YIELD UCOSM_WAIT(0)
+#define UCOSM_YIELD UCOSM_SLEEP_FOR(0)
 
 
 
-#define UCOSM_WAIT_UNTIL(condition, check_period)           \
+#define UCOSM_SLEEP_UNTIL(condition, check_period)          \
         if(!(condition)) {                                  \
-            UCOSM_WAIT(check_period);                       \
+            UCOSM_SLEEP_FOR(check_period);                  \
             if (!(condition)) {                             \
                 return;                                     \
             }                                               \
@@ -93,11 +93,11 @@ namespace ucosm {
      * struct MyTask : IResumableTask {
      *     void run() override {
      *         UCOSM_START
-     *             // Initialization code
-     *             UCOSM_WAIT(1000)  // Wait 1 second
-     *             // More code
-     *             UCOSM_YIELD       // Yield to other tasks
-     *             // Final code
+     *         // Initialization code
+     *         UCOSM_SLEEP_FOR(1000)  // Wait 1 second
+     *         // More code
+     *         UCOSM_YIELD       // Yield to other tasks
+     *         // Final code
      *         UCOSM_END
      *     }
      * };

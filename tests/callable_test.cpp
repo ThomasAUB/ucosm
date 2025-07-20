@@ -11,23 +11,23 @@ TEST_CASE("Callable task test") {
     int t1Counter = 0;
     int t2Counter = 0;
 
-    ucosm::CallableTask<ucosm::IPeriodicTask> t1(
-        [&] () {
-            //std::cout << "run " << t1.getPeriod() << std::endl;
-            if (++t1Counter == 5) {
-                t1.removeTask();
-            }
-        }
-    );
+    ucosm::CallableTask<ucosm::IPeriodicTask> t1;
 
-    ucosm::CallableTask<ucosm::IPeriodicTask> t2(
-        [&] () {
-            //std::cout << "run " << t2.getPeriod() << std::endl;
-            if (++t2Counter == 5) {
-                t2.removeTask();
-            }
+    t1 = [&] () {
+        //std::cout << "run " << t1.getPeriod() << std::endl;
+        if (++t1Counter == 5) {
+            t1.removeTask();
         }
-    );
+        };
+
+    ucosm::CallableTask<ucosm::IPeriodicTask> t2;
+
+    t2 = [&] () {
+        //std::cout << "run " << t2.getPeriod() << std::endl;
+        if (++t2Counter == 5) {
+            t2.removeTask();
+        }
+        };
 
     ucosm::CallableTask<ucosm::IPeriodicTask> t3;
 

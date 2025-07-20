@@ -34,7 +34,7 @@ TEST_CASE("Coroutine task test") {
             mStateList.push_back(CONNECTING);
             std::cout << "Connecting..." << std::endl;
 
-            UCOSM_WAIT(500);  // Connection delay
+            UCOSM_SLEEP_FOR(500);  // Connection delay
 
             if (connectionSuccessful()) {
                 mStateList.push_back(SENDING);
@@ -45,7 +45,7 @@ TEST_CASE("Coroutine task test") {
                 UCOSM_RESTART;  // Restart from beginning
             }
 
-            UCOSM_WAIT(200);  // Send delay
+            UCOSM_SLEEP_FOR(200);  // Send delay
 
             mStateList.push_back(WAITING);
             std::cout << "Waiting for response..." << std::endl;
@@ -53,7 +53,7 @@ TEST_CASE("Coroutine task test") {
             mRetries = 0;
             mAttempts = 0;
 
-            UCOSM_WAIT_UNTIL(responseReceived() || mRetries++ == 3, 100); // timeout at 300ms
+            UCOSM_SLEEP_UNTIL(responseReceived() || mRetries++ == 3, 100); // timeout at 300ms
 
             if (responseReceived()) {
                 std::cout << "Success!" << std::endl;
