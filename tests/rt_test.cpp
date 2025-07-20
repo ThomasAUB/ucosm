@@ -2,8 +2,7 @@
 #include "doctest.h"
 
 #include "ucosm/rt/rt_scheduler.hpp"
-#include "ucosm/rt/rt_message_queue.hpp"
-#include "ucosm/rt/rt_communication_example.hpp"
+#include "ucosm/rt/rt_inter_task.hpp"
 
 #include <iostream>
 #include <thread>
@@ -11,6 +10,8 @@
 #include <chrono>
 #include <iomanip>
 #include <cmath>
+
+#include "doctest.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -93,7 +94,7 @@ public:
     }
 };
 
-void rtTaskTests() {
+TEST_CASE("RT task test") {
 
 #ifdef _WIN32
     // Improve timer resolution on Windows
@@ -150,7 +151,7 @@ void rtTaskTests() {
         uint32_t mLastExecution;
         int mCounter = 0;
         int mID;
-};
+    };
 
     std::cout << "\n=== RT Scheduler start ===\n" << std::endl;
 
@@ -404,11 +405,4 @@ TEST_CASE("RT Communication Integration") {
 
         CHECK_FALSE(events.testAny(DATA_READY));
     }
-}
-
-TEST_CASE("RT Communication Example") {
-    // This will run the demonstration example
-    std::cout << "\n--- Running RT Communication Demo ---\n";
-    demonstrateRTCommunication();
-    std::cout << "--- Demo Complete ---\n\n";
 }
