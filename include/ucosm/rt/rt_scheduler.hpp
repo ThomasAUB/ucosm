@@ -41,20 +41,132 @@ namespace ucosm {
 
         using ITimer = IRTTimer<ITask<uint8_t>>;
 
-        bool setTimer(ITimer& inTimer);
+        bool setTimer(ITimer& inTimer) {
+            if (mTimer || !inTimer.setTask(*this)) {
+                // scheduler already has a timer
+                // or timer is not free
+                return false;
+            }
 
-        bool addTask(IPeriodicTask& inTask) override;
+            mTimer = &inTimer;
+            return true;
+        }
 
-        bool addTask(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay);
+        bool addTask(IPeriodicTask& inTask) override {
+            return this->addTask(inTask, 0);
+        }
 
-        ~RTScheduler();
+        bool addTask(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay) {
+
+            if (inTask.getPeriod() == 0 || !mTimer) {
+                // Invalid period
+                return false;
+            }
+
+            struct InterruptGuard {
+                ITimer& timer;
+                InterruptGuard(ITimer& t) :
+                    timer(t) {
+                    timer.disable();
+                }
+                ~InterruptGuard() {
+                    timer.enable();
+                }
+            } guard(*mTimer);
+
+            if (!base_t::addTask(inTask)) {
+                return false;
+            }
+
+            if (inDelay) {
+                inTask.setRank(this->mCursorTask.getRank() + inDelay);
+                this->sortTask(inTask);
+            }
+
+            if (!mTimer->isRunning()) {
+                mTimer->setDuration(inDelay);
+                mTimer->start();
+            }
+
+            return true;
+        }
+
+        ~RTScheduler() {
+            if (mTimer) {
+                mTimer->stop();
+                mTimer->removeTask();
+            }
+        }
 
     protected:
 
-        void delay(uint32_t inDelay);
+        void delay(uint32_t inDelay) {
+            mTimer->setDuration(inDelay);
+            mCounter += inDelay;
+        }
+
+        void run() override {
+
+            this->mCurrentTask = this->getNextTask();
+
+            if (!this->mCurrentTask) {
+                // no task to execute
+                // scheduler is empty
+                mTimer->stop();
+                return;
+            }
+
+            // check if the task to be executed hasn't been deleted since the timer has been programed
+            const auto cursorRank = this->mCursorTask.getRank();
+            const auto currentRank = this->mCurrentTask->getRank();
+
+            const auto deltaTask = currentRank - cursorRank;
+            const auto deltaTick = mCounter - cursorRank;
+
+            if (deltaTick < deltaTask) {
+
+                // task is not ready
+
+                if (auto* next = this->getNextTask()) {
+                    delay(next->getRank() - mCounter);
+                }
+                else {
+                    // no other task to execute
+                    mTimer->stop();
+                }
+
+                this->mCurrentTask = nullptr;
+                return;
+            }
+
+            // execute the task
+            this->mCursorTask.setRank(currentRank);
+            this->mCurrentTask->run();
+
+            // Check if task is still linked after execution
+            if (this->mCurrentTask->isLinked()) {
+
+                // the task is still in the list
+                // update the task rank
+                this->mCurrentTask->setRank(
+                    currentRank +
+                    this->mCurrentTask->getPeriod()
+                );
+
+                this->sortTask(*this->mCurrentTask);
+            }
+            else if (this->empty()) {
+                mTimer->stop();
+                this->mCurrentTask = nullptr;
+                return;
+            }
+
+            delay(this->getNextRank() - currentRank);
+            this->mCurrentTask = nullptr;
+        }
+
 
         uint32_t mCounter = 0;
-        void run() override;
         using base_t = IScheduler<IPeriodicTask, ITask<uint8_t>>;
         ITimer* mTimer = nullptr;
     };

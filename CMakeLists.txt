@@ -24,14 +24,17 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/ulink/CMakeLists.txt")
 endif()
 
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
-include_directories(${CMAKE_SOURCE_DIR}/ulink/include)
+# Create header-only library target
+add_library(ucosm_impl INTERFACE)
 
-# Create a library for ucosm implementation files
-add_library(ucosm_impl 
-    include/ucosm/rt/rt_scheduler.cpp
+# Set include directories for the header-only library
+target_include_directories(ucosm_impl INTERFACE 
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/ulink/include
 )
-target_include_directories(ucosm_impl PUBLIC include)
+
+# Set C++17 standard for the library
+target_compile_features(ucosm_impl INTERFACE cxx_std_17)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
