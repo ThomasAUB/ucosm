@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include "ucosm/core/deadline.hpp"
 #include "ucosm/core/ischeduler.hpp"
 #include "iperiodic_task.hpp"
 
@@ -69,7 +70,7 @@ namespace ucosm {
         IPeriodicTask& inTask,
         IPeriodicTask::tick_t inDelay
     ) {
-        inTask.setRank(mGetTick() + inDelay);
+        inTask.setRank(makeDeadline(mGetTick(), inDelay));
         this->sortTask(inTask);
     }
 
@@ -83,10 +84,7 @@ namespace ucosm {
         if (this->mCurrentTask) {
 
             const auto cursorRank = this->mCursorTask.getRank();
-            const auto deltaTask = this->mCurrentTask->getRank() - cursorRank;
-            const auto deltaTick = tick - cursorRank;
-
-            if (deltaTick < deltaTask) {
+            if (!isDeadlineDue(cursorRank, this->mCurrentTask->getRank(), tick)) {
                 // task is not ready
                 this->mCurrentTask = nullptr;
             }
@@ -109,10 +107,7 @@ namespace ucosm {
 
             // the task is still in the list
             // update the task rank
-            this->mCurrentTask->setRank(
-                tick +
-                this->mCurrentTask->getPeriod()
-            );
+            this->mCurrentTask->setRank(makeDeadline(tick, this->mCurrentTask->getPeriod()));
 
             this->sortTask(*this->mCurrentTask);
         }

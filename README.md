@@ -360,6 +360,16 @@ struct ProcessorTask : ucosm::IPeriodicTask {
 };
 ```
 
+## Tasklet Scheduler and Tasks
+
+The tasklet scheduler provides a safe, low-priority execution context for work that must be triggered from ISRs or other high-priority contexts. Instead of performing potentially long or blocking operations inside an interrupt, code can post a tasklet which will be executed later in a low-priority context (using `pendSV` on supported platforms).
+
+- **Purpose**: Run work posted from ISRs or high-priority contexts without blocking interrupts.
+- **Execution context**: Uses a low-priority PendSV (`pendSV`) to execute tasklets in a safe, low-priority thread of execution.
+- **Triggering**: Tasks are triggered from ISRs or higher-priority code and identified by interrupt IDs; the scheduler tracks timings to determine when tasklets should run.
+- **API**: Implement tasks via `ITasklet` and register them with `TaskletScheduler` (see headers below).
+
+
 ## Callable Tasks
 
 For simple tasks that don't require full class definitions, `CallableTask` provides a convenient wrapper that can store lambdas, function pointers, and member functions.

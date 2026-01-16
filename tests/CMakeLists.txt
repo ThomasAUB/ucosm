@@ -9,7 +9,8 @@ set(TARGET_SRC
 	cfs_test.cpp
 	periodic_test.cpp
 	resumable_test.cpp
-	rt_test.cpp
+    rt_test.cpp
+	tasklet_test.cpp
 	tests.cpp
 	ulink_test.cpp
 )
