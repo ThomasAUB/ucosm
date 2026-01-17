@@ -127,53 +127,70 @@ namespace ucosm {
 
     template<typename rank_t>
     bool ITask<rank_t>::updateRank() {
-
         if (!this->isLinked()) {
             return false;
         }
 
-        auto* prevTask = this->prev->prev;
-        auto* nextTask = this->next->next;
+        auto* const left = this->prev;
+        auto* const right = this->next;
 
-        if (prevTask && mRank < this->prev->mRank) {
-            // move task to the left
-
-            while (prevTask->prev && mRank < prevTask->mRank) {
-                prevTask = prevTask->prev;
-            }
-
-            // insert after prevTask
-
-            this->ulink::Node<ITask<rank_t>>::remove();
-
-            this->prev = prevTask;
-            this->next = prevTask->next;
-            this->prev->next = this;
-            this->next->prev = this;
-
-        }
-        else if (nextTask && this->next->mRank < mRank) {
-            // move task to the right
-
-            while (nextTask->next && nextTask->mRank < mRank) {
-                nextTask = nextTask->next;
-            }
-
-            // insert before nextTask
-
-            this->ulink::Node<ITask<rank_t>>::remove();
-
-            this->next = nextTask;
-            this->prev = nextTask->prev;
-            this->next->prev = this;
-            this->prev->next = this;
-
-        }
-        else {
+        // Already in the correct slot: no work.
+        if (
+            (left->prev == nullptr || mRank >= left->mRank) &&
+            (right->next == nullptr || right->mRank >= mRank)
+            ) {
             return false;
         }
 
-        return true;
+        if (left->prev && mRank < left->mRank) {
+            // move task to the left
+            auto* insertAfter = left->prev;
+            while (
+                insertAfter->prev &&
+                mRank < insertAfter->mRank
+                ) {
+                insertAfter = insertAfter->prev;
+            }
+
+            // detach from current spot (guaranteed non-null neighbors when linked)
+            left->next = right;
+            right->prev = left;
+
+            // insert after insertAfter
+            auto* const before = insertAfter->next;
+            insertAfter->next = this;
+            before->prev = this;
+            this->prev = insertAfter;
+            this->next = before;
+
+            return true;
+        }
+
+        if (right->next && right->mRank < mRank) {
+            // move task to the right
+            auto* insertBefore = right->next;
+            while (
+                insertBefore->next &&
+                insertBefore->mRank < mRank
+                ) {
+                insertBefore = insertBefore->next;
+            }
+
+            // detach from current spot (guaranteed non-null neighbors when linked)
+            left->next = right;
+            right->prev = left;
+
+            // insert before insertBefore
+            auto* const after = insertBefore->prev;
+            after->next = this;
+            this->prev = after;
+            this->next = insertBefore;
+            insertBefore->prev = this;
+
+            return true;
+        }
+
+        return false;
     }
 
 }
