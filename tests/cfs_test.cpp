@@ -7,6 +7,8 @@
 
 TEST_CASE("CFS task test") {
 
+    StreamSilencer silence(std::cout);
+
     struct Task : ucosm::ICFSTask {
 
         Task(int id, uint32_t inWorkDuration_ms) :

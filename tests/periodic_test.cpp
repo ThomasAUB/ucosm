@@ -8,6 +8,8 @@
 
 TEST_CASE("Periodic task test") {
 
+    StreamSilencer silence(std::cout);
+
     SUBCASE("Timer overflow test") {
 
         struct Task : ucosm::IPeriodicTask {
@@ -237,6 +239,39 @@ TEST_CASE("Periodic task test") {
         // about 500 us in release and 1200 in debug
         std::cout << "relocation benchmark : " << durationSum << std::endl;
 
+    }
+
+    SUBCASE("Remove task from within run") {
+
+        struct Task : ucosm::IPeriodicTask {
+            void run() override {
+                mCounter++;
+                if (mCounter >= 3) {
+                    this->removeTask();
+                }
+            }
+            int mCounter = 0;
+        };
+
+        static uint32_t sClock = 0;
+
+        ucosm::PeriodicScheduler sched(
+            +[]() { return sClock; }
+        );
+
+        Task t;
+        t.setPeriod(1);
+        sched.addTask(t);
+
+        CHECK(sched.size() == 1);
+
+        for (int i = 0; i < 10 && !sched.empty(); ++i) {
+            sClock++;
+            sched.run();
+        }
+
+        CHECK(t.mCounter == 3);
+        CHECK(sched.empty());
     }
 
 }

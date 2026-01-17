@@ -54,6 +54,7 @@
         if(!(condition)) {                                  \
             UCOSM_SLEEP_FOR(check_period);                  \
             if (!(condition)) {                             \
+                this->setPeriod(check_period);              \
                 return;                                     \
             }                                               \
         }

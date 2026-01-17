@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <stdint.h>
 #include "irt_timer.hpp"
 #include "ucosm/core/ischeduler.hpp"
@@ -102,7 +103,7 @@ namespace ucosm {
 
         void delay(uint32_t inDelay) {
             mTimer->setDuration(inDelay);
-            mCounter += inDelay;
+            mCounter.fetch_add(inDelay, std::memory_order_relaxed);
         }
 
         void run() override {
@@ -166,7 +167,7 @@ namespace ucosm {
         }
 
 
-        uint32_t mCounter = 0;
+        std::atomic<uint32_t> mCounter { 0 };
         using base_t = IScheduler<IPeriodicTask, ITask<uint8_t>>;
         ITimer* mTimer = nullptr;
     };
