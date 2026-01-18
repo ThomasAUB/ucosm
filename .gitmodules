@@ -1,3 +1,6 @@
 [submodule "ulink"]
 	path = ulink
 	url = https://github.com/ThomasAUB/ulink.git
+[submodule "ugraph"]
+	path = ugraph
+	url = https://github.com/ThomasAUB/ugraph.git
