@@ -1,6 +1,13 @@
 set(UCOSM_UNIT_TESTS ucosm_tests)
 
-file(GLOB TARGET_SRC "./*.cpp" )
+set(TARGET_SRC
+	callable_test.cpp
+	cfs_test.cpp
+	periodic_test.cpp
+	resumable_test.cpp
+	rt_test.cpp
+	tests.cpp
+)
 
 add_executable(${UCOSM_UNIT_TESTS} ${TARGET_SRC})
 
