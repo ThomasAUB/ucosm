@@ -9,39 +9,19 @@
 
 namespace ucosm {
 
-    // Simple guard tag used by tests/examples
-    template<int N>
-    struct Guard {
-        static constexpr int id = N;
-        static constexpr bool is_guard = true;
-    };
 
-    template<auto _callable, uint8_t _priority>
-    struct TaskData {
-        constexpr void operator()() { _callable(); }
-        static constexpr uint8_t priority = _priority;
-        static constexpr bool is_guard = false;
-    };
-
-    // Use distinct ids for task nodes to avoid collision with guard ids.
-    // We encode the task node id as (1ull << 32) | _priority (so guard ids remain small).
-    template<typename _guard_t, auto _callable, uint8_t _priority>
-    using Task = ugraph::Link<
-        ugraph::NodeTag<_guard_t::id, _guard_t>,
-        ugraph::NodeTag< (static_cast<std::size_t>(1ull) << 32) | static_cast<std::size_t>(_priority), TaskData<_callable, _priority> >
-    >;
 
     // Builder: produce a ugraph::Topology whose nodes are the provided tasks
     // and whose edges connect tasks that share the same condition type. Within
     // each condition-group tasks are ordered by ascending numeric priority
     // (smaller value = higher priority), so edges go from higher-priority
     // to lower-priority tasks.
-    template<typename... tasks_t>
+    template<typename... links_t>
     struct Builder {
 
-        static constexpr std::size_t task_count = sizeof...(tasks_t);
+        static constexpr std::size_t links_count = sizeof...(links_t);
 
-        static_assert(task_count >= 1, "Builder requires at least one task");
+        static_assert(links_count >= 1, "Builder requires at least one link");
         // Sort tasks by (guard id, priority) at compile-time and build a topology
         // whose edges connect tasks of the same guard in ascending priority order.
 
@@ -84,13 +64,27 @@ namespace ucosm {
         template<typename Acc, typename H, typename... R>
         struct tl_sort_fold<Acc, H, R...> { using type = typename tl_sort_fold<typename tl_insert_sorted<Acc, H>::type, R...>::type; };
 
-        using sorted_list = typename tl_sort_fold<ugraph::detail::type_list<>, tasks_t...>::type;
+        using sorted_list = typename tl_sort_fold<ugraph::detail::type_list<>, links_t...>::type;
         static constexpr std::size_t sorted_count = ugraph::detail::type_list_size<sorted_list>::value;
 
         template<typename L, std::size_t... I>
         static auto list_to_topology_impl(std::index_sequence<I...>) -> ugraph::Topology<typename ugraph::detail::type_list_at<I, L>::type...>;
 
         using system_t = decltype(list_to_topology_impl<sorted_list>(std::make_index_sequence<sorted_count>{}));
+
+    };
+
+    template<typename guard_t, typename ... jobs_t>
+    struct RunLine {
+
+        template<typename job_t>
+        using link_t =
+            ugraph::Link<
+            ugraph::NodeTag<guard_t::id, guard_t>,
+            ugraph::NodeTag<(static_cast<std::size_t>(1ull) << 32) | static_cast<std::size_t>(job_t::priority), job_t>
+            >;
+
+        using type = typename Builder<link_t<jobs_t>...>::system_t;
 
     };
 

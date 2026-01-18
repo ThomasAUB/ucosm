@@ -5,8 +5,10 @@
 #include <iostream>
 
 void task0() {
+    //while (true) {
     std::cout << "coucou from task 0" << std::endl;
     //ucosm::yield();
+//}
 }
 void task1() {
     std::cout << "coucou from task 1" << std::endl;
@@ -19,13 +21,29 @@ TEST_CASE("ct system skeleton basic operations") {
 
     using namespace ucosm;
 
-    using system = System<
-        Task<Guard<0>, task0, 5>,
-        Task<Guard<0>, task1, 2>,
-        Task<Guard<2>, task2, 8>
-    >;
+    using pipeline1_t =
+        Pipeline<
+        7, // prio
+        Hook<0>,
+        Job<task0>,
+        Job<task1>
+        >;
 
-    system sys;
-    sys.schedule();
+    using pipeline2_t =
+        Pipeline<
+        5, // prio
+        Hook<17>,
+        Job<task2>
+        >;
+
+    System<
+        pipeline1_t,
+        pipeline2_t
+    > system;
+
+
+    //system.signalHook(0);
+    system.signalHook(17);
+    system.run();
 
 }
