@@ -44,16 +44,23 @@ namespace ucosm {
         }
 
         void run() {
-            while (ready_mask) {
+            while (pending_mask) {
                 // execute ready pipelines in priority order (lower value -> higher priority)
-                for (auto idx : sorted_ids) {
-                    const hook_id_t hid = hooks_ids[idx];
-                    const uint32_t mask = 1u << hid;
-                    if (ready_mask & mask) {
+                for (auto idx : sorted_idx) {
+                    const uint32_t mask = 1u << hooks_ids[idx];
+                    if (pending_mask & mask) {
                         // clear this hook id flag once before running all hooks with this id
-                        ready_mask &= ~mask;
+                        pending_mask &= ~mask;
+                        // prevent reentry while jobs of this hook are executing
+                        running_hook_mask |= mask;
                         // run all jobs that share this id (respecting priority order)
-                        runners[idx]();
+                        runners[idx](this);
+                        // release running flag and reschedule if the hook fired while running
+                        running_hook_mask &= ~mask;
+                        if (deferred_mask & mask) {
+                            pending_mask |= mask;
+                            deferred_mask &= ~mask;
+                        }
                     }
                 }
             }
@@ -61,12 +68,19 @@ namespace ucosm {
 
         constexpr void signalHook(hook_id_t inID) {
             // ignore invalid or unused hook ids
-            if (!((1u << inID) & hooks_mask)) { return; }
-            ready_mask |= (1u << inID);
+            const uint32_t mask = 1u << inID;
+            if (!(mask & hooks_mask)) { return; }
+            // if hook is currently executing, defer until it finishes
+            if (running_hook_mask & mask) {
+                deferred_mask |= mask;
+                return;
+            }
+            pending_mask |= mask;
         }
 
         void yield() override {
             // simple cooperative yield: run ready pipelines once
+            if (!pending_mask) { return; }
             run();
         }
 
@@ -195,19 +209,30 @@ namespace ucosm {
             }
             return out;
         }
-        static constexpr auto sorted_ids = make_sorted_indices();
+        static constexpr auto sorted_idx = make_sorted_indices();
 
-        using runner_t = void(*)();
+        using runner_t = void(*)(System*);
 
         template<size_t I, size_t... Js>
         static constexpr runner_t make_runner_for_index_impl(std::index_sequence<Js...>) {
-            // For each possible job index Js, if it's present in job_order[I], call its callable in order
-            return +[] () {
+            // For each possible job index Js, if it's present in job_order[I], call its callable in order.
+            // The runner accepts a `System*` to consult the runtime `job_skip_mask` so that if a job
+            // calls `yield()` and `run()` is invoked nested, the currently executing job will be
+            // skipped (avoiding re-entry into the same callable).
+            return +[] (System* self) {
                 // unfold calls for all jobs matching this hook in the precomputed order
                 (([&] () {
+                    const uint32_t bit = (1u << Js);
                     for (size_t p = 0; p < job_counts[I]; ++p) {
                         if (job_order[I][p] == static_cast<uint8_t>(Js)) {
+                            // skip if this job is already running (prevents re-entry)
+                            if (self->job_skip_mask & bit) {
+                                continue;
+                            }
+                            // mark as running, call the callable, then unmark
+                            self->job_skip_mask |= bit;
                             type_at<Js>::callable();
+                            self->job_skip_mask &= ~bit;
                         }
                     }
                     }()), ...);
@@ -228,9 +253,15 @@ namespace ucosm {
             return makeRunnerListImpl(std::make_index_sequence<hooks_count>{});
         }
 
-        static constexpr auto runners = makeRunnerList();
+        uint32_t pending_mask {};
+        // hooks that fired while their jobs were running; re-armed after the run completes
+        uint32_t deferred_mask {};
+        // mask of hook ids currently executing
+        uint32_t running_hook_mask {};
+        // mask of job indices currently executing (used to prevent re-entry during nested run())
+        uint32_t job_skip_mask {};
 
-        uint32_t ready_mask {};
+        static constexpr auto runners = makeRunnerList();
 
     };
 
