@@ -1,5 +1,6 @@
 #include "tests.hpp"
 #include "doctest.h"
+#include <chrono>
 #include <iostream>
 
 #include "ucosm/periodic/periodic_scheduler.hpp"
@@ -76,7 +77,6 @@ TEST_CASE("Callable task test") {
 }
 
 TEST_CASE("Callable task advanced tests") {
-
     // Test empty callable safety
     ucosm::CallableTask<ucosm::IPeriodicTask> emptyTask;
     ucosm::PeriodicScheduler sched(getMillis);
@@ -117,4 +117,43 @@ TEST_CASE("Callable task advanced tests") {
     testSched.addTask(assigned);
     testSched.run();
     CHECK(counter == 3);
+}
+
+TEST_CASE("Callable task micro-benchmark") {
+
+    using namespace ucosm;
+
+    using clock = std::chrono::high_resolution_clock;
+    constexpr int iterations = 200000;
+
+    int callableCounter = 0;
+    CallableTask<IPeriodicTask> callable([&] () { ++callableCounter; });
+
+    struct DerivedTask final : IPeriodicTask {
+        int counter = 0;
+        void run() override { ++counter; }
+    } derived;
+
+    auto bench = [&] (auto&& fn) {
+        // small warmup to stabilize branch prediction and caches
+        for (int i = 0; i < 64; ++i) { fn(); }
+        const auto start = clock::now();
+        for (int i = 0; i < iterations; ++i) { fn(); }
+        const auto end = clock::now();
+        return end - start;
+        };
+
+    const auto callableDur = bench([&] () { static_cast<IPeriodicTask&>(callable).run(); });
+    const auto derivedDur = bench([&] () { derived.run(); });
+
+    const auto callableNs = std::chrono::duration_cast<std::chrono::nanoseconds>(callableDur).count();
+    const auto derivedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(derivedDur).count();
+
+    INFO("Callable total ns: ", callableNs);
+    INFO("Derived total ns: ", derivedNs);
+    INFO("Callable ns/call: ", static_cast<double>(callableNs) / iterations);
+    INFO("Derived ns/call: ", static_cast<double>(derivedNs) / iterations);
+
+    CHECK(callableCounter == iterations + 64);
+    CHECK(derived.counter == iterations + 64);
 }

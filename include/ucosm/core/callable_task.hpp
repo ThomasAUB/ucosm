@@ -30,6 +30,7 @@
 #include <new>
 #include <utility>
 #include <cstddef>
+#include <cstdint>
 #include <type_traits>
 
 namespace ucosm {
@@ -77,7 +78,7 @@ namespace ucosm {
             std::is_invocable_r_v<void, callable_t> &&
             !std::is_same_v<std::decay_t<callable_t>, CallableTask>>
             >
-            CallableTask(callable_t&& c) {
+            CallableTask(callable_t&& c) noexcept(std::is_nothrow_constructible_v<std::decay_t<callable_t>, callable_t&&>) {
             using decayed = std::decay_t<callable_t>;
             static_assert(
                 sizeof(decayed) <= storage_size,
@@ -100,7 +101,7 @@ namespace ucosm {
             : CallableTask([obj, f] () { (obj->*f)(); }) {}
 
         CallableTask(const CallableTask& other) noexcept {
-            if (other.mOps) {
+            if (other.mOps && other.mOps->copy) {
                 other.mOps->copy(other.mStorage, this->mStorage);
                 mOps = other.mOps;
             }
@@ -108,27 +109,25 @@ namespace ucosm {
 
         CallableTask(CallableTask&& other) noexcept {
             if (other.mOps) {
-                other.mOps->copy(other.mStorage, this->mStorage);
+                other.mOps->move(other.mStorage, this->mStorage);
                 mOps = other.mOps;
-                other.mOps->destroy(other.mStorage);
-                other.mOps = nullptr;
+                other.mOps = &empty_ops;
             }
         }
 
         ~CallableTask() {
-            if (mOps) {
+            if (mOps && mOps->destroy) {
                 mOps->destroy(mStorage);
             }
         }
 
         CallableTask& operator=(CallableTask&& other) noexcept {
             if (this != &other) {
-                if (mOps) { mOps->destroy(mStorage); }
+                if (mOps && mOps->destroy) { mOps->destroy(mStorage); }
                 if (other.mOps) {
-                    other.mOps->copy(other.mStorage, this->mStorage);
+                    other.mOps->move(other.mStorage, this->mStorage);
                     mOps = other.mOps;
-                    other.mOps->destroy(other.mStorage);
-                    other.mOps = nullptr;
+                    other.mOps = &empty_ops;
                 }
                 else {
                     mOps = nullptr;
@@ -139,8 +138,8 @@ namespace ucosm {
 
         CallableTask& operator=(const CallableTask& other) noexcept {
             if (this != &other) {
-                if (mOps) { mOps->destroy(mStorage); }
-                if (other.mOps) {
+                if (mOps && mOps->destroy) { mOps->destroy(mStorage); }
+                if (other.mOps && other.mOps->copy) {
                     other.mOps->copy(other.mStorage, this->mStorage);
                     mOps = other.mOps;
                 }
@@ -154,34 +153,39 @@ namespace ucosm {
     private:
 
         void run() override {
-            if (mOps) {
-                mOps->invoke(mStorage);
-            }
-            else {
-                this->removeTask();
-            }
+            mOps->invoke(mStorage, *this);
         }
 
         struct Operations {
-            void(*invoke)(const std::byte*);
-            void (*destroy)(std::byte*);
-            void (*copy)(const std::byte*, std::byte*);
+            void(*invoke)(std::byte*, task_t&) noexcept;
+            void (*move)(std::byte*, std::byte*) noexcept;
+            void (*copy)(const std::byte*, std::byte*) noexcept;
+            void (*destroy)(std::byte*) noexcept;
         };
 
         template<typename callable_t>
-        static void invoke_impl(const std::byte* storage) {
-            const auto* callable = reinterpret_cast<const callable_t*>(storage);
+        static void invoke_impl(std::byte* storage, task_t&) noexcept {
+            auto* callable = reinterpret_cast<callable_t*>(storage);
             (*callable)();
         }
 
         template<typename callable_t>
-        static void destroy_impl(std::byte* storage) {
+        static void move_impl(std::byte* src, std::byte* dst) noexcept {
+            auto* src_callable = reinterpret_cast<callable_t*>(src);
+            ::new(dst) callable_t(std::move(*src_callable));
+            if constexpr (!std::is_trivially_destructible_v<callable_t>) {
+                src_callable->~callable_t();
+            }
+        }
+
+        template<typename callable_t>
+        static void destroy_impl(std::byte* storage) noexcept {
             auto* callable = reinterpret_cast<callable_t*>(storage);
             callable->~callable_t();
         }
 
         template<typename callable_t>
-        static void copy_impl(const std::byte* src, std::byte* dst) {
+        static void copy_impl(const std::byte* src, std::byte* dst) noexcept {
             const auto* src_callable = reinterpret_cast<const callable_t*>(src);
             ::new(dst) callable_t(*src_callable);
         }
@@ -189,15 +193,27 @@ namespace ucosm {
         template<typename callable_t>
         static constexpr Operations ops_table = {
             &invoke_impl<callable_t>,
-            &destroy_impl<callable_t>,
-            &copy_impl<callable_t>
+            &move_impl<callable_t>,
+            std::is_copy_constructible_v<callable_t> ? &copy_impl<callable_t> : nullptr,
+            std::is_trivially_destructible_v<callable_t> ? nullptr : &destroy_impl<callable_t>
+        };
+
+        static void invoke_empty(std::byte*, task_t& self) noexcept {
+            self.removeTask();
+        }
+
+        static constexpr Operations empty_ops = {
+            &invoke_empty,
+            nullptr,
+            nullptr,
+            nullptr
         };
 
         static constexpr size_t storage_size = 4 * sizeof(uintptr_t);
         static constexpr size_t storage_align = alignof(std::max_align_t);
 
         alignas(storage_align) std::byte mStorage[storage_size];
-        const Operations* mOps = nullptr;
+        const Operations* mOps = &empty_ops;
 
     };
 
