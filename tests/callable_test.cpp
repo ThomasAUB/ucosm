@@ -9,6 +9,8 @@
 
 TEST_CASE("Callable task test") {
 
+    StreamSilencer silence(std::cout);
+
     int t1Counter = 0;
     int t2Counter = 0;
 
@@ -77,6 +79,8 @@ TEST_CASE("Callable task test") {
 }
 
 TEST_CASE("Callable task advanced tests") {
+
+    StreamSilencer silence(std::cout);
     // Test empty callable safety
     ucosm::CallableTask<ucosm::IPeriodicTask> emptyTask;
     ucosm::PeriodicScheduler sched(getMillis);
@@ -120,6 +124,8 @@ TEST_CASE("Callable task advanced tests") {
 }
 
 TEST_CASE("Callable task micro-benchmark") {
+
+    StreamSilencer silence(std::cout);
 
     using namespace ucosm;
 

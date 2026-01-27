@@ -94,6 +94,8 @@ public:
 
 TEST_CASE("RT task test") {
 
+    StreamSilencer silence(std::cout);
+
     struct RTTask : ucosm::IPeriodicTask {
 
         RTTask(int id, uint32_t inPeriod) :
@@ -198,6 +200,8 @@ TEST_CASE("RT task test") {
 }
 
 TEST_CASE("RT Message Queue") {
+
+    StreamSilencer silence(std::cout);
     using namespace ucosm;
 
     SUBCASE("Basic send/receive") {
@@ -260,6 +264,8 @@ TEST_CASE("RT Message Queue") {
 }
 
 TEST_CASE("RT Shared Variable") {
+
+    StreamSilencer silence(std::cout);
     using namespace ucosm;
 
     SUBCASE("Basic operations") {
@@ -306,6 +312,8 @@ TEST_CASE("RT Shared Variable") {
 }
 
 TEST_CASE("RT Event Flags") {
+
+    StreamSilencer silence(std::cout);
     using namespace ucosm;
 
     SUBCASE("Basic flag operations") {
@@ -343,6 +351,8 @@ TEST_CASE("RT Event Flags") {
 }
 
 TEST_CASE("RT Communication Integration") {
+
+    StreamSilencer silence(std::cout);
     using namespace ucosm;
 
     SUBCASE("Message queue with complex types") {

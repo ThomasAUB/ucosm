@@ -8,6 +8,8 @@
 
 TEST_CASE("Periodic task test") {
 
+    StreamSilencer silence(std::cout);
+
     SUBCASE("Timer overflow test") {
 
         struct Task : ucosm::IPeriodicTask {

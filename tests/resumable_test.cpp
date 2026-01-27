@@ -9,6 +9,8 @@
 
 TEST_CASE("Coroutine task test") {
 
+    StreamSilencer silence(std::cout);
+
     struct StateMachineTask : ucosm::IResumableTask {
 
         bool connectionSuccessful() {
