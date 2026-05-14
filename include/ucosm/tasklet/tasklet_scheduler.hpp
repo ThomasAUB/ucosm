@@ -271,7 +271,7 @@ namespace ucosm {
             task_list_t::iterator nextIt = it;
             ++nextIt;
 
-            if (node.getRank() > nowTick) {
+            if (!isDeadlineDue(cursor, node.getRank(), nowTick)) {
                 break;
             }
 
@@ -317,7 +317,7 @@ namespace ucosm {
                 if (t.isSleeping()) {
                     // push into timer list
                     const auto sleep = t.getSleepDuration();
-                    t.setRank(static_cast<tick_t>(current + (sleep > 0 ? sleep : 1)));
+                    t.setRank(makeDeadline(current, sleep > 0 ? sleep : 1));
                     insertSort(mTimerList, t);
                 }
                 else {

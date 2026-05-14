@@ -29,6 +29,7 @@
 
 #include <atomic>
 #include <stdint.h>
+#include "ucosm/core/deadline.hpp"
 #include "irt_timer.hpp"
 #include "ucosm/core/ischeduler.hpp"
 #include "ucosm/periodic/iperiodic_task.hpp"
@@ -80,7 +81,7 @@ namespace ucosm {
             }
 
             if (inDelay) {
-                inTask.setRank(this->mCursorTask.getRank() + inDelay);
+                inTask.setRank(makeDeadline(this->mCursorTask.getRank(), inDelay));
                 this->sortTask(inTask);
             }
 
@@ -121,15 +122,12 @@ namespace ucosm {
             const auto cursorRank = this->mCursorTask.getRank();
             const auto currentRank = this->mCurrentTask->getRank();
 
-            const auto deltaTask = currentRank - cursorRank;
-            const auto deltaTick = mCounter - cursorRank;
-
-            if (deltaTick < deltaTask) {
+            if (!isDeadlineDue(cursorRank, currentRank, mCounter)) {
 
                 // task is not ready
 
                 if (auto* next = this->getNextTask()) {
-                    delay(next->getRank() - mCounter);
+                    delay(getDeadlineDelay(mCounter, next->getRank()));
                 }
                 else {
                     // no other task to execute
@@ -149,10 +147,7 @@ namespace ucosm {
 
                 // the task is still in the list
                 // update the task rank
-                this->mCurrentTask->setRank(
-                    currentRank +
-                    this->mCurrentTask->getPeriod()
-                );
+                this->mCurrentTask->setRank(makeDeadline(currentRank, this->mCurrentTask->getPeriod()));
 
                 this->sortTask(*this->mCurrentTask);
             }
@@ -162,7 +157,7 @@ namespace ucosm {
                 return;
             }
 
-            delay(this->getNextRank() - currentRank);
+            delay(getDeadlineDelay(currentRank, this->getNextRank()));
             this->mCurrentTask = nullptr;
         }
 
