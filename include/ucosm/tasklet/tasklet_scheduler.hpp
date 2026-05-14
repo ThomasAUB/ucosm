@@ -29,6 +29,7 @@
 
 #include <atomic>
 #include "itasklet.hpp"
+#include "ucosm/core/deadline.hpp"
 #include "ucosm/core/ischeduler.hpp"
 
 namespace ucosm {
@@ -79,8 +80,9 @@ namespace ucosm {
             }
         }
 
-        // adds a task
-        bool addTask(ITasklet& inTask);
+        // Adds a task. Priority is in reverse order: lower values are higher priority.
+        // A default-constructed ITasklet has priority 0xFFFFFFFF (lowest priority).
+        bool addTask(ITasklet& inTask) override;
 
         // called from a periodic tick (ISR or thread) to refresh current time
         // and wake sleeping tasks when their deadline expires.
@@ -115,9 +117,7 @@ namespace ucosm {
 
         bool updateNextTimerLocked();
 
-        static bool isDeadlineDue(tick_t cursor, tick_t deadline, tick_t nowTick) {
-            return static_cast<tick_t>(deadline - cursor) <= static_cast<tick_t>(nowTick - cursor);
-        }
+        void requestExecution() const;
 
         struct ExecutionLock final {
             explicit ExecutionLock(TaskletScheduler& inScheduler) :
@@ -156,7 +156,7 @@ namespace ucosm {
         ExecutionLock guard(*this);
 
         if (inTask.isSleeping()) {
-            inTask.setRank(now() + inTask.getSleepDuration());
+            inTask.setRank(makeDeadline(now(), inTask.getSleepDuration()));
             insertSort(mTimerList, inTask); // insert after mCursorTask ?
             updateNextTimerLocked();
             return true;
@@ -191,7 +191,7 @@ namespace ucosm {
         const auto cursor = mCursorRank.load(std::memory_order_acquire);
 
         if (isDeadlineDue(cursor, next, newNow)) {
-            mBackend.requestTaskletExecution();
+            requestExecution();
         }
 
     }
@@ -223,7 +223,7 @@ namespace ucosm {
         mPendingISR.set(inInterruptID);
 
         // program low priority function for tasklet execution
-        mBackend.requestTaskletExecution();
+        requestExecution();
     }
 
     // called from foreground
@@ -276,7 +276,7 @@ namespace ucosm {
             }
 
             auto& pendTask = static_cast<ITasklet&>(node);
-            pendTask.setSleeping(false);
+            pendTask.dispose();
             pendTask.setRank(pendTask.getPriority());
             insertSort(ioList, pendTask);
 
@@ -433,6 +433,13 @@ namespace ucosm {
         }
     }
 
+    template<interrupt_id_t interrupt_count>
+    void TaskletScheduler<interrupt_count>::requestExecution() const {
+        if (mBackend.requestTaskletExecution) {
+            mBackend.requestTaskletExecution();
+        }
+    }
+
     template<uint8_t size>
     struct Bitset {
 
@@ -466,13 +473,16 @@ namespace ucosm {
             return false;
         }
 
-        // atomically fetch current storage and clear it (set to zero)
-        // writes the previous content into 'dest'
-        // this avoids races with concurrent ISR writes (which typically use atomic fetch_or()).
+        // Atomically snapshot all bits and clear them.
+        // Each word is individually exchanged, so an ISR can set a bit in a
+        // later word between exchanges — that bit will appear in the
+        // snapshot AND remain set in *this.  Callers must handle that
+        // scenario (e.g. re-checking or tolerating duplicate processing).
         void fetchAndClear(Bitset& dest) {
             for (uint8_t i = 0; i < storage_size; ++i) {
-                uint32_t prev = mStorage[i].exchange(0u, std::memory_order_acq_rel);
-                dest.mStorage[i].store(prev, std::memory_order_release);
+                dest.mStorage[i].store(
+                    mStorage[i].exchange(0u, std::memory_order_acq_rel),
+                    std::memory_order_release);
             }
         }
 

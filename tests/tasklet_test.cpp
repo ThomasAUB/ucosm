@@ -9,6 +9,21 @@
 #include <atomic>
 #include <chrono>
 
+namespace {
+
+bool waitForExecutions(
+    std::mutex& inMutex,
+    std::condition_variable& inCondition,
+    std::vector<int>& inExecuted,
+    std::size_t inExpectedCount,
+    std::chrono::milliseconds inTimeout = std::chrono::seconds(1)
+) {
+    std::unique_lock<std::mutex> lock(inMutex);
+    return inCondition.wait_for(lock, inTimeout, [&] { return inExecuted.size() == inExpectedCount; });
+}
+
+}
+
 TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
 
     using namespace ucosm;
@@ -39,24 +54,33 @@ TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
     WrapTask t1(1, &executed, &m, &cv);
     WrapTask t2(2, &executed, &m, &cv);
 
-    // schedule t1 to wake shortly after wrap (e.g., +10), t2 a bit later (+20)
+    // Move the scheduler close to wrap first, then schedule relative delays.
+    sched.tick(static_cast<tick_t>(UINT32_MAX - 2));
+
     t1.sleepFor(10);
     t2.sleepFor(20);
 
     REQUIRE(sched.addTask(t1));
     REQUIRE(sched.addTask(t2));
 
-    // advance across the wrap boundary in small steps so timer expiry is detected
-    uint64_t start = static_cast<uint64_t>(UINT32_MAX) - 2;
-    // iterate enough ticks across the wrap so both deadlines (5 and 15) are reached
-    for (uint64_t v = start; v < start + 40; ++v) {
-        sched.tick(static_cast<uint32_t>(v));
-    }
+    tick_t nextDeadline = 0;
+    REQUIRE(sched.tryGetNextDeadline(nextDeadline));
+    CHECK(nextDeadline == static_cast<tick_t>(7));
 
-    {
-        std::unique_lock<std::mutex> lk(m);
-        cv.wait_for(lk, std::chrono::seconds(1), [&] { return executed.size() == 2; });
-    }
+    sched.tick(9);
+    CHECK(executed.empty());
+
+    sched.tick(1);
+    REQUIRE(waitForExecutions(m, cv, executed, 1));
+
+    REQUIRE(sched.tryGetNextDeadline(nextDeadline));
+    CHECK(nextDeadline == static_cast<tick_t>(17));
+
+    sched.tick(9);
+    CHECK(executed.size() == 1);
+
+    sched.tick(1);
+    REQUIRE(waitForExecutions(m, cv, executed, 2));
 
     REQUIRE(executed.size() == 2);
     CHECK(executed[0] == 1);
@@ -176,17 +200,15 @@ TEST_CASE("TaskletScheduler - combined sleep and ISR ordering") {
     REQUIRE(sched.addTask(isrHigh));
     REQUIRE(sched.addTask(isrLow));
 
-    // trigger both ISRs first; they should run (ordered by priority among ISRs)
+    // Queue both interrupts and the timer wake-up before allowing the low-priority worker to run.
+    suspend_low_priority_execution();
     sched.tick(50);
     sched.signalInterrupt(0);
     sched.signalInterrupt(1);
+    resume_low_priority_execution();
 
-    {
-        std::unique_lock<std::mutex> lk(m);
-        cv.wait_for(lk, std::chrono::seconds(1), [&] { return executed.size() >= 2; });
-    }
+    REQUIRE(waitForExecutions(m, cv, executed, 3));
 
-    // So far, executed should contain isrMid (priority 10) then isrLow (20)
     CHECK(executed.size() == 3);
     CHECK(executed[0] == 2);
     CHECK(executed[1] == 1);
@@ -246,11 +268,7 @@ TEST_CASE("TaskletScheduler - interrupt ordering") {
     sched.signalInterrupt(1);
     sched.signalInterrupt(2);
 
-    // wait for tasks to run
-    {
-        std::unique_lock<std::mutex> lk(m);
-        cv.wait_for(lk, std::chrono::seconds(2), [&] { return executed.size() == 3; });
-    }
+    REQUIRE(waitForExecutions(m, cv, executed, 3, std::chrono::seconds(2)));
 
     CHECK(executed.size() == 3);
 
@@ -304,32 +322,33 @@ TEST_CASE("TaskletScheduler - timer wake ordering") {
     REQUIRE(sched.addTask(s2));
     REQUIRE(sched.addTask(s3));
 
-    sched.tick(10);
+    tick_t nextDeadline = 0;
+    REQUIRE(sched.tryGetNextDeadline(nextDeadline));
+    CHECK(nextDeadline == 10);
 
-    {
-        std::unique_lock<std::mutex> lk(m);
-        cv.wait_for(lk, std::chrono::seconds(1), [&] { return executed.size() >= 1; });
-    }
+    sched.tick(10);
+    REQUIRE(waitForExecutions(m, cv, executed, 1));
+
     CHECK(executed.size() == 1);
     CHECK(executed[0] == 2);
 
-    // advance to 50 -> should wake s1
-    sched.tick(50);
+    REQUIRE(sched.tryGetNextDeadline(nextDeadline));
+    CHECK(nextDeadline == 50);
 
-    {
-        std::unique_lock<std::mutex> lk(m);
-        cv.wait_for(lk, std::chrono::seconds(1), [&] { return executed.size() >= 2; });
-    }
+    // advance from tick 10 to tick 50 -> should wake s1
+    sched.tick(40);
+    REQUIRE(waitForExecutions(m, cv, executed, 2));
+
     CHECK(executed.size() == 2);
     CHECK(executed[1] == 1);
 
-    // advance to 100 -> should wake s3
-    sched.tick(100);
+    REQUIRE(sched.tryGetNextDeadline(nextDeadline));
+    CHECK(nextDeadline == 100);
 
-    {
-        std::unique_lock<std::mutex> lk(m);
-        cv.wait_for(lk, std::chrono::seconds(1), [&] { return executed.size() >= 3; });
-    }
+    // advance from tick 50 to tick 100 -> should wake s3
+    sched.tick(50);
+    REQUIRE(waitForExecutions(m, cv, executed, 3));
+
     CHECK(executed.size() == 3);
     CHECK(executed[2] == 3);
 

@@ -121,13 +121,14 @@ namespace ucosm {
             // check if the task to be executed hasn't been deleted since the timer has been programed
             const auto cursorRank = this->mCursorTask.getRank();
             const auto currentRank = this->mCurrentTask->getRank();
+            const auto counter = mCounter.load(std::memory_order_acquire);
 
-            if (!isDeadlineDue(cursorRank, currentRank, mCounter)) {
+            if (!isDeadlineDue(cursorRank, currentRank, counter)) {
 
                 // task is not ready
 
                 if (auto* next = this->getNextTask()) {
-                    delay(getDeadlineDelay(mCounter, next->getRank()));
+                    delay(getDeadlineDelay(counter, next->getRank()));
                 }
                 else {
                     // no other task to execute
