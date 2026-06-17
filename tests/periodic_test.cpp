@@ -241,4 +241,37 @@ TEST_CASE("Periodic task test") {
 
     }
 
+    SUBCASE("Remove task from within run") {
+
+        struct Task : ucosm::IPeriodicTask {
+            void run() override {
+                mCounter++;
+                if (mCounter >= 3) {
+                    this->removeTask();
+                }
+            }
+            int mCounter = 0;
+        };
+
+        static uint32_t sClock = 0;
+
+        ucosm::PeriodicScheduler sched(
+            +[]() { return sClock; }
+        );
+
+        Task t;
+        t.setPeriod(1);
+        sched.addTask(t);
+
+        CHECK(sched.size() == 1);
+
+        for (int i = 0; i < 10 && !sched.empty(); ++i) {
+            sClock++;
+            sched.run();
+        }
+
+        CHECK(t.mCounter == 3);
+        CHECK(sched.empty());
+    }
+
 }
