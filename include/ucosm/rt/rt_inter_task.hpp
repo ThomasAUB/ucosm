@@ -49,7 +49,7 @@ namespace ucosm {
      * - Template-based for type safety
      *
      * @tparam T Message type (must be trivially copyable)
-     * @tparam Size Queue capacity (must be power of 2)
+     * @tparam Size Queue buffer size (must be power of 2; usable capacity is Size - 1)
      */
     template<typename T, size_t Size>
     class RTMessageQueue {
