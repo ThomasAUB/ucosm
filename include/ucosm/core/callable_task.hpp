@@ -88,6 +88,10 @@ namespace ucosm {
                 alignof(decayed) <= storage_align,
                 "Callable object alignment too strict for internal storage."
                 );
+            static_assert(
+                std::is_nothrow_move_constructible_v<decayed>,
+                "Callable object must be nothrow move constructible."
+                );
             ::new(mStorage) decayed(std::forward<callable_t>(c));
             mOps = &ops_table<decayed>;
         }
