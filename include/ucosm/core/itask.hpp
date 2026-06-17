@@ -42,6 +42,8 @@ namespace ucosm {
 
         using rank_t = _rank_t;
 
+        virtual ~ITask() = default;
+
         /**
          * @brief Runs the task.
          * Typically called by the scheduler when the task is ready.
