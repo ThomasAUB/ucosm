@@ -404,3 +404,46 @@ TEST_CASE("RT Communication Integration") {
         CHECK_FALSE(events.testAny(DATA_READY));
     }
 }
+
+TEST_CASE("RT Message Queue - multithreaded SPSC") {
+
+    StreamSilencer silence(std::cout);
+    using namespace ucosm;
+
+    SUBCASE("Single producer single consumer") {
+        RTMessageQueue<int, 16> queue;
+
+        constexpr int itemCount = 10000;
+        std::atomic<int> consumed{0};
+        std::atomic<bool> producerDone{false};
+
+        std::thread producer([&] {
+            for (int i = 1; i <= itemCount; ++i) {
+                while (!queue.trySend(i)) {
+                    std::this_thread::yield();
+                }
+            }
+            producerDone.store(true, std::memory_order_release);
+        });
+
+        std::thread consumer([&] {
+            int expected = 1;
+            while (consumed.load() < itemCount) {
+                int value;
+                if (queue.tryReceive(value)) {
+                    CHECK(value == expected);
+                    expected++;
+                    consumed.fetch_add(1, std::memory_order_relaxed);
+                } else {
+                    std::this_thread::yield();
+                }
+            }
+        });
+
+        producer.join();
+        consumer.join();
+
+        CHECK(consumed.load() == itemCount);
+        CHECK(queue.empty());
+    }
+}
