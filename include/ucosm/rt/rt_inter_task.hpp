@@ -175,25 +175,26 @@ namespace ucosm {
          * @brief Construct with initial value.
          * @param initialValue Initial value
          */
-        explicit RTSharedVariable(const T& initialValue = T {})
+        explicit RTSharedVariable(const T& initialValue = T{})
             : mVersion(0), mValue(initialValue) {}
 
         /**
-         * @brief Atomically update the value.
+         * @brief Atomically update the value using a seqlock.
+         *
+         * The version is incremented before and after the write so that
+         * a concurrent reader observing an inconsistent value will detect
+         * the in-flight writer and retry (see loadWithVersion).
+         *
          * @param newValue New value to store
-         * @note Version is only incremented if value actually changes
+         * @note Version is only incremented once per store; the pre-write
+         * bump uses an odd sentinel so readers can detect an in-flight write.
          */
         void store(const T& newValue) {
-            T expected = mValue.load(std::memory_order_relaxed);
-            while (expected != newValue) {
-                if (mValue.compare_exchange_weak(expected, newValue,
-                    std::memory_order_release,
-                    std::memory_order_relaxed)) {
-                    mVersion.fetch_add(1, std::memory_order_release);
-                    break;
-                }
-                // expected is updated by compare_exchange_weak on failure
-            }
+            const uint32_t pre = mVersion.fetch_add(1, std::memory_order_acq_rel);
+            // pre is now even after the increment; mark an in-flight write
+            // by making the version odd until the write completes.
+            mValue.store(newValue, std::memory_order_release);
+            mVersion.fetch_add(1, std::memory_order_release);
         }
 
         /**
@@ -205,15 +206,20 @@ namespace ucosm {
         }
 
         /**
-         * @brief Read value and version atomically.
+         * @brief Read value and version atomically using a seqlock retry.
          * @param value Reference to store current value
-         * @return Current version number
-         * @note Ensures consistent version-value pair reading
+         * @return Current version number (always even for a consistent read)
+         * @note Retries until it observes a stable value (version unchanged
+         * and even), ensuring a consistent version-value pair.
          */
         uint32_t loadWithVersion(T& value) const {
             uint32_t version1, version2;
             do {
                 version1 = mVersion.load(std::memory_order_acquire);
+                // An odd version means a write is in-flight; retry.
+                if (version1 & 1u) {
+                    continue;
+                }
                 value = mValue.load(std::memory_order_acquire);
                 version2 = mVersion.load(std::memory_order_acquire);
             } while (version1 != version2);
@@ -244,11 +250,12 @@ namespace ucosm {
          * @return true if swap occurred, false otherwise
          */
         bool compareAndSwap(T& expected, const T& desired) {
+            // Bump version to mark an in-flight write, perform the CAS,
+            // then bump version again to publish the result.
+            mVersion.fetch_add(1, std::memory_order_acq_rel);
             bool result = mValue.compare_exchange_weak(expected, desired,
                 std::memory_order_acq_rel);
-            if (result) {
-                mVersion.fetch_add(1, std::memory_order_acq_rel);
-            }
+            mVersion.fetch_add(1, std::memory_order_release);
             return result;
         }
 

@@ -10,6 +10,7 @@
 #include <chrono>
 #include <iomanip>
 #include <cmath>
+#include <type_traits>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -289,11 +290,12 @@ TEST_CASE("RT Shared Variable") {
         CHECK(value == 200);
         CHECK(version2 != version1);
 
-        // Same value, version should not change
+        // A seqlock advances the version on every store, even when the
+        // value is unchanged, so readers can detect in-flight writers.
         var.store(200);
         uint32_t version3 = var.loadWithVersion(value);
         CHECK(value == 200);
-        CHECK(version3 == version2);
+        CHECK(version3 != version2);
     }
 
     SUBCASE("Compare and swap") {
@@ -308,6 +310,49 @@ TEST_CASE("RT Shared Variable") {
         CHECK_FALSE(var.compareAndSwap(expected, 30));
         CHECK(var.load() == 20); // Should not change
         CHECK(expected == 20); // Should be updated with current value
+    }
+
+    SUBCASE("Concurrent store/loadWithVersion never tears") {
+        // A seqlock must guarantee that loadWithVersion never observes
+        // a value that was half-written by a concurrent store. We run
+        // a writer flipping a 64-bit-ish payload (two uint32_t halves
+        // that must stay in sync) while a reader repeatedly reads with
+        // version. A torn read would produce mismatched halves.
+        struct Payload {
+            uint32_t a;
+            uint32_t b;
+            bool valid() const { return a == b + 1; }
+        };
+        static_assert(std::is_trivially_copyable_v<Payload>);
+        static_assert(std::atomic<Payload>::is_always_lock_free,
+            "Payload must be lock-free on this platform");
+
+        RTSharedVariable<Payload> var(Payload{0, 0});
+
+        std::atomic<bool> stop{false};
+        std::atomic<int> tears{0};
+
+        std::thread writer([&] {
+            for (uint32_t i = 1; i <= 50000; ++i) {
+                var.store(Payload{i, i - 1});
+            }
+            stop.store(true, std::memory_order_release);
+        });
+
+        std::thread reader([&] {
+            while (!stop.load(std::memory_order_acquire)) {
+                Payload p;
+                var.loadWithVersion(p);
+                if (!p.valid()) {
+                    tears.fetch_add(1, std::memory_order_relaxed);
+                }
+            }
+        });
+
+        writer.join();
+        reader.join();
+
+        CHECK(tears.load() == 0);
     }
 }
 
