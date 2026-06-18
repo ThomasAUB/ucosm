@@ -43,7 +43,7 @@ jobs:
             c_compiler: cl
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set reusable strings
         # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
@@ -71,3 +71,32 @@ jobs:
         # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
         # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: ctest --build-config ${{ matrix.build_type }}
+
+  # AddressSanitizer + UndefinedBehaviorSanitizer build. Catches the
+  # CallableTask nullptr-assignment class of bugs, leaks, and UB. TSAN is
+  # intentionally not enabled here: the tasklet scheduler has known data
+  # races in the intrusive list path that are tracked as a follow-up.
+  sanitizer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake (ASAN + UBSAN)
+        run: >
+          cmake -B ${{ github.workspace }}/build
+          -DCMAKE_CXX_COMPILER=g++
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          -S ${{ github.workspace }}
+
+      - name: Build
+        run: cmake --build ${{ github.workspace }}/build
+
+      - name: Test
+        working-directory: ${{ github.workspace }}/build
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=0
+          UBSAN_OPTIONS: abort_on_error=0:print_stacktrace=1
+        run: ctest --output-on-failure
