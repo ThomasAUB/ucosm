@@ -163,3 +163,27 @@ TEST_CASE("Callable task micro-benchmark") {
     CHECK(callableCounter == iterations + 64);
     CHECK(derived.counter == iterations + 64);
 }
+
+TEST_CASE("Callable task - assign empty does not crash") {
+    StreamSilencer silence(std::cout);
+    using namespace ucosm;
+
+    CallableTask<IPeriodicTask> target([] {});
+
+    CallableTask<IPeriodicTask> empty;
+    // move-assign from empty: previously set mOps=nullptr, causing
+    // the next run() to segfault on mOps->invoke.
+    target = std::move(empty);
+
+    PeriodicScheduler sched(getMillis);
+    sched.addTask(target);
+    sched.run(); // empty_ops::invoke_empty removes the task
+    CHECK(sched.empty());
+
+    // copy-assign from empty: same class of bug.
+    CallableTask<IPeriodicTask> copyTarget([] {});
+    copyTarget = empty;
+    sched.addTask(copyTarget);
+    sched.run();
+    CHECK(sched.empty());
+}

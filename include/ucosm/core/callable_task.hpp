@@ -109,12 +109,19 @@ namespace ucosm {
                 other.mOps->copy(other.mStorage, this->mStorage);
                 mOps = other.mOps;
             }
+            else {
+                mOps = &empty_ops;
+            }
         }
 
         CallableTask(CallableTask&& other) noexcept {
-            if (other.mOps) {
+            if (other.mOps && other.mOps->move) {
                 other.mOps->move(other.mStorage, this->mStorage);
                 mOps = other.mOps;
+                other.mOps = &empty_ops;
+            }
+            else {
+                mOps = &empty_ops;
                 other.mOps = &empty_ops;
             }
         }
@@ -128,13 +135,14 @@ namespace ucosm {
         CallableTask& operator=(CallableTask&& other) noexcept {
             if (this != &other) {
                 if (mOps && mOps->destroy) { mOps->destroy(mStorage); }
-                if (other.mOps) {
+                if (other.mOps && other.mOps->move) {
                     other.mOps->move(other.mStorage, this->mStorage);
                     mOps = other.mOps;
                     other.mOps = &empty_ops;
                 }
                 else {
-                    mOps = nullptr;
+                    mOps = &empty_ops;
+                    other.mOps = &empty_ops;
                 }
             }
             return *this;
@@ -148,7 +156,7 @@ namespace ucosm {
                     mOps = other.mOps;
                 }
                 else {
-                    mOps = nullptr;
+                    mOps = &empty_ops;
                 }
             }
             return *this;
