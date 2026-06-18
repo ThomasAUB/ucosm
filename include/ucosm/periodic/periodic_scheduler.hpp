@@ -79,38 +79,18 @@ namespace ucosm {
 
         const auto tick = mGetTick();
 
-        this->mCurrentTask = this->getNextTask();
-
-        if (this->mCurrentTask) {
-
-            const auto cursorRank = this->mCursorTask.getRank();
-            if (!isDeadlineDue(cursorRank, this->mCurrentTask->getRank(), tick)) {
-                // task is not ready
-                this->mCurrentTask = nullptr;
-            }
-
-        }
+        this->mCurrentTask = this->selectReadyTask(tick);
 
         if (!this->mCurrentTask) {
-            // no task to run
+            // no task ready to run
             if (this->mIdleTask) {
                 this->mIdleTask();
             }
             return;
         }
 
-        this->mCursorTask.setRank(this->mCurrentTask->getRank());
-        this->mCurrentTask->run();
-
-        // Check if task is still linked after execution
-        if (this->mCurrentTask->isLinked()) {
-
-            // the task is still in the list
-            // update the task rank
-            this->mCurrentTask->setRank(makeDeadline(tick, this->mCurrentTask->getPeriod()));
-
-            this->sortTask(*this->mCurrentTask);
-        }
+        // Re-arm using the current tick as the time base (catch-up semantics).
+        this->runAndRearm(*this->mCurrentTask, tick);
 
         this->mCurrentTask = nullptr;
     }

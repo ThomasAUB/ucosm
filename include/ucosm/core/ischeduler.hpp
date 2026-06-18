@@ -29,6 +29,7 @@
 
 #include "ulink.hpp"
 #include "itask.hpp"
+#include "deadline.hpp"
 
 namespace ucosm {
 
@@ -124,6 +125,19 @@ namespace ucosm {
         bool sortTask(itask_t& inTask);
 
         task_t* getNextTask();
+
+        // Selects the next task from the list and verifies its deadline is
+        // due with respect to `now`. Returns the ready task, or nullptr if
+        // no task is ready. On a not-ready candidate, the cursor is left in
+        // place so getNextRank() reports the earliest pending deadline.
+        task_t* selectReadyTask(task_rank_t now);
+
+        // Runs the given task, then if it is still linked re-arms its rank
+        // to makeDeadline(reference, task.getPeriod()) and re-sorts it.
+        // `reference` is the time base for the new deadline: callers pass
+        // the current tick for "catch-up" semantics (Periodic) or the
+        // executed task's previous rank for "drift-free" semantics (RT).
+        void runAndRearm(task_t& task, task_rank_t reference);
 
         ulink::List<itask_t> mTasks;
 
@@ -260,6 +274,43 @@ namespace ucosm {
 
         return true;
 
+    }
+
+    template<typename task_t, typename sched_rank_t>
+    task_t* IScheduler<task_t, sched_rank_t>::selectReadyTask(task_rank_t now) {
+
+        auto* candidate = getNextTask();
+
+        if (candidate) {
+            const auto cursorRank = mCursorTask.getRank();
+            if (!isDeadlineDue(cursorRank, candidate->getRank(), now)) {
+                // task is not ready yet; leave the cursor in place so
+                // getNextRank() keeps reporting the earliest pending deadline.
+                return nullptr;
+            }
+        }
+
+        return candidate;
+    }
+
+    template<typename task_t, typename sched_rank_t>
+    void IScheduler<task_t, sched_rank_t>::runAndRearm(task_t& task, task_rank_t reference) {
+
+        // Advance the cursor to the executed task's rank so subsequent
+        // deadline comparisons stay wrap-safe.
+        mCursorTask.setRank(task.getRank());
+
+        task.run();
+
+        // Check if task is still linked after execution
+        if (task.isLinked()) {
+
+            // the task is still in the list
+            // update the task rank
+            task.setRank(makeDeadline(reference, task.getPeriod()));
+
+            sortTask(task);
+        }
     }
 
 }
