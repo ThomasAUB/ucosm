@@ -80,10 +80,15 @@ namespace ucosm {
         /**
          * @brief Updates the task position in the list according to its rank value.
          *
+         * The list must be the one the task is currently linked to. The task is
+         * moved with the list iterators so that the start and end sentinels are
+         * never accessed as tasks.
+         *
+         * @param ioList List the task belongs to.
          * @return true if the task was moved in the list
          * @return false otherwise.
          */
-        bool updateRank();
+        bool updateRank(ulink::List<ITask>& ioList);
 
         /**
          * @brief Sets the task rank value.
@@ -128,71 +133,70 @@ namespace ucosm {
     }
 
     template<typename rank_t>
-    bool ITask<rank_t>::updateRank() {
+    bool ITask<rank_t>::updateRank(ulink::List<ITask<rank_t>>& ioList) {
+
         if (!this->isLinked()) {
             return false;
         }
 
-        auto* const left = this->prev;
-        auto* const right = this->next;
+        using iterator_t = typename ulink::List<ITask<rank_t>>::iterator;
+
+        const iterator_t begin = ioList.begin();
+        const iterator_t end = ioList.end();
+
+        const iterator_t self(this);
+
+        // The list boundaries are detected by comparing against begin() and
+        // end() rather than by inspecting the neighbor links : the sentinel
+        // nodes are plain ulink::Node and must never be read as tasks.
+
+        const bool isFirst = (self == begin);
+
+        iterator_t left = self;
+        if (!isFirst) {
+            --left;
+        }
+
+        iterator_t right = self;
+        ++right;
+
+        const bool isLast = (right == end);
 
         // Already in the correct slot: no work.
-        if (
-            (left->prev == nullptr || mRank >= left->mRank) &&
-            (right->next == nullptr || right->mRank >= mRank)
-            ) {
+        const bool leftSorted = (isFirst || left->getRank() <= mRank);
+        const bool rightSorted = (isLast || mRank <= right->getRank());
+
+        if (leftSorted && rightSorted) {
             return false;
         }
 
-        if (left->prev && mRank < left->mRank) {
-            // move task to the left
-            auto* insertAfter = left->prev;
-            while (
-                insertAfter->prev &&
-                mRank < insertAfter->mRank
-                ) {
-                insertAfter = insertAfter->prev;
+        iterator_t pos = self;
+
+        if (!leftSorted) {
+            // move task to the left, stop on the first task ranked before us
+            pos = left;
+            while (pos != begin) {
+                iterator_t candidate = pos;
+                --candidate;
+                if (candidate->getRank() <= mRank) {
+                    break;
+                }
+                pos = candidate;
             }
-
-            // detach from current spot (guaranteed non-null neighbors when linked)
-            left->next = right;
-            right->prev = left;
-
-            // insert after insertAfter
-            auto* const before = insertAfter->next;
-            insertAfter->next = this;
-            before->prev = this;
-            this->prev = insertAfter;
-            this->next = before;
-
-            return true;
+        }
+        else {
+            // move task to the right, stop on the first task ranked after us
+            pos = right;
+            ++pos;
+            while (pos != end && pos->getRank() < mRank) {
+                ++pos;
+            }
         }
 
-        if (right->next && right->mRank < mRank) {
-            // move task to the right
-            auto* insertBefore = right->next;
-            while (
-                insertBefore->next &&
-                insertBefore->mRank < mRank
-                ) {
-                insertBefore = insertBefore->next;
-            }
+        // relinks the task before pos, unlinking it from its current spot
+        ioList.insert_before(pos, *this);
 
-            // detach from current spot (guaranteed non-null neighbors when linked)
-            left->next = right;
-            right->prev = left;
-
-            // insert before insertBefore
-            auto* const after = insertBefore->prev;
-            after->next = this;
-            this->prev = after;
-            this->next = insertBefore;
-            insertBefore->prev = this;
-
-            return true;
-        }
-
-        return false;
+        return true;
     }
 
 }

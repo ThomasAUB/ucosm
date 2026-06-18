@@ -119,11 +119,10 @@ namespace ucosm {
             }
 
             // check if the task to be executed hasn't been deleted since the timer has been programed
-            const auto cursorRank = this->mCursorTask.getRank();
             const auto currentRank = this->mCurrentTask->getRank();
             const auto counter = mCounter.load(std::memory_order_acquire);
 
-            if (!isDeadlineDue(cursorRank, currentRank, counter)) {
+            if (!isDeadlineDue(this->mCursorTask.getRank(), currentRank, counter)) {
 
                 // task is not ready
 
@@ -139,26 +138,23 @@ namespace ucosm {
                 return;
             }
 
-            // execute the task
-            this->mCursorTask.setRank(currentRank);
-            this->mCurrentTask->run();
+            // execute the task. Re-arm using the task's previous rank as
+            // the time base (drift-free semantics: next deadline is anchored
+            // to the one we just fired, not to the current tick).
+            this->runAndRearm(*this->mCurrentTask, currentRank);
 
-            // Check if task is still linked after execution
             if (this->mCurrentTask->isLinked()) {
-
-                // the task is still in the list
-                // update the task rank
-                this->mCurrentTask->setRank(makeDeadline(currentRank, this->mCurrentTask->getPeriod()));
-
-                this->sortTask(*this->mCurrentTask);
+                // task still scheduled: program the next interrupt
+                delay(getDeadlineDelay(currentRank, this->getNextRank()));
             }
             else if (this->empty()) {
                 mTimer->stop();
-                this->mCurrentTask = nullptr;
-                return;
+            }
+            else {
+                // task removed itself but others remain
+                delay(getDeadlineDelay(currentRank, this->getNextRank()));
             }
 
-            delay(getDeadlineDelay(currentRank, this->getNextRank()));
             this->mCurrentTask = nullptr;
         }
 

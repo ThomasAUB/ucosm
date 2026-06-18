@@ -27,7 +27,7 @@ This library provides a modular scheduling framework with three main implementat
 | **RT** | Real-time | Hardware timer interrupts | Deterministic real-time systems |
 
 **Additional Components:**
-- **Core**: Basic cooperative scheduler foundation with intrusive containers
+- **Core**: Intrusive-list foundation (`IScheduler`/`ITask`/`ulink`) all schedulers build on — not a standalone scheduler
 - **Resumable Tasks**: Macro-based coroutine system for stateful operations  
 - **Callable Tasks**: Type-erased wrappers for lambdas and function pointers
 - **RT Communication**: Lock-free message queues for inter-task communication
