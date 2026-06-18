@@ -155,7 +155,7 @@ Resumable tasks provide coroutine-like functionality, allowing tasks to yield ex
 
 ```cpp
 #include <iostream>
-#include "ucosm/periodic/ilong_task.hpp"
+#include "ucosm/resumable/iresumable_task.hpp"
 
 struct SequenceTask : ucosm::IResumableTask {
     
