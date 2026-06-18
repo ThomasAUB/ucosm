@@ -201,17 +201,26 @@ TEST_CASE("ulink::List - node auto-unlink on destruction") {
 
     ulink::List<TestNode> list;
 
-    list.push_back(*new TestNode(1));
-    list.push_back(*new TestNode(2));
+    // Use scoped nodes so there is no leak regardless of which subcase runs.
+    // The "destroy linked node" subcase uses a heap node, which it deletes
+    // itself; the second node here is always cleaned up at scope exit.
+    TestNode b(2);
+    list.push_back(b);
 
-    CHECK(list.size() == 2);
+    CHECK(list.size() == 1);
 
     SUBCASE("Destroying a linked node unlinks it") {
-        TestNode* node = &list.front();
+        TestNode* node = new TestNode(1);
+        list.push_front(*node);
+        CHECK(list.size() == 2);
         CHECK(node->isLinked());
         delete node;
         CHECK(list.size() == 1);
+        CHECK(&list.front() == &b);
     }
+
+    // b is still linked here; it auto-unlinks when destroyed at scope exit.
+    CHECK(list.size() == 1);
 }
 
 TEST_CASE("ulink::List - node remove") {
