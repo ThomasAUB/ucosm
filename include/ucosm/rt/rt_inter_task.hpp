@@ -29,7 +29,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <atomic>
+#include "uatom.hpp"
 #include <type_traits>
 
 namespace ucosm {
@@ -148,8 +148,8 @@ namespace ucosm {
 
     private:
         // Platform-optimized alignment to prevent false sharing
-        alignas(std::max_align_t) std::atomic<size_t> mReadIndex;
-        alignas(std::max_align_t) std::atomic<size_t> mWriteIndex;
+        alignas(std::max_align_t) uatom::Atomic<size_t> mReadIndex;
+        alignas(std::max_align_t) uatom::Atomic<size_t> mWriteIndex;
         alignas(std::max_align_t) T mBuffer[Size];
     };
 
@@ -167,7 +167,7 @@ namespace ucosm {
             "Type must be trivially copyable");
         static_assert(sizeof(T) <= sizeof(uint64_t),
             "Type too large for atomic operations");
-        static_assert(std::atomic<T>::is_always_lock_free,
+        static_assert(uatom::Atomic<T>::is_always_lock_free,
             "Type must be lock-free on this platform (use smaller types on MCU)");
 
     public:
@@ -264,8 +264,8 @@ namespace ucosm {
         }
 
     private:
-        alignas(std::max_align_t) std::atomic<uint32_t> mVersion;
-        alignas(std::max_align_t) std::atomic<T> mValue;
+        alignas(std::max_align_t) uatom::Atomic<uint32_t> mVersion;
+        alignas(std::max_align_t) uatom::Atomic<T> mValue;
     };
 
     /**
@@ -382,7 +382,7 @@ namespace ucosm {
         }
 
     private:
-        std::atomic<flags_t> mFlags;
+        uatom::Atomic<flags_t> mFlags;
     };
 
 }

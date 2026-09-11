@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include <atomic>
+#include "uatom.hpp"
 #include <stdint.h>
 #include "ucosm/core/deadline.hpp"
 #include "irt_timer.hpp"
@@ -159,7 +159,7 @@ namespace ucosm {
         }
 
 
-        std::atomic<uint32_t> mCounter { 0 };
+        uatom::Atomic<uint32_t> mCounter { 0 };
         using base_t = IScheduler<IPeriodicTask, ITask<uint8_t>>;
         ITimer* mTimer = nullptr;
     };

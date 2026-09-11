@@ -36,6 +36,9 @@ namespace ucosm {
     using priority_t = tick_t;
     using interrupt_id_t = uint8_t;
 
+    template<interrupt_id_t interrupt_count>
+    struct TaskletScheduler;
+
     struct ITasklet : ITask<priority_t> {
 
         void setPriority(priority_t inPriority) {
@@ -46,26 +49,26 @@ namespace ucosm {
             return mPriority;
         }
 
-        void sleepFor(tick_t inSleepDuration) {
+        void setPeriod(tick_t inPeriod) {
             mState = eState::sleeping;
-            mSleepDuration = inSleepDuration;
+            mPeriod = inPeriod > 0 ? inPeriod : 1;
             mInterruptID = invalid_interrupt_id;
+        }
+
+        tick_t getPeriod() const {
+            return mPeriod;
         }
 
         void waitForInterrupt(interrupt_id_t inInterruptID) {
             mInterruptID = inInterruptID;
             mState = eState::waitingForInterrupt;
-            mSleepDuration = 0;
+            mPeriod = 0;
         }
 
         void dispose() {
-            mState = eState::waitingForInterrupt;
+            mState = eState::unconfigured;
             mInterruptID = invalid_interrupt_id;
-            mSleepDuration = 0;
-        }
-
-        tick_t getSleepDuration() const {
-            return mSleepDuration;
+            mPeriod = 0;
         }
 
         bool isSleeping() const {
@@ -76,15 +79,38 @@ namespace ucosm {
             return mState == eState::waitingForInterrupt;
         }
 
+        bool isConfigured() const {
+            return mState != eState::unconfigured;
+        }
+
         interrupt_id_t getInterruptID() const {
             return mInterruptID;
         }
 
         ~ITasklet() = default;
 
+    protected:
+
+        // Demoted from ITask's public removeTask() : use
+        // TaskletScheduler::removeTask() from outside, or this->removeTask()
+        // from within run().
+        using ITask<priority_t>::removeTask;
+
     private:
 
+        template<interrupt_id_t>
+        friend struct TaskletScheduler;
+
+        void setScheduledDeadline(tick_t inDeadline) {
+            mScheduledDeadline = inDeadline;
+        }
+
+        tick_t getScheduledDeadline() const {
+            return mScheduledDeadline;
+        }
+
         enum class eState : uint8_t {
+            unconfigured,
             sleeping,
             waitingForInterrupt
         };
@@ -92,9 +118,10 @@ namespace ucosm {
         static constexpr interrupt_id_t invalid_interrupt_id = static_cast<interrupt_id_t>(-1);
 
         priority_t mPriority = static_cast<priority_t>(-1);
+        tick_t mPeriod = 0;
+        tick_t mScheduledDeadline = 0;
         interrupt_id_t mInterruptID = invalid_interrupt_id;
-        tick_t mSleepDuration = 0;
-        eState mState = eState::sleeping;
+        eState mState = eState::unconfigured;
     };
 
 }
