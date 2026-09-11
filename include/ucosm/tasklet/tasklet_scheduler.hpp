@@ -40,10 +40,19 @@ namespace ucosm {
         using handler_installer_t = void(*)(void(*)(void*), void*);
         using execution_hook_t = void(*)();
 
+        // Called whenever the deadline of the next sleeping task changes,
+        // so a platform can reprogram a one-shot hardware timer instead of
+        // being driven by a fixed-period tick source. inHasDeadline is false
+        // when no task is sleeping (the timer should be stopped); otherwise
+        // inDeadline is the absolute tick at which it is next due - use
+        // getDeadlineDelay(now(), inDeadline) to turn it into a duration.
+        using reprogram_timer_t = void(*)(bool inHasDeadline, tick_t inDeadline);
+
         request_tasklet_execution_t requestTaskletExecution = nullptr;
         handler_installer_t installHandler = nullptr;
         execution_hook_t suspendExecution = nullptr;
         execution_hook_t resumeExecution = nullptr;
+        reprogram_timer_t reprogramTimer = nullptr;
 
     };
 
@@ -81,7 +90,6 @@ namespace ucosm {
         }
 
         // Adds a task. Priority is in reverse order: lower values are higher priority.
-        // A default-constructed ITasklet has priority 0xFFFFFFFF (lowest priority).
         bool addTask(ITasklet& inTask) override;
 
         // called from a periodic tick (ISR or thread) to refresh current time
@@ -144,6 +152,12 @@ namespace ucosm {
         std::atomic<tick_t> mNextTimer { 0 };
         std::atomic<tick_t> mNow { 0 };
         std::atomic<tick_t> mCursorRank { 0 };
+
+        // Last (hasDeadline, deadline) reported to mBackend.reprogramTimer.
+        // Only ever touched from updateNextTimerLocked(), which always runs
+        // under an ExecutionLock, so these don't need to be atomic.
+        bool mNotifiedHasTimer = false;
+        tick_t mNotifiedDeadline = 0;
 
         const TaskletBackend mBackend;
     };
@@ -422,15 +436,30 @@ namespace ucosm {
     // called from background and foreground
     template<interrupt_id_t interrupt_count>
     bool TaskletScheduler<interrupt_count>::updateNextTimerLocked() {
+
+        bool hasTimer;
+        tick_t deadline = 0;
+
         if (auto* nextTask = this->getNextTask()) {
-            mNextTimer.store(nextTask->getRank(), std::memory_order_release);
+            deadline = nextTask->getRank();
+            mNextTimer.store(deadline, std::memory_order_release);
             mHasTimerTask.store(true, std::memory_order_release);
-            return true;
+            hasTimer = true;
         }
         else {
             mHasTimerTask.store(false, std::memory_order_release);
-            return false;
+            hasTimer = false;
         }
+
+        if (mBackend.reprogramTimer &&
+            (hasTimer != mNotifiedHasTimer ||
+                (hasTimer && deadline != mNotifiedDeadline))) {
+            mNotifiedHasTimer = hasTimer;
+            mNotifiedDeadline = deadline;
+            mBackend.reprogramTimer(hasTimer, deadline);
+        }
+
+        return hasTimer;
     }
 
     template<interrupt_id_t interrupt_count>
