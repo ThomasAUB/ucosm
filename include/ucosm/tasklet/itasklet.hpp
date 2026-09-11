@@ -85,6 +85,7 @@ namespace ucosm {
     private:
 
         enum class eState : uint8_t {
+            unconfigured,
             sleeping,
             waitingForInterrupt
         };
@@ -94,7 +95,7 @@ namespace ucosm {
         priority_t mPriority = static_cast<priority_t>(-1);
         interrupt_id_t mInterruptID = invalid_interrupt_id;
         tick_t mSleepDuration = 0;
-        eState mState = eState::sleeping;
+        eState mState = eState::unconfigured;
     };
 
 }

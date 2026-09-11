@@ -279,6 +279,93 @@ TEST_CASE("TaskletScheduler - interrupt ordering") {
 
 }
 
+TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
+
+    using namespace ucosm;
+
+    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+
+    std::vector<int> executed;
+    std::mutex m;
+    std::condition_variable cv;
+
+    struct ReconfigurableTask : ucosm::ITasklet {
+        ReconfigurableTask(int id, std::vector<int>* out, std::mutex* m, std::condition_variable* cv) :
+            mID(id), mOut(out), mM(m), mCV(cv) {}
+        void run() override {
+            {
+                std::lock_guard<std::mutex> lk(*mM);
+                mOut->push_back(mID);
+            }
+            mCV->notify_one();
+            this->removeTask();
+        }
+        int mID;
+        std::vector<int>* mOut;
+        std::mutex* mM;
+        std::condition_variable* mCV;
+    };
+
+    SUBCASE("sleeping task reconfigured to wait for an interrupt") {
+
+        ReconfigurableTask t(1, &executed, &m, &cv);
+
+        t.sleepFor(10);
+        REQUIRE(sched.addTask(t));
+
+        // Change its mind before the deadline: it should now run on the
+        // interrupt instead, not on tick().
+        t.waitForInterrupt(0);
+        REQUIRE(sched.addTask(t));
+
+        sched.tick(50);
+        CHECK(executed.empty());
+
+        sched.signalInterrupt(0);
+        REQUIRE(waitForExecutions(m, cv, executed, 1));
+        CHECK(executed[0] == 1);
+    }
+
+    SUBCASE("interrupt task reconfigured to sleep") {
+
+        ReconfigurableTask t(2, &executed, &m, &cv);
+
+        t.waitForInterrupt(0);
+        REQUIRE(sched.addTask(t));
+
+        // Change its mind: it should now run on the timer instead, not on
+        // the interrupt it was previously waiting for.
+        t.sleepFor(10);
+        REQUIRE(sched.addTask(t));
+
+        sched.signalInterrupt(0);
+        CHECK(executed.empty());
+
+        sched.tick(10);
+        REQUIRE(waitForExecutions(m, cv, executed, 1));
+        CHECK(executed[0] == 2);
+    }
+
+}
+
+TEST_CASE("TaskletScheduler - unconfigured task is rejected") {
+
+    using namespace ucosm;
+
+    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+
+    struct NeverConfiguredTask : ucosm::ITasklet {
+        void run() override {}
+    };
+
+    NeverConfiguredTask t;
+
+    // Never went through sleepFor()/waitForInterrupt(): nothing to
+    // schedule, so addTask() must refuse rather than silently guessing.
+    CHECK_FALSE(sched.addTask(t));
+    CHECK_FALSE(t.isLinked());
+}
+
 TEST_CASE("TaskletScheduler - timer wake ordering") {
 
     using namespace ucosm;
