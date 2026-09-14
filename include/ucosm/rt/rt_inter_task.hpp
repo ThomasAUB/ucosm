@@ -213,17 +213,18 @@ namespace ucosm {
          * and even), ensuring a consistent version-value pair.
          */
         uint32_t loadWithVersion(T& value) const {
-            uint32_t version1, version2;
-            do {
-                version1 = mVersion.load(std::memory_order_acquire);
+            for (;;) {
+                const uint32_t version1 = mVersion.load(std::memory_order_acquire);
                 // An odd version means a write is in-flight; retry.
                 if (version1 & 1u) {
                     continue;
                 }
                 value = mValue.load(std::memory_order_acquire);
-                version2 = mVersion.load(std::memory_order_acquire);
-            } while (version1 != version2);
-            return version2;
+                const uint32_t version2 = mVersion.load(std::memory_order_acquire);
+                if (version1 == version2) {
+                    return version2;
+                }
+            }
         }
 
         /**
