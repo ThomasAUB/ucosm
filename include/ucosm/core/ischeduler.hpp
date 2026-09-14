@@ -269,7 +269,7 @@ namespace ucosm {
 
         }
         else {
-            return inTask.updateRank();
+            return inTask.updateRank(mTasks);
         }
 
         return true;

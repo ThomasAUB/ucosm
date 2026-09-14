@@ -369,7 +369,7 @@ namespace ucosm {
         }
 
         inList.push_back(inTask);
-        inTask.updateRank();
+        inTask.updateRank(inList);
     }
 
     // called from foreground task
