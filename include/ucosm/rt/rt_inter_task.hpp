@@ -186,13 +186,15 @@ namespace ucosm {
          * the in-flight writer and retry (see loadWithVersion).
          *
          * @param newValue New value to store
-         * @note Version is only incremented once per store; the pre-write
-         * bump uses an odd sentinel so readers can detect an in-flight write.
+         * @note The version is incremented twice per store, so it is odd while
+         * the write is in flight and even once it has completed.
+         * @note Single writer only : concurrent stores would interleave their
+         * version increments and let a reader observe a torn value.
          */
         void store(const T& newValue) {
-            const uint32_t pre = mVersion.fetch_add(1, std::memory_order_acq_rel);
-            // pre is now even after the increment; mark an in-flight write
-            // by making the version odd until the write completes.
+            // the version goes odd for the duration of the write so that a
+            // concurrent reader can detect the in-flight write and retry.
+            mVersion.fetch_add(1, std::memory_order_acq_rel);
             mValue.store(newValue, std::memory_order_release);
             mVersion.fetch_add(1, std::memory_order_release);
         }
@@ -213,17 +215,19 @@ namespace ucosm {
          * and even), ensuring a consistent version-value pair.
          */
         uint32_t loadWithVersion(T& value) const {
-            uint32_t version1, version2;
-            do {
-                version1 = mVersion.load(std::memory_order_acquire);
+            for (;;) {
+                const uint32_t version1 = mVersion.load(std::memory_order_acquire);
                 // An odd version means a write is in-flight; retry.
                 if (version1 & 1u) {
                     continue;
                 }
                 value = mValue.load(std::memory_order_acquire);
-                version2 = mVersion.load(std::memory_order_acquire);
-            } while (version1 != version2);
-            return version2;
+                const uint32_t version2 = mVersion.load(std::memory_order_acquire);
+                if (version1 == version2) {
+                    // no writer interfered, the value and the version match
+                    return version2;
+                }
+            }
         }
 
         /**

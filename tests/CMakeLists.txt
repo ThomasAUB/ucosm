@@ -22,3 +22,8 @@ target_link_libraries(${UCOSM_UNIT_TESTS} ucosm_impl Threads::Threads)
 
 # Register test with correct executable path
 add_test(NAME ${UCOSM_UNIT_TESTS} COMMAND ${UCOSM_UNIT_TESTS})
+
+# The suite runs in a few seconds, even under a sanitizer. Cap it well below
+# the 1500s ctest default so a scheduler deadlock is reported as a failure
+# quickly instead of stalling every job in the matrix.
+set_tests_properties(${UCOSM_UNIT_TESTS} PROPERTIES TIMEOUT 300)
