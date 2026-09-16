@@ -90,7 +90,24 @@ namespace ucosm {
         }
 
         // Adds a task. Priority is in reverse order: lower values are higher priority.
+        // A sleeping task waits for a full period before its first execution.
         bool addTask(ITasklet& inTask) override;
+
+        // Adds a sleeping task whose first execution must not wait for a full
+        // period : it is armed inDelay ticks from now, the period taking over
+        // afterwards. Returns false for a task that isn't configured with
+        // setPeriod(), a delay being meaningless for an interrupt.
+        bool addTask(ITasklet& inTask, tick_t inDelay);
+
+        // Sets the delay before the next execution of a task that is already
+        // scheduled, and re-sorts it so that the scheduler wakes up for it.
+        // Only the next execution is affected, the period takes over
+        // afterwards. Like PeriodicScheduler::setDelay the delay is held by
+        // the task rank, so it can only be set on a task that is scheduled on
+        // the timer : false is returned for a task that isn't linked or that
+        // is waiting for an interrupt. A running task may call it on itself to
+        // shift its next execution.
+        bool setDelay(ITasklet& inTask, tick_t inDelay);
 
         // called from a periodic tick (ISR or thread) to refresh current time
         // and wake sleeping tasks when their deadline expires.
@@ -122,6 +139,10 @@ namespace ucosm {
         void pushReadyInterruptTasks(task_list_t& ioList);
 
         void pushReadyTimerTasks(task_list_t& ioList);
+
+        // Arms a sleeping task inDelay ticks from now and sorts it into the
+        // timer list, wherever it was before. Called under an ExecutionLock.
+        void armTimerLocked(ITasklet& inTask, tick_t inDelay);
 
         bool updateNextTimerLocked();
 
@@ -170,9 +191,7 @@ namespace ucosm {
         ExecutionLock guard(*this);
 
         if (inTask.isSleeping()) {
-            inTask.setRank(makeDeadline(now(), inTask.getSleepDuration()));
-            insertSort(mTimerList, inTask); // insert after mCursorTask ?
-            updateNextTimerLocked();
+            armTimerLocked(inTask, inTask.getPeriod());
         }
         else if (inTask.isWaitingForInterrupt()) {
 
@@ -192,6 +211,45 @@ namespace ucosm {
         }
 
         return true;
+    }
+
+    // called from background and foreground tasks
+    template<interrupt_id_t interrupt_count>
+    bool TaskletScheduler<interrupt_count>::addTask(ITasklet& inTask, tick_t inDelay) {
+
+        ExecutionLock guard(*this);
+
+        if (!inTask.isSleeping()) {
+            return false;
+        }
+
+        armTimerLocked(inTask, inDelay);
+
+        return true;
+    }
+
+    // called from background and foreground tasks
+    template<interrupt_id_t interrupt_count>
+    bool TaskletScheduler<interrupt_count>::setDelay(ITasklet& inTask, tick_t inDelay) {
+
+        ExecutionLock guard(*this);
+
+        if (!inTask.isLinked() || !inTask.isSleeping()) {
+            // nothing to re-sort : the task isn't scheduled on the timer
+            return false;
+        }
+
+        armTimerLocked(inTask, inDelay);
+
+        return true;
+    }
+
+    // called from background and foreground tasks
+    template<interrupt_id_t interrupt_count>
+    void TaskletScheduler<interrupt_count>::armTimerLocked(ITasklet& inTask, tick_t inDelay) {
+        inTask.setRank(makeDeadline(now(), inDelay));
+        insertSort(mTimerList, inTask); // insert after mCursorTask ?
+        updateNextTimerLocked();
     }
 
     // called from ISR
@@ -296,8 +354,10 @@ namespace ucosm {
                 break;
             }
 
+            // The task configuration is left untouched : a task that does
+            // not reconfigure itself in run() is re-armed with the same sleep
+            // duration, which makes its sleep act as a period.
             auto& pendTask = static_cast<ITasklet&>(node);
-            pendTask.dispose();
             pendTask.setRank(pendTask.getPriority());
             insertSort(ioList, pendTask);
 
@@ -331,24 +391,40 @@ namespace ucosm {
 
                 t.run();
 
-                if (!t.isLinked()) {
+                if (!t.isLinked() || runList.empty() || &runList.front() != &t) {
+                    // the task removed itself, or rescheduled itself through
+                    // the scheduler : it already left the run list. The
+                    // emptiness check comes first, front() on an empty list
+                    // is a fault.
                     continue;
                 }
 
+                const auto itID = t.getInterruptID();
+
                 if (t.isSleeping()) {
-                    // push into timer list
-                    const auto sleep = t.getSleepDuration();
-                    t.setRank(makeDeadline(current, sleep > 0 ? sleep : 1));
+                    // push into timer list. `current` is the tick sampled
+                    // before the task ran, so a late wake-up shifts the next
+                    // deadline instead of trying to catch up on missed ones.
+                    // A null period is pushed to the next tick : re-arming
+                    // the task on the tick it just ran at would make it due
+                    // again in this very pass, and the handler would never
+                    // return.
+                    const auto period = t.getPeriod();
+                    t.setRank(makeDeadline(current, period > 0 ? period : 1));
                     insertSort(mTimerList, t);
                 }
-                else {
+                else if (t.isWaitingForInterrupt() && itID < interrupt_count) {
                     // push into interrupt list
-                    const auto itID = t.getInterruptID();
-                    if (itID < interrupt_count) {
-                        mHasISRTaskID.set(itID);
-                        t.setRank(t.getPriority());
-                        insertSort(mBlockedTaskLists[itID], t);
-                    }
+                    mHasISRTaskID.set(itID);
+                    t.setRank(t.getPriority());
+                    insertSort(mBlockedTaskLists[itID], t);
+                }
+                else {
+                    // The task disposed of itself or is waiting for an
+                    // interrupt this scheduler doesn't have : there is no list
+                    // to push it into. It must still leave the run list, which
+                    // would otherwise keep running it forever.
+                    t.removeTask();
                 }
             }
 

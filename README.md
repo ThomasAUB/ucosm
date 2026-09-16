@@ -368,6 +368,10 @@ The tasklet scheduler provides a safe, low-priority execution context for work t
 - **Execution context**: Uses a low-priority PendSV (`pendSV`) to execute tasklets in a safe, low-priority thread of execution.
 - **Triggering**: Tasks are triggered from ISRs or higher-priority code and identified by interrupt IDs; the scheduler tracks timings to determine when tasklets should run.
 - **API**: Implement tasks via `ITasklet` and register them with `TaskletScheduler` (see headers below).
+- **Wake-up source**: a tasklet either runs on a period (`setPeriod`) or waits for an interrupt (`waitForInterrupt`). A task that was configured with neither is refused by `addTask`.
+- **Lifetime**: the configuration is kept across runs. A tasklet that doesn't reconfigure itself in `run()` is re-armed as it was, so `setPeriod` acts as a period like `IPeriodicTask` and `waitForInterrupt` keeps the subscription. The period is counted from the tick the task was dispatched at, so a late wake-up shifts the next deadline instead of catching up on missed ones. A period of 0 means "as soon as possible", which for a tasklet is the next tick.
+- **Delay**: like `IPeriodicTask` the delay lives in the task rank rather than in the task, so it is set through the scheduler - `addTask(task, delay)` when the first execution must not wait for a full period, and `setDelay(task, delay)` to re-arm a task that is already scheduled, which a task may call on itself from `run()` to shift its next execution. Only the next execution is affected, the period takes over afterwards.
+- **Stopping**: call `removeTask()` to leave the scheduler, or `dispose()` to clear the configuration - a task that disposes of itself from `run()` is unlinked, and can be scheduled again only after a new `setPeriod` / `waitForInterrupt`.
 
 
 ## Callable Tasks
