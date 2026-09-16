@@ -40,10 +40,19 @@ namespace ucosm {
         using handler_installer_t = void(*)(void(*)(void*), void*);
         using execution_hook_t = void(*)();
 
+        // Called whenever the deadline of the next sleeping task changes,
+        // so a platform can reprogram a one-shot hardware timer instead of
+        // being driven by a fixed-period tick source. inHasDeadline is false
+        // when no task is sleeping (the timer should be stopped); otherwise
+        // inDeadline is the absolute tick at which it is next due - use
+        // getDeadlineDelay(now(), inDeadline) to turn it into a duration.
+        using schedule_next_wakeup_t = void(*)(bool inHasDeadline, tick_t inDeadline);
+
         request_tasklet_execution_t requestTaskletExecution = nullptr;
         handler_installer_t installHandler = nullptr;
         execution_hook_t suspendExecution = nullptr;
         execution_hook_t resumeExecution = nullptr;
+        schedule_next_wakeup_t scheduleNextWakeup = nullptr;
 
     };
 
@@ -81,8 +90,24 @@ namespace ucosm {
         }
 
         // Adds a task. Priority is in reverse order: lower values are higher priority.
-        // A default-constructed ITasklet has priority 0xFFFFFFFF (lowest priority).
+        // A sleeping task waits for a full period before its first execution.
         bool addTask(ITasklet& inTask) override;
+
+        // Adds a sleeping task whose first execution must not wait for a full
+        // period : it is armed inDelay ticks from now, the period taking over
+        // afterwards. Returns false for a task that isn't configured with
+        // setPeriod(), a delay being meaningless for an interrupt.
+        bool addTask(ITasklet& inTask, tick_t inDelay);
+
+        // Sets the delay before the next execution of a task that is already
+        // scheduled, and re-sorts it so that the scheduler wakes up for it.
+        // Only the next execution is affected, the period takes over
+        // afterwards. Like PeriodicScheduler::setDelay the delay is held by
+        // the task rank, so it can only be set on a task that is scheduled on
+        // the timer : false is returned for a task that isn't linked or that
+        // is waiting for an interrupt. A running task may call it on itself to
+        // shift its next execution.
+        bool setDelay(ITasklet& inTask, tick_t inDelay);
 
         // called from a periodic tick (ISR or thread) to refresh current time
         // and wake sleeping tasks when their deadline expires.
@@ -115,6 +140,10 @@ namespace ucosm {
 
         void pushReadyTimerTasks(task_list_t& ioList);
 
+        // Arms a sleeping task inDelay ticks from now and sorts it into the
+        // timer list, wherever it was before. Called under an ExecutionLock.
+        void armTimerLocked(ITasklet& inTask, tick_t inDelay);
+
         bool updateNextTimerLocked();
 
         void requestExecution() const;
@@ -145,6 +174,12 @@ namespace ucosm {
         std::atomic<tick_t> mNow { 0 };
         std::atomic<tick_t> mCursorRank { 0 };
 
+        // Last (hasDeadline, deadline) reported to mBackend.scheduleNextWakeup.
+        // Only ever touched from updateNextTimerLocked(), which always runs
+        // under an ExecutionLock, so these don't need to be atomic.
+        bool mNotifiedHasTimer = false;
+        tick_t mNotifiedDeadline = 0;
+
         const TaskletBackend mBackend;
     };
 
@@ -156,21 +191,65 @@ namespace ucosm {
         ExecutionLock guard(*this);
 
         if (inTask.isSleeping()) {
-            inTask.setRank(makeDeadline(now(), inTask.getSleepDuration()));
-            insertSort(mTimerList, inTask); // insert after mCursorTask ?
-            updateNextTimerLocked();
-            return true;
+            armTimerLocked(inTask, inTask.getPeriod());
         }
+        else if (inTask.isWaitingForInterrupt()) {
 
-        const auto itID = inTask.getInterruptID();
-        if (itID < interrupt_count) {
+            const auto itID = inTask.getInterruptID();
+
+            if (itID >= interrupt_count) {
+                return false;
+            }
+
             inTask.setRank(inTask.getPriority());
             insertSort(mBlockedTaskLists[itID], inTask);
             mHasISRTaskID.set(itID);
-            return true;
+        }
+        else {
+            // unconfigured task
+            return false;
         }
 
-        return false;
+        return true;
+    }
+
+    // called from background and foreground tasks
+    template<interrupt_id_t interrupt_count>
+    bool TaskletScheduler<interrupt_count>::addTask(ITasklet& inTask, tick_t inDelay) {
+
+        ExecutionLock guard(*this);
+
+        if (!inTask.isSleeping()) {
+            return false;
+        }
+
+        armTimerLocked(inTask, inDelay);
+
+        return true;
+    }
+
+    // called from background and foreground tasks
+    template<interrupt_id_t interrupt_count>
+    bool TaskletScheduler<interrupt_count>::setDelay(ITasklet& inTask, tick_t inDelay) {
+
+        ExecutionLock guard(*this);
+
+        if (!inTask.isLinked() || !inTask.isSleeping()) {
+            // nothing to re-sort : the task isn't scheduled on the timer
+            return false;
+        }
+
+        armTimerLocked(inTask, inDelay);
+
+        return true;
+    }
+
+    // called from background and foreground tasks
+    template<interrupt_id_t interrupt_count>
+    void TaskletScheduler<interrupt_count>::armTimerLocked(ITasklet& inTask, tick_t inDelay) {
+        inTask.setRank(makeDeadline(now(), inDelay));
+        insertSort(mTimerList, inTask); // insert after mCursorTask ?
+        updateNextTimerLocked();
     }
 
     // called from ISR
@@ -275,8 +354,10 @@ namespace ucosm {
                 break;
             }
 
+            // The task configuration is left untouched : a task that does
+            // not reconfigure itself in run() is re-armed with the same sleep
+            // duration, which makes its sleep act as a period.
             auto& pendTask = static_cast<ITasklet&>(node);
-            pendTask.dispose();
             pendTask.setRank(pendTask.getPriority());
             insertSort(ioList, pendTask);
 
@@ -310,24 +391,40 @@ namespace ucosm {
 
                 t.run();
 
-                if (!t.isLinked()) {
+                if (!t.isLinked() || runList.empty() || &runList.front() != &t) {
+                    // the task removed itself, or rescheduled itself through
+                    // the scheduler : it already left the run list. The
+                    // emptiness check comes first, front() on an empty list
+                    // is a fault.
                     continue;
                 }
 
+                const auto itID = t.getInterruptID();
+
                 if (t.isSleeping()) {
-                    // push into timer list
-                    const auto sleep = t.getSleepDuration();
-                    t.setRank(makeDeadline(current, sleep > 0 ? sleep : 1));
+                    // push into timer list. `current` is the tick sampled
+                    // before the task ran, so a late wake-up shifts the next
+                    // deadline instead of trying to catch up on missed ones.
+                    // A null period is pushed to the next tick : re-arming
+                    // the task on the tick it just ran at would make it due
+                    // again in this very pass, and the handler would never
+                    // return.
+                    const auto period = t.getPeriod();
+                    t.setRank(makeDeadline(current, period > 0 ? period : 1));
                     insertSort(mTimerList, t);
                 }
-                else {
+                else if (t.isWaitingForInterrupt() && itID < interrupt_count) {
                     // push into interrupt list
-                    const auto itID = t.getInterruptID();
-                    if (itID < interrupt_count) {
-                        mHasISRTaskID.set(itID);
-                        t.setRank(t.getPriority());
-                        insertSort(mBlockedTaskLists[itID], t);
-                    }
+                    mHasISRTaskID.set(itID);
+                    t.setRank(t.getPriority());
+                    insertSort(mBlockedTaskLists[itID], t);
+                }
+                else {
+                    // The task disposed of itself or is waiting for an
+                    // interrupt this scheduler doesn't have : there is no list
+                    // to push it into. It must still leave the run list, which
+                    // would otherwise keep running it forever.
+                    t.removeTask();
                 }
             }
 
@@ -422,15 +519,30 @@ namespace ucosm {
     // called from background and foreground
     template<interrupt_id_t interrupt_count>
     bool TaskletScheduler<interrupt_count>::updateNextTimerLocked() {
+
+        bool hasTimer;
+        tick_t deadline = 0;
+
         if (auto* nextTask = this->getNextTask()) {
-            mNextTimer.store(nextTask->getRank(), std::memory_order_release);
+            deadline = nextTask->getRank();
+            mNextTimer.store(deadline, std::memory_order_release);
             mHasTimerTask.store(true, std::memory_order_release);
-            return true;
+            hasTimer = true;
         }
         else {
             mHasTimerTask.store(false, std::memory_order_release);
-            return false;
+            hasTimer = false;
         }
+
+        if (mBackend.scheduleNextWakeup &&
+            (hasTimer != mNotifiedHasTimer ||
+                (hasTimer && deadline != mNotifiedDeadline))) {
+            mNotifiedHasTimer = hasTimer;
+            mNotifiedDeadline = deadline;
+            mBackend.scheduleNextWakeup(hasTimer, deadline);
+        }
+
+        return hasTimer;
     }
 
     template<interrupt_id_t interrupt_count>
