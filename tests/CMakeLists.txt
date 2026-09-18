@@ -10,6 +10,7 @@ set(TARGET_SRC
 	periodic_test.cpp
 	resumable_test.cpp
     rt_test.cpp
+	tasklet_clock_test.cpp
 	tasklet_test.cpp
 	tests.cpp
 	ulink_test.cpp
