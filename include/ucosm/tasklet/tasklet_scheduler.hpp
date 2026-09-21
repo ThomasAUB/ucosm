@@ -128,6 +128,16 @@ namespace ucosm {
         // shift its next execution.
         bool setDelay(ITasklet& inTask, tick_t inDelay);
 
+        // Unschedules a task, from whichever list it sits in, and refreshes
+        // the next deadline so that a platform driven by scheduleNextWakeup
+        // stops waiting for a task that is gone.
+        //
+        // ITask::removeTask() does the same unlinking but without the
+        // ExecutionLock : calling it from outside the task's own run() races
+        // the list walk this scheduler does from its dispatch context. Go
+        // through here instead.
+        void removeTask(ITasklet& inTask);
+
         // called from a periodic tick (ISR or thread) to refresh current time
         // and wake sleeping tasks when their deadline expires.
         // Does nothing when the backend reads the clock itself, the software
@@ -154,6 +164,9 @@ namespace ucosm {
         // called from low priority context
         void run() override;
 
+        // Sorts a task into a list on its plain rank. Used for the lists
+        // ranked by priority - the run list and the interrupt lists - where
+        // the rank is a value to compare, not a point in time.
         static void insertSort(task_list_t& inList, itask_t& inTask);
 
         static void mergeSortedLists(task_list_t& ioList, task_list_t& inList);
@@ -161,6 +174,17 @@ namespace ucosm {
         void pushReadyInterruptTasks(task_list_t& ioList);
 
         void pushReadyTimerTasks(task_list_t& ioList);
+
+        // Sorts a task into the timer list, wherever it was before.
+        //
+        // Deadlines are cyclic, so the list is ordered by the delay separating
+        // each task from the cursor rather than by the raw rank : ordering on
+        // the rank would put a deadline that has wrapped past zero in front of
+        // the cursor, which is the one place getNextTask() never looks.
+        //
+        // The cursor is therefore always the head of the list, at a delay of
+        // zero from itself. Called under an ExecutionLock.
+        void insertTimerLocked(itask_t& inTask);
 
         // Arms a sleeping task inDelay ticks from now and sorts it into the
         // timer list, wherever it was before. Called under an ExecutionLock.
@@ -268,9 +292,46 @@ namespace ucosm {
 
     // called from background and foreground tasks
     template<interrupt_id_t interrupt_count>
+    void TaskletScheduler<interrupt_count>::insertTimerLocked(itask_t& inTask) {
+
+        const auto cursor = this->mCursorTask.getRank();
+        const auto delay = getDeadlineDelay(cursor, inTask.getRank());
+
+        // Walked from the cursor rather than from the head of the list :
+        // everything the cursor has already gone past belongs to the round
+        // being retired, and a deadline armed now always comes after it.
+        task_list_t::iterator it(&this->mCursorTask);
+        ++it;
+
+        const auto endIt = mTimerList.end();
+
+        while (it != endIt && getDeadlineDelay(cursor, it->getRank()) <= delay) {
+            ++it;
+        }
+
+        // insert_before(end()) appends, so the last slot needs no special case.
+        mTimerList.insert_before(it, inTask);
+    }
+
+    // called from background and foreground tasks
+    template<interrupt_id_t interrupt_count>
     void TaskletScheduler<interrupt_count>::armTimerLocked(ITasklet& inTask, tick_t inDelay) {
         inTask.setRank(makeDeadline(now(), inDelay));
-        insertSort(mTimerList, inTask); // insert after mCursorTask ?
+        insertTimerLocked(inTask);
+        updateNextTimerLocked();
+    }
+
+    // called from background and foreground tasks
+    template<interrupt_id_t interrupt_count>
+    void TaskletScheduler<interrupt_count>::removeTask(ITasklet& inTask) {
+
+        ExecutionLock guard(*this);
+
+        inTask.ITasklet::removeTask();
+
+        // The task may have been the one the platform is waiting for : tell it
+        // what is left, rather than letting it wake up for a deadline that no
+        // longer belongs to anyone.
         updateNextTimerLocked();
     }
 
@@ -464,7 +525,7 @@ namespace ucosm {
                     }
 
                     t.setRank(deadline);
-                    insertSort(mTimerList, t);
+                    insertTimerLocked(t);
                 }
                 else if (t.isWaitingForInterrupt() && itID < interrupt_count) {
                     // push into interrupt list

@@ -365,3 +365,65 @@ TEST_CASE("TaskletScheduler - backend clock : an interrupt task runs without any
 
     CHECK_FALSE(g_wakeupArmed);
 }
+
+TEST_CASE("TaskletScheduler - backend clock : a task armed across the tick wrap is not skipped") {
+
+    // Deadlines are cyclic, so around the moment the clock wraps past zero the
+    // timer list holds both kinds at once : deadlines that have wrapped,
+    // numerically tiny, and the cursor they are ahead of, numerically huge.
+    // Ordering them on the raw value rather than on the delay separating them
+    // from the cursor files a wrapped deadline in front of it, which is the one
+    // place the scheduler never looks for the next task to run.
+
+    resetHarness();
+    TaskletScheduler<1> sched(clock_backend);
+
+    g_now = 0xFFFF'FF00;
+
+    // Runs a hair before the wrap and re-arms past it. That pass is what
+    // leaves the list holding a deadline numerically below the cursor.
+    CountTask spanning;
+    spanning.setPeriod(0xF0);
+    REQUIRE(sched.addTask(spanning));
+    CHECK(g_wakeupDeadline == tick_t(0xFFFF'FFF0));
+
+    advanceClock(0xF0);
+    REQUIRE(spanning.mCount == 1);
+    REQUIRE(g_wakeupDeadline == tick_t(0xE0));
+
+    // Armed from there, due before it.
+    CountTask early;
+    early.setPeriod(0x20);
+    REQUIRE(sched.addTask(early));
+
+    REQUIRE(g_wakeupArmed);
+    CHECK(g_wakeupDeadline == tick_t(0x10));
+
+    advanceClock(0x20);
+    CHECK(early.mCount == 1);
+    CHECK(spanning.mCount == 1);
+
+    // and the one that spans the wrap still runs at its own deadline
+    advanceClock(0xD0);
+    CHECK(spanning.mCount == 2);
+}
+
+TEST_CASE("TaskletScheduler - backend clock : removeTask drops the deadline it was armed on") {
+
+    resetHarness();
+    TaskletScheduler<1> sched(clock_backend);
+
+    CountTask task;
+    task.setPeriod(500);
+    REQUIRE(sched.addTask(task));
+    REQUIRE(g_wakeupArmed);
+
+    sched.removeTask(task);
+
+    // nothing left to wait for : the platform's timer is told to stop rather
+    // than left running for a task that is gone
+    CHECK_FALSE(g_wakeupArmed);
+
+    advanceClock(1'000);
+    CHECK(task.mCount == 0);
+}
