@@ -32,12 +32,30 @@ struct SchedulerBarrier final {
     SchedulerBarrier& operator=(const SchedulerBarrier&) = delete;
 };
 
+// What a periodic tick interrupt does : move the platform's clock on, then
+// let the scheduler pend its handler if a deadline has come round. The two
+// are separate because the scheduler keeps no clock of its own - it reads the
+// one the backend gives it, and poll() only makes it look.
+template<ucosm::interrupt_id_t interrupt_count>
+void tick(ucosm::TaskletScheduler<interrupt_count>& inScheduler, ucosm::tick_t inInc = 1) {
+    advance_tick(inInc);
+    inScheduler.poll();
+}
+
+// Puts the clock back to its origin so each test case can reason in absolute
+// deadlines. The scheduler under test is built after this, and takes its
+// first deadlines from here.
+struct ClockOrigin final {
+    explicit ClockOrigin(ucosm::tick_t inValue = 0) { reset_tick(inValue); }
+};
+
 }
 
 TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -65,7 +83,7 @@ TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
     WrapTask t2(2, &executed, &m, &cv);
 
     // Move the scheduler close to wrap first, then schedule relative delays.
-    sched.tick(static_cast<tick_t>(UINT32_MAX - 2));
+    tick(sched, static_cast<tick_t>(UINT32_MAX - 2));
 
     t1.setPeriod(10);
     t2.setPeriod(20);
@@ -77,10 +95,10 @@ TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
     REQUIRE(sched.tryGetNextDeadline(nextDeadline));
     CHECK(nextDeadline == static_cast<tick_t>(7));
 
-    sched.tick(9);
+    tick(sched, 9);
     CHECK(executed.empty());
 
-    sched.tick(1);
+    tick(sched, 1);
     REQUIRE(waitForExecutions(m, cv, executed, 1));
 
     {
@@ -89,10 +107,10 @@ TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
         CHECK(nextDeadline == static_cast<tick_t>(17));
     }
 
-    sched.tick(9);
+    tick(sched, 9);
     CHECK(executed.size() == 1);
 
-    sched.tick(1);
+    tick(sched, 1);
     REQUIRE(waitForExecutions(m, cv, executed, 2));
 
     REQUIRE(executed.size() == 2);
@@ -105,6 +123,7 @@ TEST_CASE("TaskletScheduler - concurrent signalInterrupt calls") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<4> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -173,6 +192,7 @@ TEST_CASE("TaskletScheduler - combined sleep and ISR ordering") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<4> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -215,7 +235,7 @@ TEST_CASE("TaskletScheduler - combined sleep and ISR ordering") {
 
     // Queue both interrupts and the timer wake-up before allowing the low-priority worker to run.
     suspend_low_priority_execution();
-    sched.tick(50);
+    tick(sched, 50);
     sched.signalInterrupt(0);
     sched.signalInterrupt(1);
     resume_low_priority_execution();
@@ -233,6 +253,7 @@ TEST_CASE("TaskletScheduler - interrupt ordering") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<4> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -296,6 +317,7 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -331,7 +353,7 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
         t.waitForInterrupt(0);
         REQUIRE(sched.addTask(t));
 
-        sched.tick(50);
+        tick(sched, 50);
         CHECK(executed.empty());
 
         sched.signalInterrupt(0);
@@ -354,7 +376,7 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
         sched.signalInterrupt(0);
         CHECK(executed.empty());
 
-        sched.tick(10);
+        tick(sched, 10);
         REQUIRE(waitForExecutions(m, cv, executed, 1));
         CHECK(executed[0] == 2);
     }
@@ -365,6 +387,7 @@ TEST_CASE("TaskletScheduler - unconfigured task is rejected") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     struct NeverConfiguredTask : ucosm::ITasklet {
@@ -384,6 +407,7 @@ TEST_CASE("TaskletScheduler - timer wake ordering") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -427,7 +451,7 @@ TEST_CASE("TaskletScheduler - timer wake ordering") {
     REQUIRE(sched.tryGetNextDeadline(nextDeadline));
     CHECK(nextDeadline == 10);
 
-    sched.tick(10);
+    tick(sched, 10);
     REQUIRE(waitForExecutions(m, cv, executed, 1));
 
     CHECK(executed.size() == 1);
@@ -440,7 +464,7 @@ TEST_CASE("TaskletScheduler - timer wake ordering") {
     }
 
     // advance from tick 10 to tick 50 -> should wake s1
-    sched.tick(40);
+    tick(sched, 40);
     REQUIRE(waitForExecutions(m, cv, executed, 2));
 
     CHECK(executed.size() == 2);
@@ -453,7 +477,7 @@ TEST_CASE("TaskletScheduler - timer wake ordering") {
     }
 
     // advance from tick 50 to tick 100 -> should wake s3
-    sched.tick(50);
+    tick(sched, 50);
     REQUIRE(waitForExecutions(m, cv, executed, 3));
 
     CHECK(executed.size() == 3);
@@ -465,6 +489,7 @@ TEST_CASE("TaskletScheduler - the period is kept across runs") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -498,7 +523,7 @@ TEST_CASE("TaskletScheduler - the period is kept across runs") {
     REQUIRE(sched.tryGetNextDeadline(nextDeadline));
     CHECK(nextDeadline == 10);
 
-    sched.tick(10);
+    tick(sched, 10);
     REQUIRE(waitForExecutions(m, cv, executed, 1));
 
     {
@@ -508,7 +533,7 @@ TEST_CASE("TaskletScheduler - the period is kept across runs") {
         CHECK(nextDeadline == 20);
     }
 
-    sched.tick(10);
+    tick(sched, 10);
     REQUIRE(waitForExecutions(m, cv, executed, 2));
 
     {
@@ -524,7 +549,7 @@ TEST_CASE("TaskletScheduler - the period is kept across runs") {
     // run() already overdue against that next deadline falls back to being
     // counted from there, so a genuinely stale wake-up still doesn't trap the
     // handler catching up.
-    sched.tick(15);
+    tick(sched, 15);
     REQUIRE(waitForExecutions(m, cv, executed, 3));
 
     {
@@ -539,12 +564,12 @@ TEST_CASE("TaskletScheduler - the period is kept across runs") {
 
     {
         SchedulerBarrier barrier;
-        t.removeTask();
+        sched.removeTask(t);
     }
 
     CHECK_FALSE(t.isLinked());
 
-    sched.tick(100);
+    tick(sched, 100);
 
     CHECK_FALSE(waitForExecutions(m, cv, executed, 4, std::chrono::milliseconds(100)));
 
@@ -554,6 +579,7 @@ TEST_CASE("TaskletScheduler - a task disposing of itself is dropped") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -584,7 +610,7 @@ TEST_CASE("TaskletScheduler - a task disposing of itself is dropped") {
     t.setPeriod(10);
     REQUIRE(sched.addTask(t));
 
-    sched.tick(10);
+    tick(sched, 10);
     REQUIRE(waitForExecutions(m, cv, executed, 1));
 
     {
@@ -593,7 +619,7 @@ TEST_CASE("TaskletScheduler - a task disposing of itself is dropped") {
         CHECK_FALSE(t.isConfigured());
     }
 
-    sched.tick(100);
+    tick(sched, 100);
 
     CHECK_FALSE(waitForExecutions(m, cv, executed, 2, std::chrono::milliseconds(100)));
 
@@ -605,7 +631,7 @@ TEST_CASE("TaskletScheduler - a task disposing of itself is dropped") {
 
     {
         SchedulerBarrier barrier;
-        t.removeTask();
+        sched.removeTask(t);
     }
 
 }
@@ -614,6 +640,7 @@ TEST_CASE("TaskletScheduler - interrupt subscription is kept across runs") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -652,7 +679,7 @@ TEST_CASE("TaskletScheduler - interrupt subscription is kept across runs") {
     {
         SchedulerBarrier barrier;
         CHECK(t.isLinked());
-        t.removeTask();
+        sched.removeTask(t);
     }
 
     sched.signalInterrupt(0);
@@ -665,6 +692,7 @@ TEST_CASE("TaskletScheduler - delay applies once, then the period takes over") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -697,7 +725,7 @@ TEST_CASE("TaskletScheduler - delay applies once, then the period takes over") {
     REQUIRE(sched.tryGetNextDeadline(nextDeadline));
     CHECK(nextDeadline == 10);
 
-    sched.tick(10);
+    tick(sched, 10);
     REQUIRE(waitForExecutions(m, cv, executed, 1));
 
     {
@@ -706,14 +734,14 @@ TEST_CASE("TaskletScheduler - delay applies once, then the period takes over") {
         CHECK(nextDeadline == 110);
     }
 
-    sched.tick(100);
+    tick(sched, 100);
     REQUIRE(waitForExecutions(m, cv, executed, 2));
 
     {
         SchedulerBarrier barrier;
         REQUIRE(sched.tryGetNextDeadline(nextDeadline));
         CHECK(nextDeadline == 210);
-        t.removeTask();
+        sched.removeTask(t);
     }
 
 }
@@ -722,6 +750,7 @@ TEST_CASE("TaskletScheduler - a task can delay its next execution from run()") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -766,7 +795,7 @@ TEST_CASE("TaskletScheduler - a task can delay its next execution from run()") {
     t.setPeriod(20);
     REQUIRE(sched.addTask(t));
 
-    sched.tick(20);
+    tick(sched, 20);
     REQUIRE(waitForExecutions(m, cv, executed, 1));
 
     tick_t nextDeadline = 0;
@@ -778,14 +807,14 @@ TEST_CASE("TaskletScheduler - a task can delay its next execution from run()") {
         CHECK(nextDeadline == 25);
     }
 
-    sched.tick(5);
+    tick(sched, 5);
     REQUIRE(waitForExecutions(m, cv, executed, 2));
 
     {
         SchedulerBarrier barrier;
         REQUIRE(sched.tryGetNextDeadline(nextDeadline));
         CHECK(nextDeadline == 45);
-        t.removeTask();
+        sched.removeTask(t);
     }
 
 }
@@ -794,6 +823,7 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
 
     using namespace ucosm;
 
+    ClockOrigin origin;
     ucosm::TaskletScheduler<2> sched(tasklet_backend);
 
     std::vector<int> executed;
@@ -834,14 +864,14 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
         REQUIRE(sched.tryGetNextDeadline(nextDeadline));
         CHECK(nextDeadline == 10);
 
-        sched.tick(10);
+        tick(sched, 10);
         REQUIRE(waitForExecutions(m, cv, executed, 1));
 
         {
             SchedulerBarrier barrier;
             REQUIRE(sched.tryGetNextDeadline(nextDeadline));
             CHECK(nextDeadline == 110);
-            t.removeTask();
+            sched.removeTask(t);
         }
     }
 
@@ -862,7 +892,7 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
 
         {
             SchedulerBarrier barrier;
-            t.removeTask();
+            sched.removeTask(t);
         }
     }
 
@@ -883,7 +913,7 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
 
         {
             SchedulerBarrier barrier;
-            t.removeTask();
+            sched.removeTask(t);
         }
     }
 

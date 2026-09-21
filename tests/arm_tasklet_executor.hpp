@@ -39,7 +39,10 @@ inline void suspend_low_priority_execution();
 
 inline void resume_low_priority_execution();
 
+inline ucosm::tick_t get_tick();
+
 inline constexpr ucosm::TaskletBackend tasklet_backend {
+    get_tick,
     request_low_priority_execution,
     install_low_priority_handler,
     suspend_low_priority_execution,
@@ -100,6 +103,31 @@ inline void request_low_priority_execution() {
 inline void install_low_priority_handler(void (*handler)(void*), void* ctx) {
     detail::g_arm_handler = handler;
     detail::g_arm_ctx = ctx;
+}
+
+namespace detail {
+    // The clock the scheduler reads. Bumped by the periodic tick interrupt
+    // below; a free running counter (DWT->CYCCNT, or a hardware timer's count
+    // register) would do just as well, and would let get_tick() return it
+    // directly with no interrupt of its own.
+    inline volatile ucosm::tick_t g_tick = 0;
+}
+
+inline ucosm::tick_t get_tick() {
+    return detail::g_tick;
+}
+
+// Call this from the periodic tick interrupt (SysTick_Handler, or whichever
+// timer provides the tick), passing the scheduler instance : it moves the
+// clock on, then lets the scheduler pend PendSV if a deadline has come round.
+//
+// A platform that would rather sleep between deadlines than take a periodic
+// interrupt implements TaskletBackend::scheduleNextWakeup instead, arms a
+// one-shot on the deadline it is given, and never calls this.
+template<ucosm::interrupt_id_t interrupt_count>
+inline void tick_interrupt(ucosm::TaskletScheduler<interrupt_count>& inScheduler) {
+    ++detail::g_tick;
+    inScheduler.poll();
 }
 
 inline void suspend_low_priority_execution() {

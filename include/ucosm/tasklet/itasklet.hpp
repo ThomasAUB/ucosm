@@ -36,6 +36,9 @@ namespace ucosm {
     using priority_t = tick_t;
     using interrupt_id_t = uint8_t;
 
+    template<interrupt_id_t interrupt_count>
+    struct TaskletScheduler;
+
     struct ITasklet : ITask<priority_t> {
 
         void setPriority(priority_t inPriority) {
@@ -46,17 +49,9 @@ namespace ucosm {
             return mPriority;
         }
 
-        // Schedules the task on the timer list and sets how often it runs.
-        // The period is kept after the task has run : a task that leaves its
-        // state untouched in run() is re-armed with the same value.
-        // A period of 0 means "as soon as possible", which for a tasklet is
-        // the next tick : re-arming a task on the tick it just ran at would
-        // keep the low priority handler from ever returning.
-        // The delay before the next execution is held by the task rank, like
-        // IPeriodicTask : see TaskletScheduler::addTask and setDelay.
         void setPeriod(tick_t inPeriod) {
             mState = eState::sleeping;
-            mPeriod = inPeriod;
+            mPeriod = inPeriod > 0 ? inPeriod : 1;
             mInterruptID = invalid_interrupt_id;
         }
 
@@ -64,18 +59,12 @@ namespace ucosm {
             return mPeriod;
         }
 
-        // Subscribes the task to an interrupt. The subscription is kept after
-        // the task has run, symmetrically with setPeriod().
         void waitForInterrupt(interrupt_id_t inInterruptID) {
             mInterruptID = inInterruptID;
             mState = eState::waitingForInterrupt;
             mPeriod = 0;
         }
 
-        // Clears the task configuration : it goes back to the state it had
-        // before the first setPeriod() / waitForInterrupt(). A task that
-        // disposes itself from run() is unlinked by the scheduler, and a
-        // disposed task is refused by addTask() until it is configured again.
         void dispose() {
             mState = eState::unconfigured;
             mInterruptID = invalid_interrupt_id;
@@ -90,8 +79,6 @@ namespace ucosm {
             return mState == eState::waitingForInterrupt;
         }
 
-        // Tells whether the task went through setPeriod() or
-        // waitForInterrupt() and can therefore be scheduled.
         bool isConfigured() const {
             return mState != eState::unconfigured;
         }
@@ -100,11 +87,20 @@ namespace ucosm {
             return mInterruptID;
         }
 
-        // The deadline this task was due at when the scheduler pulled it off
-        // the timer list, captured before its rank gets overwritten for
-        // run-list ordering. Used as the anchor for the next period so that
-        // dispatch latency doesn't get folded into it - see
-        // TaskletScheduler::pushReadyTimerTasks / run().
+        ~ITasklet() = default;
+
+    protected:
+
+        // Demoted from ITask's public removeTask() : use
+        // TaskletScheduler::removeTask() from outside, or this->removeTask()
+        // from within run().
+        using ITask<priority_t>::removeTask;
+
+    private:
+
+        template<interrupt_id_t>
+        friend struct TaskletScheduler;
+
         void setScheduledDeadline(tick_t inDeadline) {
             mScheduledDeadline = inDeadline;
         }
@@ -112,10 +108,6 @@ namespace ucosm {
         tick_t getScheduledDeadline() const {
             return mScheduledDeadline;
         }
-
-        ~ITasklet() = default;
-
-    private:
 
         enum class eState : uint8_t {
             unconfigured,

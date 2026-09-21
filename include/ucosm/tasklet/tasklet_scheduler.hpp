@@ -46,32 +46,30 @@ namespace ucosm {
         // when no task is sleeping (the timer should be stopped); otherwise
         // inDeadline is the absolute tick at which it is next due - use
         // getDeadlineDelay(now(), inDeadline) to turn it into a duration.
+        //
+        // One of this and poll() is required : between them they are the only
+        // things that make a sleeping task run. A platform on a one-shot timer
+        // implements this; a platform on a periodic tick calls poll() from its
+        // tick interrupt and leaves this null.
         using schedule_next_wakeup_t = void(*)(bool inHasDeadline, tick_t inDeadline);
 
         // Reads the platform's clock, in the same unit as the task periods.
-        //
-        // Leaving it null keeps the software clock, which only moves when
-        // tick() is called : the scheduler's idea of the current time is then
-        // as old as the last call, and a task armed in between is armed
-        // relative to that older moment - it becomes due early by however far
-        // behind the clock was. A periodic tick bounds that error by its own
-        // period, which is what makes it acceptable there.
-        //
-        // Reading the time from the platform instead removes the error rather
-        // than bounding it, at the cost of a call wherever the scheduler needs
-        // the time, several times per run() pass. It suits a platform waking
-        // the scheduler on its deadlines, where there is no period to bound
-        // anything with : scheduleNextWakeup is then required, being the only
-        // thing left to make a sleeping task run, and tick() must not be
-        // called anymore.
-        using read_tick_t = tick_t(*)();
+        // Required : the scheduler keeps no clock of its own, and calls this
+        // wherever it needs the time - several times per run() pass, so it
+        // should be cheap. A free running counter read is the intended shape;
+        // a counter incremented by a periodic tick interrupt does just as
+        // well, and is what a platform driving the scheduler through poll()
+        // would return.
+        using get_tick_t = tick_t(*)();
+
+        // listed first because it is the only one that must be provided
+        get_tick_t getTick = nullptr;
 
         request_tasklet_execution_t requestTaskletExecution = nullptr;
         handler_installer_t installHandler = nullptr;
         execution_hook_t suspendExecution = nullptr;
         execution_hook_t resumeExecution = nullptr;
         schedule_next_wakeup_t scheduleNextWakeup = nullptr;
-        read_tick_t readTick = nullptr;
 
     };
 
@@ -138,14 +136,22 @@ namespace ucosm {
         // through here instead.
         void removeTask(ITasklet& inTask);
 
-        // called from a periodic tick (ISR or thread) to refresh current time
-        // and wake sleeping tasks when their deadline expires.
-        // Does nothing when the backend reads the clock itself, the software
-        // clock it advances then being unused : the platform wakes the
-        // scheduler through scheduleNextWakeup instead.
-        void tick(tick_t inc = 1);
+        // A scheduler is itself a task, so it may be nested in another one and
+        // unscheduled from it. Re-exposed because the overload above would
+        // otherwise hide it.
+        using ITask<uint8_t>::removeTask;
 
-        // current time, from the backend's clock when it provides one
+        // Tells the scheduler that time may have moved on, and wakes it if a
+        // deadline has come round. Called from a periodic tick (ISR or
+        // thread), which is also expected to be what moves the clock that
+        // backend getTick reads : this only looks at that clock, it does not
+        // advance anything.
+        //
+        // A platform on a one-shot timer implements backend scheduleNextWakeup
+        // instead and never calls this. One of the two is required.
+        void poll();
+
+        // current time, read from the backend's clock
         tick_t now() const;
 
         // return next timer deadline (tick) if any. Returns true and writes
@@ -217,7 +223,6 @@ namespace ucosm {
         Bitset<interrupt_count> mHasISRTaskID;
         std::atomic<bool> mHasTimerTask { false };
         std::atomic<tick_t> mNextTimer { 0 };
-        std::atomic<tick_t> mNow { 0 };
         std::atomic<tick_t> mCursorRank { 0 };
 
         // Last (hasDeadline, deadline) reported to mBackend.scheduleNextWakeup.
@@ -337,30 +342,17 @@ namespace ucosm {
 
     // called from ISR
     template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::tick(tick_t inc) {
+    void TaskletScheduler<interrupt_count>::poll() {
 
-        if (mBackend.readTick) {
-            // The backend reads the clock, so there is no software clock to
-            // advance and nothing here to compare against : the platform is
-            // the one deciding when to wake the scheduler, from the deadline
-            // it was given.
-            return;
-        }
-
-        // Atomically increment the current time by `inc` and use the
-        // resulting value for deadline comparisons
-        const tick_t newNow = mNow.fetch_add(inc, std::memory_order_acq_rel) + inc;
-
-        const bool timerArmed = mHasTimerTask.load(std::memory_order_acquire);
-
-        if (!timerArmed) {
+        if (!mHasTimerTask.load(std::memory_order_acquire)) {
+            // nothing sleeping, so no deadline to come round
             return;
         }
 
         const auto next = mNextTimer.load(std::memory_order_acquire);
         const auto cursor = mCursorRank.load(std::memory_order_acquire);
 
-        if (isDeadlineDue(cursor, next, newNow)) {
+        if (isDeadlineDue(cursor, next, now())) {
             requestExecution();
         }
 
@@ -369,10 +361,7 @@ namespace ucosm {
     // called from ISR, foregreound and background (anywhere)
     template<interrupt_id_t interrupt_count>
     tick_t TaskletScheduler<interrupt_count>::now() const {
-        if (mBackend.readTick) {
-            return mBackend.readTick();
-        }
-        return mNow.load(std::memory_order_acquire);
+        return mBackend.getTick();
     }
 
     // called from ISR, background, foreground (anywhere)
@@ -480,12 +469,19 @@ namespace ucosm {
             pushReadyInterruptTasks(runList);
             pushReadyTimerTasks(runList);
 
+            // Anchor for a task that switches from waitingForInterrupt to
+            // sleeping inside run() below : it was never due at a deadline,
+            // so its first period counts from the moment it became ready
+            // instead, the same way a timer task's counts from the deadline
+            // it was due at - see pushReadyTimerTasks().
+            const auto readyTick = now();
+
             // execute the run list's tasks
             while (!runList.empty()) {
 
                 auto& t = static_cast<ITasklet&>(runList.front());
 
-                const auto current = now();
+                const bool wasSleeping = t.isSleeping();
 
                 t.run();
 
@@ -500,35 +496,30 @@ namespace ucosm {
                 const auto itID = t.getInterruptID();
 
                 if (t.isSleeping()) {
-                    // push into timer list. The next deadline is anchored on
-                    // the deadline this execution was scheduled for (captured
-                    // by pushReadyTimerTasks before it got overwritten for
-                    // run-list ordering), not on dispatch time : anchoring on
-                    // dispatch time would fold each pass's dispatch latency
-                    // into the period itself, making every period longer by
-                    // that latency instead of just its wake-up being late by
-                    // it. A null period is pushed to the next tick :
-                    // re-arming the task on the tick it just ran at would
-                    // make it due again in this very pass, and the handler
-                    // would never return.
-                    const auto period = (t.getPeriod() > 0) ? t.getPeriod() : 1;
+
+                    if (!wasSleeping) {
+                        // Just configured itself with setPeriod() from a
+                        // waitingForInterrupt state : it has no due-deadline
+                        // to anchor on, unlike a task that was already
+                        // sleeping and keeps whatever pushReadyTimerTasks
+                        // stamped it with.
+                        t.setScheduledDeadline(readyTick);
+                    }
+
+                    const auto period = t.getPeriod();
 
                     auto deadline = makeDeadline(t.getScheduledDeadline(), period);
 
-                    // A task whose callable takes longer than its own period
-                    // comes back out of run() already overdue, and re-arming
-                    // it in the past would make it due again in this very
-                    // pass - the handler would keep running it and never
-                    // return. Counting the period from the moment it finished
-                    // instead drops the deadlines it could not have met, the
-                    // same way a late wake-up shifts rather than catches up.
-                    // This can only happen when the backend reads the clock :
-                    // the software clock does not move while a task runs, so
-                    // `after` and `current` are equal there and the deadline
-                    // is kept untouched.
+                    // If the task took longer to run than its own period,
+                    // the computed deadline already lies in the past. Left
+                    // as is, it would sort to the far end of the timer list
+                    // and never come due again, or make a backend fire its
+                    // one-shot wake-up immediately, over and over. Detecting
+                    // that case below and re-arming from now instead keeps
+                    // the scheduler running.
                     const auto after = now();
 
-                    if (isDeadlineDue(current, deadline, after)) {
+                    if (isDeadlinePassed(after, deadline)) {
                         deadline = makeDeadline(after, period);
                     }
 
@@ -555,8 +546,8 @@ namespace ucosm {
                 isDeadlineDue(
                     mCursorRank.load(std::memory_order_acquire),
                     mNextTimer.load(std::memory_order_acquire),
-                    // through now(), so that a backend reading the clock
-                    // itself sees the time the tasks just spent running
+                    // re-read, so that the time the tasks just spent running
+                    // counts towards the next deadline being due
                     now()
                 );
 
