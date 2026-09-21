@@ -239,6 +239,40 @@ TEST_CASE("TaskletScheduler - backend clock : a period is re-armed from the cloc
     CHECK(g_wakeupDeadline == tick_t(200));
 }
 
+TEST_CASE("TaskletScheduler - backend clock : dispatch latency does not shift the period") {
+
+    // On real hardware the handler never sees now() land exactly on the
+    // deadline : ISR/PendSV latency and list-walk overhead mean a few ticks
+    // have already elapsed by the time run() reads the clock. The next
+    // deadline must stay anchored on the original schedule (multiples of the
+    // period) rather than drifting later by that same latency every pass.
+
+    resetHarness();
+    TaskletScheduler<1> sched(clock_backend);
+
+    CountTask task;
+    task.setPeriod(200);
+    REQUIRE(sched.addTask(task));
+    CHECK(g_wakeupDeadline == tick_t(200));
+
+    constexpr tick_t dispatch_latency = 4;
+
+    // dispatched 4 ticks after its 200 deadline
+    advanceClock(200 + dispatch_latency);
+    CHECK(task.mCount == 1);
+    CHECK(g_wakeupDeadline == tick_t(400));
+
+    // dispatched 4 ticks after its 400 deadline
+    advanceClock(200);
+    CHECK(task.mCount == 2);
+    CHECK(g_wakeupDeadline == tick_t(600));
+
+    // dispatched 4 ticks after its 600 deadline
+    advanceClock(200);
+    CHECK(task.mCount == 3);
+    CHECK(g_wakeupDeadline == tick_t(800));
+}
+
 TEST_CASE("TaskletScheduler - backend clock : the deadline is the earliest of the tasks") {
 
     resetHarness();

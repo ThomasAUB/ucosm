@@ -452,6 +452,10 @@ namespace ucosm {
             // not reconfigure itself in run() is re-armed with the same sleep
             // duration, which makes its sleep act as a period.
             auto& pendTask = static_cast<ITasklet&>(node);
+            // Captured before the rank gets overwritten for run-list
+            // ordering below : run() anchors the next deadline on this
+            // value rather than on dispatch time, see run().
+            pendTask.setScheduledDeadline(node.getRank());
             pendTask.setRank(pendTask.getPriority());
             insertSort(ioList, pendTask);
 
@@ -496,16 +500,20 @@ namespace ucosm {
                 const auto itID = t.getInterruptID();
 
                 if (t.isSleeping()) {
-                    // push into timer list. `current` is the tick sampled
-                    // before the task ran, so a late wake-up shifts the next
-                    // deadline instead of trying to catch up on missed ones.
-                    // A null period is pushed to the next tick : re-arming
-                    // the task on the tick it just ran at would make it due
-                    // again in this very pass, and the handler would never
-                    // return.
+                    // push into timer list. The next deadline is anchored on
+                    // the deadline this execution was scheduled for (captured
+                    // by pushReadyTimerTasks before it got overwritten for
+                    // run-list ordering), not on dispatch time : anchoring on
+                    // dispatch time would fold each pass's dispatch latency
+                    // into the period itself, making every period longer by
+                    // that latency instead of just its wake-up being late by
+                    // it. A null period is pushed to the next tick :
+                    // re-arming the task on the tick it just ran at would
+                    // make it due again in this very pass, and the handler
+                    // would never return.
                     const auto period = (t.getPeriod() > 0) ? t.getPeriod() : 1;
 
-                    auto deadline = makeDeadline(current, period);
+                    auto deadline = makeDeadline(t.getScheduledDeadline(), period);
 
                     // A task whose callable takes longer than its own period
                     // comes back out of run() already overdue, and re-arming

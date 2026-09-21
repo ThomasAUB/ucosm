@@ -100,6 +100,19 @@ namespace ucosm {
             return mInterruptID;
         }
 
+        // The deadline this task was due at when the scheduler pulled it off
+        // the timer list, captured before its rank gets overwritten for
+        // run-list ordering. Used as the anchor for the next period so that
+        // dispatch latency doesn't get folded into it - see
+        // TaskletScheduler::pushReadyTimerTasks / run().
+        void setScheduledDeadline(tick_t inDeadline) {
+            mScheduledDeadline = inDeadline;
+        }
+
+        tick_t getScheduledDeadline() const {
+            return mScheduledDeadline;
+        }
+
         ~ITasklet() = default;
 
     private:
@@ -114,6 +127,7 @@ namespace ucosm {
 
         priority_t mPriority = static_cast<priority_t>(-1);
         tick_t mPeriod = 0;
+        tick_t mScheduledDeadline = 0;
         interrupt_id_t mInterruptID = invalid_interrupt_id;
         eState mState = eState::unconfigured;
     };

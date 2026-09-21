@@ -517,15 +517,20 @@ TEST_CASE("TaskletScheduler - the period is kept across runs") {
         CHECK(nextDeadline == 30);
     }
 
-    // A late wake-up shifts the next deadline : the period is counted from the
-    // tick the task was dispatched at (35), not from the missed deadline (30).
+    // A late wake-up (dispatched at 35 for a deadline due at 30) does not
+    // shift the period : the next deadline stays on the original grid (40),
+    // counted from the deadline that was due rather than from the moment the
+    // task happened to be dispatched. Only a task that comes back out of
+    // run() already overdue against that next deadline falls back to being
+    // counted from there, so a genuinely stale wake-up still doesn't trap the
+    // handler catching up.
     sched.tick(15);
     REQUIRE(waitForExecutions(m, cv, executed, 3));
 
     {
         SchedulerBarrier barrier;
         REQUIRE(sched.tryGetNextDeadline(nextDeadline));
-        CHECK(nextDeadline == 45);
+        CHECK(nextDeadline == 40);
     }
 
     CHECK(executed[0] == 1);
