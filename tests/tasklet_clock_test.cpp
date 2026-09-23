@@ -59,7 +59,7 @@ namespace {
 
     // A platform sleeping between deadlines : it is handed each one through
     // scheduleNextWakeup and arms a one-shot on it.
-    const TaskletBackend oneshot_backend {
+    constexpr TaskletBackend oneshot_backend {
         getTick,
         requestExecution,
         installHandler,
@@ -70,7 +70,7 @@ namespace {
 
     // The same platform on a periodic tick : its tick interrupt moves the
     // clock and calls poll(), so it needs no wake-up to be scheduled for it.
-    const TaskletBackend periodic_backend {
+    constexpr TaskletBackend periodic_backend {
         getTick,
         requestExecution,
         installHandler,
@@ -138,8 +138,8 @@ namespace {
     // What a periodic tick interrupt does : move the clock, then let the
     // scheduler look at it. Without the poll() nothing would happen - the
     // scheduler is never told the time on its own.
-    template<interrupt_id_t interrupt_count>
-    void tickInterrupt(TaskletScheduler<interrupt_count>& inScheduler, tick_t inDelta) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void tickInterrupt(TaskletScheduler<interrupt_count, backend>& inScheduler, tick_t inDelta) {
         g_now += inDelta;
         inScheduler.poll();
         pumpPending();
@@ -163,7 +163,7 @@ namespace {
 TEST_CASE("TaskletScheduler - one-shot timer : a task armed after an idle stretch is not due early") {
 
     resetHarness();
-    TaskletScheduler<1> sched(oneshot_backend);
+    TaskletScheduler<1, oneshot_backend> sched;
 
     // Time passes with nothing scheduled, so nothing wakes the scheduler at
     // all. Reading the clock rather than counting elapsed ticks is what makes
@@ -192,7 +192,7 @@ TEST_CASE("TaskletScheduler - periodic tick : the same clock, looked at by poll(
     // clock is read the same way, so the deadline is the same absolute value.
 
     resetHarness();
-    TaskletScheduler<1> sched(periodic_backend);
+    TaskletScheduler<1, periodic_backend> sched;
 
     g_now = 5'000;
 
@@ -221,7 +221,7 @@ TEST_CASE("TaskletScheduler - periodic tick : moving the clock without poll() do
     // the task waiting, however far past the deadline it goes.
 
     resetHarness();
-    TaskletScheduler<1> sched(periodic_backend);
+    TaskletScheduler<1, periodic_backend> sched;
 
     CountTask task;
     task.setPeriod(50);
@@ -240,7 +240,7 @@ TEST_CASE("TaskletScheduler - periodic tick : moving the clock without poll() do
 TEST_CASE("TaskletScheduler - one-shot timer : a period is re-armed from the clock") {
 
     resetHarness();
-    TaskletScheduler<1> sched(oneshot_backend);
+    TaskletScheduler<1, oneshot_backend> sched;
 
     CountTask task;
     task.setPeriod(50);
@@ -269,7 +269,7 @@ TEST_CASE("TaskletScheduler - one-shot timer : dispatch latency does not shift t
     // period) rather than drifting later by that same latency every pass.
 
     resetHarness();
-    TaskletScheduler<1> sched(oneshot_backend);
+    TaskletScheduler<1, oneshot_backend> sched;
 
     CountTask task;
     task.setPeriod(200);
@@ -297,7 +297,7 @@ TEST_CASE("TaskletScheduler - one-shot timer : dispatch latency does not shift t
 TEST_CASE("TaskletScheduler - one-shot timer : the deadline is the earliest of the tasks") {
 
     resetHarness();
-    TaskletScheduler<1> sched(oneshot_backend);
+    TaskletScheduler<1, oneshot_backend> sched;
 
     g_now = 1'000;
 
@@ -332,7 +332,7 @@ TEST_CASE("TaskletScheduler - one-shot timer : the deadline is the earliest of t
 TEST_CASE("TaskletScheduler - one-shot timer : a task slower than its period does not trap run()") {
 
     resetHarness();
-    TaskletScheduler<1> sched(oneshot_backend);
+    TaskletScheduler<1, oneshot_backend> sched;
 
     // A task whose callable takes longer than its own period. Counted from the
     // moment the batch started, its next deadline is already behind the clock
@@ -370,7 +370,7 @@ TEST_CASE("TaskletScheduler - one-shot timer : a task slower than its period doe
 TEST_CASE("TaskletScheduler - one-shot timer : a task faster than its period keeps an exact period") {
 
     resetHarness();
-    TaskletScheduler<1> sched(oneshot_backend);
+    TaskletScheduler<1, oneshot_backend> sched;
 
     // The counterpart of the test above : as long as the callable fits in the
     // period, the deadline stays counted from the previous one, so the time
@@ -399,7 +399,7 @@ TEST_CASE("TaskletScheduler - one-shot timer : a task faster than its period kee
 TEST_CASE("TaskletScheduler - one-shot timer : an interrupt task runs without any deadline") {
 
     resetHarness();
-    TaskletScheduler<2> sched(oneshot_backend);
+    TaskletScheduler<2, oneshot_backend> sched;
 
     CountTask task;
     task.waitForInterrupt(1);
@@ -431,7 +431,7 @@ TEST_CASE("TaskletScheduler - one-shot timer : a task armed across the tick wrap
     // place the scheduler never looks for the next task to run.
 
     resetHarness();
-    TaskletScheduler<1> sched(oneshot_backend);
+    TaskletScheduler<1, oneshot_backend> sched;
 
     g_now = 0xFFFF'FF00;
 
@@ -466,7 +466,7 @@ TEST_CASE("TaskletScheduler - one-shot timer : a task armed across the tick wrap
 TEST_CASE("TaskletScheduler - one-shot timer : removeTask drops the deadline it was armed on") {
 
     resetHarness();
-    TaskletScheduler<1> sched(oneshot_backend);
+    TaskletScheduler<1, oneshot_backend> sched;
 
     CountTask task;
     task.setPeriod(500);
@@ -495,7 +495,7 @@ TEST_CASE("TaskletScheduler - one-shot timer : a wake-up later than a full perio
     // one-shot that fires the moment it is armed, for ever.
 
     resetHarness();
-    TaskletScheduler<1> sched(oneshot_backend);
+    TaskletScheduler<1, oneshot_backend> sched;
 
     CountTask task;
     task.setPeriod(50);
@@ -524,7 +524,7 @@ TEST_CASE("TaskletScheduler - periodic tick : a tick jump larger than a period d
     // makes the task arrive more than a period late.
 
     resetHarness();
-    TaskletScheduler<1> sched(periodic_backend);
+    TaskletScheduler<1, periodic_backend> sched;
 
     CountTask task;
     task.setPeriod(10);
@@ -554,7 +554,7 @@ TEST_CASE("TaskletScheduler - an interrupt task that gives itself a period is ar
     // stranded.
 
     resetHarness();
-    TaskletScheduler<2> sched(periodic_backend);
+    TaskletScheduler<2, periodic_backend> sched;
 
     struct SwitchTask : ITasklet {
         void run() override {
@@ -596,7 +596,7 @@ TEST_CASE("TaskletScheduler - a nested scheduler can still be unscheduled") {
     // no-argument removeTask() it inherits.
 
     resetHarness();
-    TaskletScheduler<1> sched(periodic_backend);
+    TaskletScheduler<1, periodic_backend> sched;
 
     sched.removeTask();
     CHECK_FALSE(sched.isLinked());

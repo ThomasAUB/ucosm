@@ -31,8 +31,24 @@
 #include "itasklet.hpp"
 #include "ucosm/core/deadline.hpp"
 #include "ucosm/core/ischeduler.hpp"
+#include <type_traits>
 
 namespace ucosm {
+
+    namespace detail {
+
+        // True when the backend hook P is provided. Written as a comparison
+        // of template arguments rather than P != nullptr because GCC does not
+        // treat the address of an inline function as non-null in a constant
+        // expression under -fno-delete-null-pointer-checks, which
+        // -fsanitize=null (part of -fsanitize=undefined) turns on.
+        template<auto P>
+        inline constexpr bool is_hook_set_v = !std::is_same_v<
+            std::integral_constant<decltype(P), P>,
+            std::integral_constant<decltype(P), nullptr>
+        >;
+
+    }
 
     struct TaskletBackend final {
 
@@ -81,14 +97,23 @@ namespace ucosm {
 
     /**
      * @brief Pend task scheduler.
+     *
+     * The backend is a template parameter so that its hooks are resolved at
+     * compile time : a null hook costs nothing, and a provided one is called
+     * directly rather than through a pointer stored in the scheduler. It must
+     * be a constexpr TaskletBackend with static storage duration, e.g.
+     *
+     *     inline constexpr ucosm::TaskletBackend backend { getTick, ... };
+     *     ucosm::TaskletScheduler<2, backend> sched;
      */
-    template<interrupt_id_t interrupt_count>
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
     struct TaskletScheduler : IScheduler<ITasklet, ITask<uint8_t>> {
 
-        TaskletScheduler(const TaskletBackend& inBackend) :
-            mBackend(inBackend) {
-            if (mBackend.installHandler) {
-                mBackend.installHandler(
+        static_assert(detail::is_hook_set_v<backend.getTick>, "TaskletBackend::getTick is required");
+
+        TaskletScheduler() {
+            if constexpr (detail::is_hook_set_v<backend.installHandler>) {
+                backend.installHandler(
                     +[] (void* ctx) {
                         if (ctx) {
                             static_cast<TaskletScheduler*>(ctx)->run();
@@ -101,8 +126,8 @@ namespace ucosm {
 
         ~TaskletScheduler() {
             // uninstall handler by passing nulls
-            if (mBackend.installHandler) {
-                mBackend.installHandler(nullptr, nullptr);
+            if constexpr (detail::is_hook_set_v<backend.installHandler>) {
+                backend.installHandler(nullptr, nullptr);
             }
         }
 
@@ -208,20 +233,17 @@ namespace ucosm {
         void requestExecution() const;
 
         struct ExecutionLock final {
-            explicit ExecutionLock(TaskletScheduler& inScheduler) :
-                mScheduler(inScheduler) {
-                if (mScheduler.mBackend.suspendExecution) {
-                    mScheduler.mBackend.suspendExecution();
+            ExecutionLock() {
+                if constexpr (detail::is_hook_set_v<backend.suspendExecution>) {
+                    backend.suspendExecution();
                 }
             }
 
             ~ExecutionLock() {
-                if (mScheduler.mBackend.resumeExecution) {
-                    mScheduler.mBackend.resumeExecution();
+                if constexpr (detail::is_hook_set_v<backend.resumeExecution>) {
+                    backend.resumeExecution();
                 }
             }
-
-            TaskletScheduler& mScheduler;
         };
 
         ulink::List<ITask<priority_t>>& mTimerList { base_t::mTasks };
@@ -232,21 +254,19 @@ namespace ucosm {
         uatom::Atomic<tick_t> mNextTimer { 0 };
         uatom::Atomic<tick_t> mCursorRank { 0 };
 
-        // Last (hasDeadline, deadline) reported to mBackend.scheduleNextWakeup.
+        // Last (hasDeadline, deadline) reported to backend.scheduleNextWakeup.
         // Only ever touched from updateNextTimerLocked(), which always runs
         // under an ExecutionLock, so these don't need to be atomic.
         bool mNotifiedHasTimer = false;
         tick_t mNotifiedDeadline = 0;
-
-        const TaskletBackend mBackend;
     };
 
 
     // called from background and foreground tasks
-    template<interrupt_id_t interrupt_count>
-    bool TaskletScheduler<interrupt_count>::addTask(ITasklet& inTask) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    bool TaskletScheduler<interrupt_count, backend>::addTask(ITasklet& inTask) {
 
-        ExecutionLock guard(*this);
+        ExecutionLock guard;
 
         if (inTask.isSleeping()) {
             armTimerLocked(inTask, inTask.getPeriod());
@@ -272,10 +292,10 @@ namespace ucosm {
     }
 
     // called from background and foreground tasks
-    template<interrupt_id_t interrupt_count>
-    bool TaskletScheduler<interrupt_count>::addTask(ITasklet& inTask, tick_t inDelay) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    bool TaskletScheduler<interrupt_count, backend>::addTask(ITasklet& inTask, tick_t inDelay) {
 
-        ExecutionLock guard(*this);
+        ExecutionLock guard;
 
         if (!inTask.isSleeping()) {
             return false;
@@ -287,10 +307,10 @@ namespace ucosm {
     }
 
     // called from background and foreground tasks
-    template<interrupt_id_t interrupt_count>
-    bool TaskletScheduler<interrupt_count>::setDelay(ITasklet& inTask, tick_t inDelay) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    bool TaskletScheduler<interrupt_count, backend>::setDelay(ITasklet& inTask, tick_t inDelay) {
 
-        ExecutionLock guard(*this);
+        ExecutionLock guard;
 
         if (!inTask.isLinked() || !inTask.isSleeping()) {
             // nothing to re-sort : the task isn't scheduled on the timer
@@ -303,8 +323,8 @@ namespace ucosm {
     }
 
     // called from background and foreground tasks
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::insertTimerLocked(itask_t& inTask) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::insertTimerLocked(itask_t& inTask) {
 
         const auto cursor = this->mCursorTask.getRank();
         const auto delay = getDeadlineDelay(cursor, inTask.getRank());
@@ -360,18 +380,18 @@ namespace ucosm {
     }
 
     // called from background and foreground tasks
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::armTimerLocked(ITasklet& inTask, tick_t inDelay) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::armTimerLocked(ITasklet& inTask, tick_t inDelay) {
         inTask.setRank(makeDeadline(now(), inDelay));
         insertTimerLocked(inTask);
         updateNextTimerLocked();
     }
 
     // called from background and foreground tasks
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::removeTask(ITasklet& inTask) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::removeTask(ITasklet& inTask) {
 
-        ExecutionLock guard(*this);
+        ExecutionLock guard;
 
         inTask.ITasklet::removeTask();
 
@@ -382,8 +402,8 @@ namespace ucosm {
     }
 
     // called from ISR
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::poll() {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::poll() {
 
         if (!mHasTimerTask.load(std::memory_order_acquire)) {
             // nothing sleeping, so no deadline to come round
@@ -402,14 +422,14 @@ namespace ucosm {
     }
 
     // called from ISR, foregreound and background (anywhere)
-    template<interrupt_id_t interrupt_count>
-    tick_t TaskletScheduler<interrupt_count>::now() const {
-        return mBackend.getTick();
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    tick_t TaskletScheduler<interrupt_count, backend>::now() const {
+        return backend.getTick();
     }
 
     // called from ISR, background, foreground (anywhere)
-    template<interrupt_id_t interrupt_count>
-    bool TaskletScheduler<interrupt_count>::tryGetNextDeadline(tick_t& out) const {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    bool TaskletScheduler<interrupt_count, backend>::tryGetNextDeadline(tick_t& out) const {
         if (!mHasTimerTask.load(std::memory_order_acquire)) {
             return false;
         }
@@ -418,8 +438,8 @@ namespace ucosm {
     }
 
     // called from ISR, background, foreground (anywhere)
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::signalInterrupt(interrupt_id_t inInterruptID) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::signalInterrupt(interrupt_id_t inInterruptID) {
 
         if ((inInterruptID >= interrupt_count) || !mHasISRTaskID.get(inInterruptID)) {
             return;
@@ -432,8 +452,8 @@ namespace ucosm {
     }
 
     // called from foreground
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::pushReadyInterruptTasks(task_list_t& ioList) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::pushReadyInterruptTasks(task_list_t& ioList) {
         // pull pending interrupts into run list
         Bitset<interrupt_count> interruptStateCopy;
         mPendingISR.fetchAndClear(interruptStateCopy);
@@ -453,8 +473,8 @@ namespace ucosm {
     }
 
     // called from foreground
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::pushReadyTimerTasks(task_list_t& ioList, tick_t inNow) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::pushReadyTimerTasks(task_list_t& ioList, tick_t inNow) {
         // pull expired timers into run list
 
         auto* task = this->getNextTask();
@@ -500,10 +520,10 @@ namespace ucosm {
     }
 
     // called from foreground
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::run() {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::run() {
 
-        ExecutionLock guard(*this);
+        ExecutionLock guard;
 
         task_list_t runList;
 
@@ -608,8 +628,8 @@ namespace ucosm {
     }
 
     // called from background and foreground tasks
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::insertSort(task_list_t& inList, itask_t& inTask) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::insertSort(task_list_t& inList, itask_t& inTask) {
 
         const auto rank = inTask.getRank();
 
@@ -636,8 +656,8 @@ namespace ucosm {
     }
 
     // called from foreground task
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::mergeSortedLists(task_list_t& ioList, task_list_t& inList) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::mergeSortedLists(task_list_t& ioList, task_list_t& inList) {
 
         if (inList.empty()) {
             return;
@@ -683,8 +703,8 @@ namespace ucosm {
     }
 
     // called from background and foreground
-    template<interrupt_id_t interrupt_count>
-    bool TaskletScheduler<interrupt_count>::updateNextTimerLocked(tick_t& outDeadline) {
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    bool TaskletScheduler<interrupt_count, backend>::updateNextTimerLocked(tick_t& outDeadline) {
 
         bool hasTimer;
         tick_t deadline = 0;
@@ -700,22 +720,23 @@ namespace ucosm {
             hasTimer = false;
         }
 
-        if (mBackend.scheduleNextWakeup &&
-            (hasTimer != mNotifiedHasTimer ||
-                (hasTimer && deadline != mNotifiedDeadline))) {
-            mNotifiedHasTimer = hasTimer;
-            mNotifiedDeadline = deadline;
-            mBackend.scheduleNextWakeup(hasTimer, deadline);
+        if constexpr (detail::is_hook_set_v<backend.scheduleNextWakeup>) {
+            if (hasTimer != mNotifiedHasTimer ||
+                (hasTimer && deadline != mNotifiedDeadline)) {
+                mNotifiedHasTimer = hasTimer;
+                mNotifiedDeadline = deadline;
+                backend.scheduleNextWakeup(hasTimer, deadline);
+            }
         }
 
         outDeadline = deadline;
         return hasTimer;
     }
 
-    template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::requestExecution() const {
-        if (mBackend.requestTaskletExecution) {
-            mBackend.requestTaskletExecution();
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
+    void TaskletScheduler<interrupt_count, backend>::requestExecution() const {
+        if constexpr (detail::is_hook_set_v<backend.requestTaskletExecution>) {
+            backend.requestTaskletExecution();
         }
     }
 
@@ -818,9 +839,9 @@ namespace ucosm {
         void reset(uint8_t) {}
         bool get(uint8_t) const { return false; }
         bool any() const { return false; }
-        void fetchAndClear(Bitset& dest) {}
+        void fetchAndClear(Bitset&) {}
         template<typename F>
-        void forEach(F&& f) const {}
+        void forEach(F&&) const {}
     };
 
 }

@@ -36,7 +36,9 @@ namespace ucosm {
     using priority_t = tick_t;
     using interrupt_id_t = uint8_t;
 
-    template<interrupt_id_t interrupt_count>
+    struct TaskletBackend;
+
+    template<interrupt_id_t interrupt_count, const TaskletBackend& backend>
     struct TaskletScheduler;
 
     struct ITasklet : ITask<priority_t> {
@@ -98,7 +100,7 @@ namespace ucosm {
 
     private:
 
-        template<interrupt_id_t>
+        template<interrupt_id_t, const TaskletBackend&>
         friend struct TaskletScheduler;
 
         void setScheduledDeadline(tick_t inDeadline) {

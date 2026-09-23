@@ -36,8 +36,8 @@ struct SchedulerBarrier final {
 // let the scheduler pend its handler if a deadline has come round. The two
 // are separate because the scheduler keeps no clock of its own - it reads the
 // one the backend gives it, and poll() only makes it look.
-template<ucosm::interrupt_id_t interrupt_count>
-void tick(ucosm::TaskletScheduler<interrupt_count>& inScheduler, ucosm::tick_t inInc = 1) {
+template<ucosm::interrupt_id_t interrupt_count, const ucosm::TaskletBackend& backend>
+void tick(ucosm::TaskletScheduler<interrupt_count, backend>& inScheduler, ucosm::tick_t inInc = 1) {
     advance_tick(inInc);
     inScheduler.poll();
 }
@@ -56,7 +56,7 @@ TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -124,7 +124,7 @@ TEST_CASE("TaskletScheduler - concurrent signalInterrupt calls") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<4> sched(tasklet_backend);
+    ucosm::TaskletScheduler<4, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -193,7 +193,7 @@ TEST_CASE("TaskletScheduler - combined sleep and ISR ordering") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<4> sched(tasklet_backend);
+    ucosm::TaskletScheduler<4, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -254,7 +254,7 @@ TEST_CASE("TaskletScheduler - interrupt ordering") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<4> sched(tasklet_backend);
+    ucosm::TaskletScheduler<4, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -318,7 +318,7 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -388,7 +388,7 @@ TEST_CASE("TaskletScheduler - unconfigured task is rejected") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     struct NeverConfiguredTask : ucosm::ITasklet {
         void run() override {}
@@ -408,7 +408,7 @@ TEST_CASE("TaskletScheduler - timer wake ordering") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -490,7 +490,7 @@ TEST_CASE("TaskletScheduler - the period is kept across runs") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -580,7 +580,7 @@ TEST_CASE("TaskletScheduler - a task disposing of itself is dropped") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -641,7 +641,7 @@ TEST_CASE("TaskletScheduler - interrupt subscription is kept across runs") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -693,7 +693,7 @@ TEST_CASE("TaskletScheduler - delay applies once, then the period takes over") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -751,7 +751,7 @@ TEST_CASE("TaskletScheduler - a task can delay its next execution from run()") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
@@ -762,7 +762,7 @@ TEST_CASE("TaskletScheduler - a task can delay its next execution from run()") {
     struct SelfDelayingTask : ucosm::ITasklet {
         SelfDelayingTask(
             int id,
-            ucosm::TaskletScheduler<2>* sched,
+            ucosm::TaskletScheduler<2, tasklet_backend>* sched,
             std::vector<int>* out,
             std::mutex* m,
             std::condition_variable* cv
@@ -784,7 +784,7 @@ TEST_CASE("TaskletScheduler - a task can delay its next execution from run()") {
         }
         int mID;
         bool mDelayed = false;
-        ucosm::TaskletScheduler<2>* mSched;
+        ucosm::TaskletScheduler<2, tasklet_backend>* mSched;
         std::vector<int>* mOut;
         std::mutex* mM;
         std::condition_variable* mCV;
@@ -824,7 +824,7 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler<2, tasklet_backend> sched;
 
     std::vector<int> executed;
     std::mutex m;
