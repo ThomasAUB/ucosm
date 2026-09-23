@@ -19,7 +19,7 @@ if(GIT_SUBMODULE)
     endif()
 endif()
 
-if(NOT EXISTS "${PROJECT_SOURCE_DIR}/ulink/CMakeLists.txt")
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/ulink/CMakeLists.txt" OR NOT EXISTS "${PROJECT_SOURCE_DIR}/uatom/CMakeLists.txt")
     message(FATAL_ERROR "The submodules were not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
 endif()
 
@@ -32,6 +32,13 @@ target_include_directories(ucosm_impl INTERFACE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/ulink/include
 )
+
+# a parent project may already provide the uatom target
+if(NOT TARGET uatom)
+    add_subdirectory(uatom)
+endif()
+
+target_link_libraries(ucosm_impl INTERFACE uatom)
 
 # Set C++17 standard for the library
 target_compile_features(ucosm_impl INTERFACE cxx_std_17)

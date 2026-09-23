@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -136,7 +137,33 @@ inline void request_low_priority_execution() {
     detail::g_worker_cv.notify_one();
 }
 
+namespace detail {
+    // The platform's clock. On target this is a counter a periodic tick
+    // interrupt increments, or a free running timer's count register; here the
+    // test moves it by hand. Atomic because the scheduler reads it from the
+    // worker thread while the test writes it.
+    inline std::atomic<ucosm::tick_t> g_tick { 0 };
+}
+
+inline ucosm::tick_t get_tick() {
+    return detail::g_tick.load(std::memory_order_acquire);
+}
+
+// Moves the platform's clock. The scheduler is not told anything by this :
+// it is poll() that makes it look, exactly as on a platform whose tick
+// interrupt bumps a counter and then calls poll().
+inline void advance_tick(ucosm::tick_t inInc = 1) {
+    detail::g_tick.fetch_add(inInc, std::memory_order_acq_rel);
+}
+
+// Puts the clock back to zero, so that each test case can reason in absolute
+// deadlines from a known origin.
+inline void reset_tick(ucosm::tick_t inValue = 0) {
+    detail::g_tick.store(inValue, std::memory_order_release);
+}
+
 inline constexpr ucosm::TaskletBackend tasklet_backend {
+    get_tick,
     request_low_priority_execution,
     install_low_priority_handler,
     suspend_low_priority_execution,
