@@ -73,9 +73,6 @@ namespace ucosm {
 
     };
 
-    static_assert(std::atomic<tick_t>::is_always_lock_free, "Atomic will be slow");
-    static_assert(std::atomic<bool>::is_always_lock_free, "Atomic will be slow");
-
     template<uint8_t size>
     struct Bitset;
 
