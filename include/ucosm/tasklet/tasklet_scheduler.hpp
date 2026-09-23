@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include <atomic>
+#include "uatom.hpp"
 #include "itasklet.hpp"
 #include "ucosm/core/deadline.hpp"
 #include "ucosm/core/ischeduler.hpp"
@@ -72,6 +72,9 @@ namespace ucosm {
         schedule_next_wakeup_t scheduleNextWakeup = nullptr;
 
     };
+
+    static_assert(uatom::Atomic<tick_t>::is_always_lock_free, "Atomic will be slow");
+    static_assert(uatom::Atomic<bool>::is_always_lock_free, "Atomic will be slow");
 
     template<uint8_t size>
     struct Bitset;
@@ -218,9 +221,9 @@ namespace ucosm {
         task_list_t mBlockedTaskLists[interrupt_count];
         Bitset<interrupt_count> mPendingISR;
         Bitset<interrupt_count> mHasISRTaskID;
-        std::atomic<bool> mHasTimerTask { false };
-        std::atomic<tick_t> mNextTimer { 0 };
-        std::atomic<tick_t> mCursorRank { 0 };
+        uatom::Atomic<bool> mHasTimerTask { false };
+        uatom::Atomic<tick_t> mNextTimer { 0 };
+        uatom::Atomic<tick_t> mCursorRank { 0 };
 
         // Last (hasDeadline, deadline) reported to mBackend.scheduleNextWakeup.
         // Only ever touched from updateNextTimerLocked(), which always runs
@@ -728,8 +731,16 @@ namespace ucosm {
 
         static uint8_t firstSetBit(uint32_t v) {
             // use builtin to avoid the loop when available
-#if defined(__clang__) || defined(__GNUC__)
+#if (defined(__clang__) || defined(__GNUC__)) && (!defined(__arm__) || defined(__ARM_FEATURE_CLZ))
             return static_cast<uint8_t>(__builtin_ctz(v));
+#elif defined(__arm__)
+            // no CLZ on ARMv6-M : isolate the lowest set bit and look it up
+            // with a de Bruijn sequence rather than calling libgcc's __ctzsi2
+            static constexpr uint8_t lookup[32] = {
+                0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
+                31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+            };
+            return lookup[((v & (0u - v)) * 0x077CB531u) >> 27];
 #else
             uint8_t idx = 0;
             while ((v & 1u) == 0u) { v >>= 1; ++idx; }
@@ -738,7 +749,7 @@ namespace ucosm {
         }
 
         static constexpr uint8_t storage_size = static_cast<uint8_t>((size + 31) / 32);
-        std::atomic<uint32_t> mStorage[storage_size] {};
+        uatom::Atomic<uint32_t> mStorage[storage_size] {};
     };
 
     template<>
