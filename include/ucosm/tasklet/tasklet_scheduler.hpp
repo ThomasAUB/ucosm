@@ -179,7 +179,7 @@ namespace ucosm {
 
         void pushReadyInterruptTasks(task_list_t& ioList);
 
-        void pushReadyTimerTasks(task_list_t& ioList);
+        void pushReadyTimerTasks(task_list_t& ioList, tick_t inNow);
 
         // Sorts a task into the timer list, wherever it was before.
         //
@@ -196,7 +196,14 @@ namespace ucosm {
         // timer list, wherever it was before. Called under an ExecutionLock.
         void armTimerLocked(ITasklet& inTask, tick_t inDelay);
 
-        bool updateNextTimerLocked();
+        // Publishes the next deadline, returning false when no task is
+        // sleeping; otherwise writes it into outDeadline.
+        bool updateNextTimerLocked(tick_t& outDeadline);
+
+        void updateNextTimerLocked() {
+            tick_t deadline;
+            updateNextTimerLocked(deadline);
+        }
 
         void requestExecution() const;
 
@@ -302,20 +309,54 @@ namespace ucosm {
         const auto cursor = this->mCursorTask.getRank();
         const auto delay = getDeadlineDelay(cursor, inTask.getRank());
 
-        // Walked from the cursor rather than from the head of the list :
-        // everything the cursor has already gone past belongs to the round
-        // being retired, and a deadline armed now always comes after it.
-        task_list_t::iterator it(&this->mCursorTask);
-        ++it;
+        // Only the part after the cursor is walked : everything the cursor
+        // has already gone past belongs to the round being retired, and a
+        // deadline armed now always comes after it. Tasks due at the same
+        // tick keep their FIFO order.
+        //
+        // The list spans delays [0, tail delay], so the walk starts from
+        // whichever end is closer : a short period re-arms near the cursor,
+        // a long one near the tail, and a deadline at or past the tail - all
+        // tasks sharing one period, or the longest period - is appended
+        // without walking at all.
+        //
+        // The task itself is skipped : setDelay() re-sorts a task that is
+        // still linked here, and inserting a node next to itself would
+        // corrupt the list.
+        auto& back = mTimerList.back();
+        const auto backDelay = getDeadlineDelay(cursor, back.getRank());
 
-        const auto endIt = mTimerList.end();
-
-        while (it != endIt && getDeadlineDelay(cursor, it->getRank()) <= delay) {
-            ++it;
+        if (&back != &inTask && delay >= backDelay) {
+            // also covers an empty timer list, where back is the cursor
+            mTimerList.push_back(inTask);
+            return;
         }
 
-        // insert_before(end()) appends, so the last slot needs no special case.
-        mTimerList.insert_before(it, inTask);
+        if (delay <= backDelay / 2) {
+            task_list_t::iterator it(&this->mCursorTask);
+            ++it;
+
+            const auto endIt = mTimerList.end();
+
+            // the task itself compares equal, so it is walked past
+            while (it != endIt && getDeadlineDelay(cursor, it->getRank()) <= delay) {
+                ++it;
+            }
+
+            // insert_before(end()) appends, so the last slot needs no special case.
+            mTimerList.insert_before(it, inTask);
+        }
+        else {
+            task_list_t::reverse_iterator it = mTimerList.rbegin();
+            const task_list_t::reverse_iterator cursorIt(&this->mCursorTask);
+
+            while (it != cursorIt &&
+                (&*it == &inTask || getDeadlineDelay(cursor, it->getRank()) > delay)) {
+                ++it;
+            }
+
+            mTimerList.insert_after(task_list_t::iterator(&*it), inTask);
+        }
     }
 
     // called from background and foreground tasks
@@ -349,8 +390,10 @@ namespace ucosm {
             return;
         }
 
-        const auto next = mNextTimer.load(std::memory_order_acquire);
-        const auto cursor = mCursorRank.load(std::memory_order_acquire);
+        // mHasTimerTask is stored last, with release, by
+        // updateNextTimerLocked() : the acquire above already orders these.
+        const auto next = mNextTimer.load(std::memory_order_relaxed);
+        const auto cursor = mCursorRank.load(std::memory_order_relaxed);
 
         if (isDeadlineDue(cursor, next, now())) {
             requestExecution();
@@ -411,7 +454,7 @@ namespace ucosm {
 
     // called from foreground
     template<interrupt_id_t interrupt_count>
-    void TaskletScheduler<interrupt_count>::pushReadyTimerTasks(task_list_t& ioList) {
+    void TaskletScheduler<interrupt_count>::pushReadyTimerTasks(task_list_t& ioList, tick_t inNow) {
         // pull expired timers into run list
 
         auto* task = this->getNextTask();
@@ -420,20 +463,20 @@ namespace ucosm {
             return;
         }
 
-        const auto nowTick = now();
         const auto cursor = this->mCursorTask.getRank();
 
-        if (!isDeadlineDue(cursor, task->getRank(), nowTick)) {
+        if (!isDeadlineDue(cursor, task->getRank(), inNow)) {
             // no timer task ready
             return;
         }
 
+        // the first task is known to be due, the loop checks the ones after it
         for (task_list_t::iterator it(task), endIt = mTimerList.end(); it != endIt; ) {
             auto& node = *it;
             task_list_t::iterator nextIt = it;
             ++nextIt;
 
-            if (!isDeadlineDue(cursor, node.getRank(), nowTick)) {
+            if (&node != task && !isDeadlineDue(cursor, node.getRank(), inNow)) {
                 break;
             }
 
@@ -452,8 +495,8 @@ namespace ucosm {
         }
 
         // track the tick value used for deadline comparisons to remain wrap-safe
-        this->mCursorTask.setRank(nowTick);
-        mCursorRank.store(nowTick, std::memory_order_release);
+        this->mCursorTask.setRank(inNow);
+        mCursorRank.store(inNow, std::memory_order_release);
     }
 
     // called from foreground
@@ -467,14 +510,17 @@ namespace ucosm {
         for (;;) {
 
             pushReadyInterruptTasks(runList);
-            pushReadyTimerTasks(runList);
 
-            // Anchor for a task that switches from waitingForInterrupt to
-            // sleeping inside run() below : it was never due at a deadline,
-            // so its first period counts from the moment it became ready
-            // instead, the same way a timer task's counts from the deadline
-            // it was due at - see pushReadyTimerTasks().
+            // Read once per pass : the time timer deadlines are checked
+            // against, and the anchor for a task that switches from
+            // waitingForInterrupt to sleeping inside run() below. That task
+            // was never due at a deadline, so its first period counts from
+            // the moment it became ready instead, the same way a timer
+            // task's counts from the deadline it was due at - see
+            // pushReadyTimerTasks().
             const auto readyTick = now();
+
+            pushReadyTimerTasks(runList, readyTick);
 
             // execute the run list's tasks
             while (!runList.empty()) {
@@ -541,17 +587,21 @@ namespace ucosm {
                 }
             }
 
+            // The cursor and the deadline are owned by this context : read
+            // them directly rather than back from the atomics published for
+            // poll().
+            tick_t nextDeadline;
             const bool hasTimerDue =
-                updateNextTimerLocked() &&
+                updateNextTimerLocked(nextDeadline) &&
                 isDeadlineDue(
-                    mCursorRank.load(std::memory_order_acquire),
-                    mNextTimer.load(std::memory_order_acquire),
+                    this->mCursorTask.getRank(),
+                    nextDeadline,
                     // re-read, so that the time the tasks just spent running
                     // counts towards the next deadline being due
                     now()
                 );
 
-            if (!(mPendingISR.any() || hasTimerDue)) {
+            if (!(hasTimerDue || mPendingISR.any())) {
                 break;
             }
         }
@@ -574,14 +624,15 @@ namespace ucosm {
             return;
         }
 
-        const auto backRank = inList.back().getRank();
-        if (rank > backRank) {
-            inList.push_back(inTask);
-            return;
+        // Walked from the back : equal ranks keep their FIFO order, and the
+        // task is linked once at its final place instead of being appended
+        // and then moved.
+        auto it = inList.rbegin();
+        while (it->getRank() > rank) {
+            ++it;
         }
 
-        inList.push_back(inTask);
-        inTask.updateRank(inList);
+        inList.insert_after(task_list_t::iterator(&*it), inTask);
     }
 
     // called from foreground task
@@ -633,7 +684,7 @@ namespace ucosm {
 
     // called from background and foreground
     template<interrupt_id_t interrupt_count>
-    bool TaskletScheduler<interrupt_count>::updateNextTimerLocked() {
+    bool TaskletScheduler<interrupt_count>::updateNextTimerLocked(tick_t& outDeadline) {
 
         bool hasTimer;
         tick_t deadline = 0;
@@ -657,6 +708,7 @@ namespace ucosm {
             mBackend.scheduleNextWakeup(hasTimer, deadline);
         }
 
+        outDeadline = deadline;
         return hasTimer;
     }
 
@@ -674,7 +726,8 @@ namespace ucosm {
             if (i >= size) { return; }
             const uint8_t idx = static_cast<uint8_t>(i >> 5);
             const uint32_t mask = static_cast<uint32_t>(1u << (i & 0x1F));
-            mStorage[idx].fetch_or(mask, std::memory_order_acq_rel);
+            // release only : set() publishes nothing it would need to read back
+            mStorage[idx].fetch_or(mask, std::memory_order_release);
         }
 
         void reset(uint8_t i) {
@@ -691,9 +744,11 @@ namespace ucosm {
             return (v & mask) != 0u;
         }
 
+        // A hint only : a bit it reports is consumed by fetchAndClear(), which
+        // carries the ordering.
         bool any() const {
             for (uint8_t i = 0; i < storage_size; ++i) {
-                if (mStorage[i].load(std::memory_order_acquire) != 0) {
+                if (mStorage[i].load(std::memory_order_relaxed) != 0) {
                     return true;
                 }
             }
@@ -705,18 +760,23 @@ namespace ucosm {
         // later word between exchanges — that bit will appear in the
         // snapshot AND remain set in *this.  Callers must handle that
         // scenario (e.g. re-checking or tolerating duplicate processing).
+        //
+        // dest is expected to be a local snapshot, private to the caller :
+        // it is written and read back relaxed, the exchange alone carries
+        // the ordering.
         void fetchAndClear(Bitset& dest) {
             for (uint8_t i = 0; i < storage_size; ++i) {
                 dest.mStorage[i].store(
                     mStorage[i].exchange(0u, std::memory_order_acq_rel),
-                    std::memory_order_release);
+                    std::memory_order_relaxed);
             }
         }
 
+        // Meant for a snapshot filled by fetchAndClear(), see above.
         template<typename F>
         void forEach(F&& f) const {
             for (uint8_t wordIndex = 0; wordIndex < storage_size; ++wordIndex) {
-                uint32_t v = mStorage[wordIndex].load(std::memory_order_acquire);
+                uint32_t v = mStorage[wordIndex].load(std::memory_order_relaxed);
                 while (v) {
                     const uint8_t bitOffset = firstSetBit(v);
                     const uint8_t globalIdx = static_cast<uint8_t>((wordIndex << 5) + bitOffset);
