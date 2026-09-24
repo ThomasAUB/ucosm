@@ -30,7 +30,7 @@ namespace {
     }
     void noop() {}
 
-    constexpr TaskletBackend stress_backend {
+    const TaskletBackend stress_backend {
         getTick,
         requestExecution,
         installHandler,
@@ -74,9 +74,9 @@ namespace {
     constexpr tick_t max_delay = 60;
 
     // Exposes the scheduler lists so the test can check their invariants.
-    struct InspectedScheduler : TaskletScheduler<stress_interrupts, stress_backend> {
+    struct InspectedScheduler : TaskletScheduler<stress_interrupts> {
 
-        using TaskletScheduler<stress_interrupts, stress_backend>::TaskletScheduler;
+        using TaskletScheduler<stress_interrupts>::TaskletScheduler;
 
         // Returns the number of tasks found in all lists, or -1 when an
         // invariant is broken.
@@ -196,7 +196,7 @@ TEST_CASE("TaskletScheduler - stress : lists stay consistent under random operat
         // starts close to the counter wrap, which every round goes through
         resetHarness(static_cast<tick_t>(0u - 2'000u + rng() % 1'000u));
 
-        InspectedScheduler sched;
+        InspectedScheduler sched(stress_backend);
         g_sched = &sched;
 
         ChaosTask tasks[task_count];
@@ -287,7 +287,7 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
 
         resetHarness(0);
 
-        TaskletScheduler<interrupt_count, stress_backend> sched;
+        TaskletScheduler<interrupt_count> sched(stress_backend);
 
         CountTask timerTasks[task_count];
         CountTask interruptTasks[interrupt_count];

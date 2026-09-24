@@ -30,7 +30,7 @@ namespace {
         void run() override { g_sink = g_sink + 4; }
     };
 
-    ucosm::TaskletScheduler<2, tasklet_backend> g_tasklets;
+    ucosm::TaskletScheduler<2> g_tasklets { tasklet_backend };
 
     PeriodicTasklet g_periodicTasklet;
     InterruptTasklet g_interruptTasklet;
