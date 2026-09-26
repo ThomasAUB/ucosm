@@ -8,7 +8,9 @@ set(TARGET_SRC
 	callable_test.cpp
 	periodic_test.cpp
 	resumable_test.cpp
+	sync_test.cpp
 	tasklet_clock_test.cpp
+	tasklet_queue_test.cpp
 	tasklet_stress_test.cpp
 	tasklet_test.cpp
 	tests.cpp

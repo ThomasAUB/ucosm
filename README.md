@@ -13,7 +13,7 @@ A lightweight C++17 scheduler framework for microcontrollers that supports coope
 - **Two schedulers** - Cooperative periodic scheduling and interrupt-driven tasklets
 - **Resumable tasks** - Coroutine-like behavior with macro system
 - **Callable wrappers** - Lambda and function pointer support
-- **Real-time communication** - Lock-free inter-task messaging
+- **Inter-context communication** - Lock-free queues and shared variables, usable from ISRs
 - **Memory safety** - Automatic task lifetime management
 - **High performance** - Optimized for embedded systems
 
@@ -29,7 +29,7 @@ This library provides a modular scheduling framework with two main implementatio
 - **Core**: Intrusive-list foundation (`IScheduler`/`ITask`/`ulink`) all schedulers build on — not a standalone scheduler
 - **Resumable Tasks**: Macro-based coroutine system for stateful operations  
 - **Callable Tasks**: Type-erased wrappers for lambdas and function pointers
-- **RT Communication**: Lock-free message queues for inter-task communication
+- **Sync**: Lock-free message queue and shared variable for passing data between contexts
 
 # Examples
 
@@ -132,6 +132,26 @@ struct SequenceTask : ucosm::IResumableTask {
 };
 ```
 
+`IResumableTask` runs on a `PeriodicScheduler`. For a `TaskletScheduler`, derive from `IResumableTasklet` instead: the same macros apply, and `UCOSM_WAIT_EVENT(id)` suspends the task until the event is signaled. On a tasklet `UCOSM_YIELD` sleeps for one tick, since a tasklet period is at least 1.
+
+```cpp
+struct RxTask : ucosm::IResumableTasklet {
+
+    void run() override {
+
+        UCOSM_START;
+
+        UCOSM_WAIT_EVENT(rx_event);  // resumes when signalEvent(rx_event) is called
+
+        processFrame();
+
+        UCOSM_SLEEP_FOR(10);
+
+        UCOSM_RESTART;
+    }
+};
+```
+
 ### Advanced Resumable Task Patterns
 
 **State Machine Example:**
@@ -219,44 +239,6 @@ int main() {
 }
 ```
 
-## Real-Time Communication
-
-For inter-task communication, µCosm provides lock-free message queues optimized for real-time systems:
-
-```cpp
-#include "ucosm/rt/rt_inter_task.hpp"
-
-// Define message structure  
-struct SensorData {
-    uint32_t timestamp;
-    float temperature;
-    float humidity;
-};
-
-// Create lock-free queue (size must be power of 2)
-ucosm::RTMessageQueue<SensorData, 16> sensorQueue;
-
-// Producer task (high priority)
-struct SensorTask : ucosm::IPeriodicTask {
-    void run() override {
-        SensorData data = readSensors();
-        if (!sensorQueue.trySend(data)) {
-            // Queue full - handle overflow condition
-        }
-    }
-};
-
-// Consumer task (lower priority)  
-struct ProcessorTask : ucosm::IPeriodicTask {
-    void run() override {
-        SensorData data;
-        while (sensorQueue.tryReceive(data)) {
-            processSensorData(data);
-        }
-    }
-};
-```
-
 ## Tasklet Scheduler and Tasks
 
 The tasklet scheduler provides a safe, low-priority execution context for work that must be triggered from ISRs or other high-priority contexts. Instead of performing potentially long or blocking operations inside an interrupt, code can post a tasklet which will be executed later in a low-priority context (using `pendSV` on supported platforms).
@@ -274,6 +256,76 @@ The tasklet scheduler provides a safe, low-priority execution context for work t
 - **Clock**: the scheduler keeps no clock of its own. `TaskletBackend::getTick` is required and is read wherever the time is needed, the same role the `getTick` passed to `PeriodicScheduler` plays - a free running counter read is the intended shape, and a counter bumped by a tick interrupt does just as well.
 - **Wake-up**: the clock alone never makes a task run, so the platform must provide one of two things. On a periodic tick, call `poll()` from the tick interrupt: it looks at the clock and pends the handler if a deadline has come round. On a one-shot timer, implement `scheduleNextWakeup` instead: it is handed each new next deadline, arms the timer on it, and no interrupt is taken in between - `poll()` is then never called. See `tests/arm_tasklet_executor.hpp` for the periodic shape.
 - **Priority levels**: a scheduler dispatches its tasklets from one context, so tasklets of the same scheduler never preempt each other. For preemptive levels, create one `TaskletScheduler` per level, each with a backend whose `requestTaskletExecution` pends a different interrupt - PendSV for the lowest level, unused vectors pended through `NVIC_SetPendingIRQ` at higher NVIC priorities for the others.
+
+
+## Inter-Context Communication
+
+The `sync` headers pass data between contexts of different priorities - an ISR and a task, or two tasks - without locks or dynamic allocation. They don't depend on any scheduler.
+
+- **`MessageQueue<T, Size>`**: lock-free single producer, single consumer queue holding `Size` messages, a power of 2. Bulk overloads - `trySend(messages, count)` and `tryReceive(messages, maxCount)` - move several messages for the cost of one.
+- **`SharedVariable<T>`**: a single lock-free value, written from one context and readable from any. Each `store()` bumps a version, so a reader can tell with `hasChanged()` whether the value was updated since it last looked.
+
+Both are tuned for small MCUs: no read-modify-write, and a send or a receive usually costs a single memory barrier. When every context sharing them runs on one core - thread mode and ISRs of a single-core MCU - define `UCOSM_SINGLE_CORE=1` to drop the barriers too: a core observes its own accesses in program order, so only compiler reordering has to be prevented. Leave it undefined for objects shared between the cores of a multi-core part (RP2040, STM32H7 dual-core...).
+
+```cpp
+#include "ucosm/sync/message_queue.hpp"
+
+struct SensorData {
+    uint32_t timestamp;
+    float temperature;
+};
+
+ucosm::MessageQueue<SensorData, 16> sensorQueue;
+
+// Producer (ISR or high priority task)
+void onSensorReady() {
+    if (!sensorQueue.trySend(readSensor())) {
+        // queue full - handle overflow
+    }
+}
+
+// Consumer (lower priority task)
+struct ProcessorTask : ucosm::IPeriodicTask {
+    void run() override {
+        SensorData data;
+        while (sensorQueue.tryReceive(data)) {
+            process(data);
+        }
+    }
+};
+```
+
+### Waking a tasklet on a message
+
+`TaskletQueue` pairs a `MessageQueue` with a tasklet scheduler event: each successful `trySend()` signals the event, so the tasklet waiting for it runs and receives the message, instead of polling the queue. Events are coalesced, so `run()` must drain the queue.
+
+```cpp
+#include "ucosm/tasklet/tasklet_queue.hpp"
+
+constexpr ucosm::event_id_t uart_rx_event = 0;
+
+ucosm::TaskletScheduler<1> sched(backend);
+ucosm::TaskletQueue<uint8_t, 64, 1> rxQueue(sched, uart_rx_event);
+
+struct RxTask : ucosm::ITasklet {
+    void run() override {
+        uint8_t byte;
+        while (rxQueue.tryReceive(byte)) {
+            parse(byte);
+        }
+    }
+} rxTask;
+
+extern "C" void UART_IRQHandler() {
+    rxQueue.trySend(UART->DR);
+}
+
+int main() {
+    rxTask.waitForEvent(uart_rx_event);
+    sched.addTask(rxTask);
+    // ...
+}
+```
 
 
 ## Callable Tasks

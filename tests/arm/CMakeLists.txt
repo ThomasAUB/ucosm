@@ -41,3 +41,19 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Werror)
 
 target_link_libraries(${PROJECT_NAME} uatom)
+
+# Same firmware with the sync primitives' single-core ordering, which must
+# link just as well.
+add_executable(${PROJECT_NAME}_single_core arm_build_check.cpp)
+
+target_include_directories(${PROJECT_NAME}_single_core PRIVATE
+    ${UCOSM_ROOT}/include
+    ${UCOSM_ROOT}/ulink/include
+    ${UCOSM_ROOT}/tests
+)
+
+target_compile_definitions(${PROJECT_NAME}_single_core PRIVATE UCOSM_SINGLE_CORE=1)
+
+target_compile_options(${PROJECT_NAME}_single_core PRIVATE -Wall -Wextra -Werror)
+
+target_link_libraries(${PROJECT_NAME}_single_core uatom)

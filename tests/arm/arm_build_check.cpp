@@ -4,7 +4,8 @@
 #include "arm_tasklet_executor.hpp"
 
 #include "ucosm/periodic/periodic_scheduler.hpp"
-#include "ucosm/rt/rt_inter_task.hpp"
+#include "ucosm/sync/shared_variable.hpp"
+#include "ucosm/tasklet/tasklet_queue.hpp"
 
 namespace {
 
@@ -16,15 +17,25 @@ namespace {
         void run() override { g_sink = g_sink + 1; }
     };
 
+    ucosm::TaskletScheduler<2> g_tasklets { tasklet_backend };
+
+    // filled by the EXTI interrupt, drained by the event tasklet
+    ucosm::TaskletQueue<std::uint32_t, 8, 2> g_extiQueue { g_tasklets, exti_event };
+
+    ucosm::SharedVariable<std::uint32_t> g_lastExti;
+
     struct EventTasklet : ucosm::ITasklet {
-        void run() override { g_sink = g_sink + 2; }
+        void run() override {
+            std::uint32_t value;
+            while (g_extiQueue.tryReceive(value)) {
+                g_lastExti.store(value);
+            }
+        }
     };
 
     struct BlinkTask : ucosm::IPeriodicTask {
         void run() override { g_sink = g_sink + 3; }
     };
-
-    ucosm::TaskletScheduler<2> g_tasklets { tasklet_backend };
 
     PeriodicTasklet g_periodicTasklet;
     EventTasklet g_eventTasklet;
@@ -40,7 +51,7 @@ extern "C" void PendSV_Handler() {
 }
 
 extern "C" void EXTI0_IRQHandler() {
-    g_tasklets.signalEvent(exti_event);
+    g_extiQueue.trySend(get_tick());
 }
 
 int main() {
@@ -58,5 +69,6 @@ int main() {
 
     for (;;) {
         periodic.run();
+        g_sink = g_sink + g_lastExti.load();
     }
 }
