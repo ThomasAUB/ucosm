@@ -139,5 +139,5 @@ jobs:
         working-directory: ${{ github.workspace }}/build
         env:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=0
-          UBSAN_OPTIONS: abort_on_error=0:print_stacktrace=1
+          UBSAN_OPTIONS: halt_on_error=1:abort_on_error=0:print_stacktrace=1
         run: ctest --output-on-failure
