@@ -3,10 +3,8 @@
 
 #include "arm_tasklet_executor.hpp"
 
-#include "ucosm/cfs/cfs_scheduler.hpp"
 #include "ucosm/periodic/periodic_scheduler.hpp"
 #include "ucosm/rt/rt_inter_task.hpp"
-#include "ucosm/rt/rt_scheduler.hpp"
 
 namespace {
 
@@ -24,10 +22,6 @@ namespace {
 
     struct BlinkTask : ucosm::IPeriodicTask {
         void run() override { g_sink = g_sink + 3; }
-    };
-
-    struct FairTask : ucosm::ICFSTask {
-        void run() override { g_sink = g_sink + 4; }
     };
 
     ucosm::TaskletScheduler<2> g_tasklets { tasklet_backend };
@@ -62,12 +56,7 @@ int main() {
     blink.setPeriod(500);
     periodic.addTask(blink);
 
-    ucosm::CFSScheduler<> cfs(get_tick);
-    FairTask fair;
-    cfs.addTask(fair);
-
     for (;;) {
         periodic.run();
-        cfs.run();
     }
 }

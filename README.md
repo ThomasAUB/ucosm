@@ -10,7 +10,7 @@ A lightweight C++17 scheduler framework for microcontrollers that supports coope
 - **Unlimited task count** - No arbitrary limits on task numbers  
 - **Platform independent** - Unified API for desktop and microcontrollers
 - **Hierarchical scheduling** - Nest schedulers within schedulers
-- **Multiple policies** - Periodic, CFS, and RT scheduling algorithms
+- **Two schedulers** - Cooperative periodic scheduling and interrupt-driven tasklets
 - **Resumable tasks** - Coroutine-like behavior with macro system
 - **Callable wrappers** - Lambda and function pointer support
 - **Real-time communication** - Lock-free inter-task messaging
@@ -18,13 +18,12 @@ A lightweight C++17 scheduler framework for microcontrollers that supports coope
 - **High performance** - Optimized for embedded systems
 
 
-This library provides a modular scheduling framework with three main implementations:
+This library provides a modular scheduling framework with two main implementations:
 
 | Scheduler | Type | Execution | Use Case |
 |-----------|------|-----------|----------|
 | **Periodic** | Cooperative | Time-based intervals | Regular maintenance tasks |
-| **CFS** | Cooperative | Priority-based fair sharing | CPU-intensive workloads |
-| **RT** | Real-time | Hardware timer interrupts | Deterministic real-time systems |
+| **Tasklet** | Deferred interrupt | Timer deadlines and ISR events | Work triggered from interrupts or hardware timers |
 
 **Additional Components:**
 - **Core**: Intrusive-list foundation (`IScheduler`/`ITask`/`ulink`) all schedulers build on — not a standalone scheduler
@@ -96,51 +95,6 @@ int main() {
     return 0;
 }
 ```
-
-## CFS Tasks
-
-Priority-based cooperative scheduling that automatically computes task periods based on execution time and priority. This ensures fair CPU usage among tasks of the same priority by executing longer-running tasks less frequently.
-
-```cpp
-#include <iostream>
-#include "cfs/icfs_task.hpp"
-
-struct Task final : ucosm::ICFSTask {
-    void run() override {
-        std::cout << "run " << (uint16_t)this->getPriority() << std::endl;
-        if(mCounter++ == 10) {
-            this->removeTask();
-        }
-    }
-    int mCounter = 0;
-};
-```
-
-```cpp
-#include <chrono>
-#include "cfs/cfs_scheduler.hpp"
-
-int main() {
-
-    ucosm::CFSScheduler sched(getTick_us);
-
-    Task t1;
-    Task t2;
-
-    t1.setPriority(2);
-    t2.setPriority(4);
-
-    sched.addTask(t1);
-    sched.addTask(t2);
-
-    while(!sched.empty()) {
-        sched.run();
-    }
-
-    return 0;
-}
-```
-
 
 ## Resumable Tasks
 
@@ -265,63 +219,6 @@ int main() {
 }
 ```
 
-## Real-Time (RT) Scheduler
-
-The RT scheduler provides deterministic task execution using platform-specific timers. On microcontrollers, it uses dedicated hardware timers with configurable interrupt priorities. On desktop platforms, the same interface can be implemented using high-resolution threads for development and testing.
-
-Tasks within the same scheduler are executed cooperatively, so timing accuracy depends on the collective workload of all tasks within the scheduler. For maximum determinism, multiple schedulers can be created with timers using different interrupt priorities.
-
-```cpp
-#include <iostream>
-#include "ucosm/periodic/iperiodic_task.hpp"
-
-struct RTTask final : ucosm::IPeriodicTask {
-    RTTask(uint32_t period_ms) : ucosm::IPeriodicTask(period_ms) {}
-    
-    void run() override {
-        std::cout << "RT task executed at " << getPeriod() << "ms period\n";
-        if(mCounter++ == 10) {
-            this->removeTask();
-        }
-    }
-    int mCounter = 0;
-};
-```
-
-```cpp
-#include "ucosm/rt/rt_scheduler.hpp"
-
-// Hardware timer or thread implementation (platform-specific)
-class Timer : public ucosm::RTScheduler::ITimer {
-    // Implement virtual methods for your platform
-    void start() override { /* Start timer */ }
-    void stop() override { /* Stop timer */ }
-    bool isRunning() const override { /* Check timer status */ }
-    void setDuration(uint32_t duration) override { /* Set timer period */ }
-    void disable() override { /* Disable timer interrupt */ }
-    void enable() override { /* Enable timer interrupt */ }
-};
-
-int main() {
-    Timer timer;
-    ucosm::RTScheduler scheduler;
-    scheduler.setTimer(timer);
-
-    RTTask task1(100);  // Execute every 100ms
-    RTTask task2(500);  // Execute every 500ms
-
-    scheduler.addTask(task1);
-    scheduler.addTask(task2);
-
-    // Tasks execute automatically via timer interrupts
-    while(!scheduler.empty()) {
-        // Main loop can handle other work
-    }
-
-    return 0;
-}
-```
-
 ## Real-Time Communication
 
 For inter-task communication, µCosm provides lock-free message queues optimized for real-time systems:
@@ -374,8 +271,9 @@ The tasklet scheduler provides a safe, low-priority execution context for work t
 - **Delay**: like `IPeriodicTask` the delay lives in the task rank rather than in the task, so it is set through the scheduler - `addTask(task, delay)` when the first execution must not wait for a full period, and `setDelay(task, delay)` to re-arm a task that is already scheduled, which a task may call on itself from `run()` to shift its next execution. Only the next execution is affected, the period takes over afterwards.
 - **Stopping**: a task may call `removeTask()` on itself from its own `run()`, or `dispose()` to clear the configuration - a task that disposes of itself from `run()` is unlinked, and can be scheduled again only after a new `setPeriod` / `waitForEvent`. From anywhere else, go through `scheduler.removeTask(task)`: it holds the execution lock, so it doesn't race the list walk the scheduler does from its dispatch context, and it refreshes the next deadline so a platform driven by `scheduleNextWakeup` stops waiting for a task that is gone.
 - **Known issue**: destroying a tasklet that is still scheduled is not thread-safe. Its destructor unlinks it without the execution lock, which can corrupt the lists if the scheduler is dispatching at the same time. Always call `scheduler.removeTask(task)` before a tasklet is destroyed.
-- **Clock**: the scheduler keeps no clock of its own. `TaskletBackend::getTick` is required and is read wherever the time is needed, the same role the `getTick` passed to `PeriodicScheduler` and `CFSScheduler` plays - a free running counter read is the intended shape, and a counter bumped by a tick interrupt does just as well.
+- **Clock**: the scheduler keeps no clock of its own. `TaskletBackend::getTick` is required and is read wherever the time is needed, the same role the `getTick` passed to `PeriodicScheduler` plays - a free running counter read is the intended shape, and a counter bumped by a tick interrupt does just as well.
 - **Wake-up**: the clock alone never makes a task run, so the platform must provide one of two things. On a periodic tick, call `poll()` from the tick interrupt: it looks at the clock and pends the handler if a deadline has come round. On a one-shot timer, implement `scheduleNextWakeup` instead: it is handed each new next deadline, arms the timer on it, and no interrupt is taken in between - `poll()` is then never called. See `tests/arm_tasklet_executor.hpp` for the periodic shape.
+- **Priority levels**: a scheduler dispatches its tasklets from one context, so tasklets of the same scheduler never preempt each other. For preemptive levels, create one `TaskletScheduler` per level, each with a backend whose `requestTaskletExecution` pends a different interrupt - PendSV for the lowest level, unused vectors pended through `NVIC_SetPendingIRQ` at higher NVIC priorities for the others.
 
 
 ## Callable Tasks
