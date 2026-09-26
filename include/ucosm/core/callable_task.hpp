@@ -36,35 +36,8 @@
 namespace ucosm {
 
     /**
-     * @brief Type-erased callable wrapper that can store lambdas, function pointers, and member functions.
-     *
-     * Features:
-     * - Small buffer optimization (no heap allocation for small callables)
-     * - Move semantics optimization when possible
-     * - Safe empty callable handling (automatically removes task)
-     * - Member function pointer support
-     *
-     * Usage:
-     * @code
-     * CallableTask<IPeriodicTask> task1([]() { std::cout << "Hello\n"; });
-     * CallableTask<IPeriodicTask> task2(&MyClass::method, myObject);
-     * @endcode
-     */
-
-     /**
-     * @brief Type-erased callable wrapper that can store
-     * lambdas, function pointers, and member functions.
-     *
-     * Features:
-     * - Small buffer optimization (no heap allocation for small callables)
-     * - Safe empty callable handling (automatically removes task)
-     * - Member function pointer support
-     *
-     * Usage:
-     * @code
-     * CallableTask<IPeriodicTask> task1([]() { std::cout << "Hello\n"; });
-     * CallableTask<IPeriodicTask> task2(&MyClass::method, myObject);
-     * @endcode
+     * @brief Task running a lambda, function or member function, stored inline.
+     * An empty task removes itself when run.
      *
      * @tparam task_t Task implementation
      */

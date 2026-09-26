@@ -657,3 +657,37 @@ TEST_CASE("TaskletScheduler - null optional hooks are replaced by no-ops") {
     CHECK_FALSE(g_wakeupArmed);
     CHECK(g_wakeupCalls == 0);
 }
+
+TEST_CASE("TaskletScheduler - thisTask() reports the task being run") {
+
+    resetHarness();
+    TaskletScheduler<1> sched(oneshot_backend);
+
+    struct SelfTask : ITasklet {
+        void run() override { mSeen = mScheduler->thisTask(); }
+        TaskletScheduler<1>* mScheduler = nullptr;
+        ITasklet* mSeen = nullptr;
+    };
+
+    SelfTask timerTask;
+    timerTask.mScheduler = &sched;
+    timerTask.setPeriod(10);
+    REQUIRE(sched.addTask(timerTask));
+
+    SelfTask eventTask;
+    eventTask.mScheduler = &sched;
+    eventTask.waitForEvent(0);
+    REQUIRE(sched.addTask(eventTask));
+
+    CHECK(sched.thisTask() == nullptr);
+
+    advanceClock(10);
+    CHECK(timerTask.mSeen == &timerTask);
+
+    sched.signalEvent(0);
+    pump();
+    CHECK(eventTask.mSeen == &eventTask);
+
+    // nothing is running once the scheduler returns
+    CHECK(sched.thisTask() == nullptr);
+}

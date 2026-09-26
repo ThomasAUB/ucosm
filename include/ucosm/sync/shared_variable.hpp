@@ -36,22 +36,8 @@
 namespace ucosm {
 
     /**
-     * @brief Single value shared between contexts, with change detection.
-     *
-     * The value is a lock-free atomic, so load() and store() never block and
-     * may be called from ISRs. Every store() bumps a version, which lets a
-     * reader tell whether the value was updated since it last looked.
-     *
-     * Single writer : store() must only be called from one context, any
-     * number of contexts may read. The version is then bumped with a plain
-     * load and store instead of a read-modify-write, which on Cortex-M would
-     * cost an LDREX/STREX loop, or a PRIMASK critical section on ARMv6-M.
-     *
-     * The version is bumped after the value is written : a reader that reads
-     * the version first and the value second gets a value at least as recent
-     * as that version, possibly a newer one. A reader that keeps the version
-     * and later sees hasChanged() return false has therefore already seen the
-     * latest value.
+     * @brief Lock-free value shared between contexts, versioned on each store.
+     * Single writer, any number of readers.
      *
      * @tparam T Value type (trivially copyable and lock-free on the platform)
      */
@@ -78,7 +64,6 @@ namespace ucosm {
          * @param newValue New value to store
          */
         void store(const T& newValue) noexcept {
-            // only the writer changes the version, it can read it relaxed
             const version_t version = mVersion.load(std::memory_order_relaxed);
             detail::storeRelease(mValue, newValue);
             detail::storeRelease(mVersion, static_cast<version_t>(version + 1));

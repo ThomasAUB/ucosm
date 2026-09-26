@@ -30,20 +30,8 @@
 
 #include <atomic>
 
-// Memory ordering used by the sync primitives to publish data between
-// contexts.
-//
-// By default they order with acquire / release atomics, which is correct
-// everywhere and costs a DMB barrier per access on Cortex-M.
-//
-// Define UCOSM_SINGLE_CORE to 1 when every context sharing a sync object runs
-// on the same core - thread mode and ISRs of a single-core MCU. A core
-// observes its own memory accesses in program order, so only the compiler
-// must be kept from reordering them : the accesses become relaxed, ordered by
-// signal fences that emit no instruction.
-//
-// Leave it at 0 when a sync object is shared with another core, e.g. between
-// the two cores of an RP2040 or an STM32H7 dual-core.
+// Set to 1 when all contexts sharing a sync object run on one core : barriers
+// are then replaced by compiler fences. Keep 0 for multi-core sharing.
 #ifndef UCOSM_SINGLE_CORE
 #define UCOSM_SINGLE_CORE 0
 #endif

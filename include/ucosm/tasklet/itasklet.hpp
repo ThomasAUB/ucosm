@@ -92,9 +92,7 @@ namespace ucosm {
 
     protected:
 
-        // Demoted from ITask's public removeTask() : use
-        // TaskletScheduler::removeTask() from outside, or this->removeTask()
-        // from within run().
+        // Use TaskletScheduler::removeTask() from outside the task's run().
         using ITask<priority_t>::removeTask;
 
     private:
@@ -121,9 +119,7 @@ namespace ucosm {
         priority_t mPriority = static_cast<priority_t>(-1);
         tick_t mScheduledDeadline = 0;
 
-        // A task waits either for the timer or for an event, never both :
-        // holds the period or the event id, as mState tells. Read it
-        // through getPeriod() / getEventID(), which check mState.
+        // period or event id, depending on mState
         tick_t mWakeupSource = 0;
         eState mState = eState::unconfigured;
     };

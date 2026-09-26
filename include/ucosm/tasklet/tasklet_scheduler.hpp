@@ -34,50 +34,58 @@
 
 namespace ucosm {
 
+    /**
+     * @brief Platform hooks of a TaskletScheduler.
+     * getTick is required, other null hooks are replaced by no-ops.
+     */
     struct TaskletBackend final {
 
+        using get_tick_t = tick_t(*)();
         using request_tasklet_execution_t = void(*)();
         using handler_installer_t = void(*)(void(*)(void*), void*);
         using execution_hook_t = void(*)();
-
-        // Called whenever the deadline of the next timer task changes,
-        // so a platform can reprogram a one-shot hardware timer instead of
-        // being driven by a fixed-period tick source. inHasDeadline is false
-        // when no task is waiting for the timer (the timer should be stopped); otherwise
-        // inDeadline is the absolute tick at which it is next due - use
-        // getDeadlineDelay(now(), inDeadline) to turn it into a duration.
-        //
-        // One of this and poll() is required : between them they are the only
-        // things that make a timer task run. A platform on a one-shot timer
-        // implements this; a platform on a periodic tick calls poll() from its
-        // tick interrupt and leaves this null.
         using schedule_next_wakeup_t = void(*)(bool inHasDeadline, tick_t inDeadline);
 
-        // Reads the platform's clock, in the same unit as the task periods.
-        // Required : the scheduler keeps no clock of its own, and calls this
-        // wherever it needs the time - several times per run() pass, so it
-        // should be cheap. A free running counter read is the intended shape;
-        // a counter incremented by a periodic tick interrupt does just as
-        // well, and is what a platform driving the scheduler through poll()
-        // would return.
-        using get_tick_t = tick_t(*)();
-
-        // listed first because it is the only one that must be provided
+        /**
+         * @brief Returns the current tick. Required, called often so keep it cheap.
+         */
         get_tick_t getTick = nullptr;
 
+        /**
+         * @brief Pends the dispatch context (e.g. PendSV). May be called from an ISR.
+         */
         request_tasklet_execution_t requestTaskletExecution = nullptr;
+
+        /**
+         * @brief Installs the handler to call from the dispatch context.
+         * Called with nulls at destruction.
+         */
         handler_installer_t installHandler = nullptr;
+
+        /**
+         * @brief Prevents the dispatch context from running. Calls may nest.
+         */
         execution_hook_t suspendExecution = nullptr;
+
+        /**
+         * @brief Undoes one suspendExecution() call.
+         */
         execution_hook_t resumeExecution = nullptr;
+
+        /**
+         * @brief Programs a one-shot timer for the next deadline.
+         * Leave null when poll() is called from a periodic tick instead.
+         *
+         * @param inHasDeadline false when no task waits for the timer.
+         * @param inDeadline Absolute tick of the next deadline.
+         */
         schedule_next_wakeup_t scheduleNextWakeup = nullptr;
 
     };
 
     namespace detail {
 
-        // Stand-ins for the optional hooks a backend leaves null. They are
-        // put in place once, when the scheduler is built, so that no call
-        // site has to test a hook before calling it.
+        // Stand-ins for null backend hooks, so that call sites need no test.
         inline void noopHook() {}
         inline void noopHandlerInstaller(void (*)(void*), void*) {}
         inline void noopScheduleNextWakeup(bool, tick_t) {}
@@ -109,15 +117,19 @@ namespace ucosm {
     struct Bitset;
 
     /**
-     * @brief Pend task scheduler.
+     * @brief Scheduler of tasklets woken by timers or events, run from a
+     * pended dispatch context.
      *
-     * The backend is copied at construction, its null optional hooks
-     * replaced by no-ops : each hook then costs an indirect call, without a
-     * test. getTick is required.
+     * @tparam event_count Number of events tasks can wait for.
      */
     template<event_id_t event_count>
     struct TaskletScheduler : IScheduler<ITasklet, ITask<uint8_t>> {
 
+        /**
+         * @brief Construct a new tasklet scheduler object.
+         *
+         * @param inBackend Platform hooks, copied by the scheduler.
+         */
         TaskletScheduler(const TaskletBackend& inBackend) :
             mBackend(inBackend) {
             detail::fillDefaultHooks(mBackend);
@@ -131,64 +143,85 @@ namespace ucosm {
             );
         }
 
+        /**
+         * @brief Destroy the tasklet scheduler object, uninstalling its handler.
+         */
         ~TaskletScheduler() {
-            // uninstall handler by passing nulls
             mBackend.installHandler(nullptr, nullptr);
         }
 
-        // Adds a task. Priority is in reverse order: lower values are higher priority.
-        // A timer task waits for a full period before its first execution.
-        bool addTask(ITasklet& inTask) override;
+        /**
+         * @brief Adds a task to the scheduler. Lower priority values run first.
+         * A timer task waits for a full period before its first execution.
+         *
+         * @param inTask Task instance.
+         * @return true if the task was successfully added.
+         * @return false if the task is unconfigured or waits for an event
+         * this scheduler doesn't have.
+         */
+        bool addTask(ITasklet& inTask);
 
-        // Adds a timer task whose first execution must not wait for a full
-        // period : it is armed inDelay ticks from now, the period taking over
-        // afterwards. Returns false for a task that isn't configured with
-        // setPeriod(), a delay being meaningless for an event.
+        /**
+         * @brief Adds a timer task, first run after inDelay instead of a period.
+         *
+         * @param inTask Task instance.
+         * @param inDelay Delay before the first execution.
+         * @return true if the task was successfully added.
+         * @return false if the task isn't configured with setPeriod().
+         */
         bool addTask(ITasklet& inTask, tick_t inDelay);
 
-        // Sets the delay before the next execution of a task that is already
-        // scheduled, and re-sorts it so that the scheduler wakes up for it.
-        // Only the next execution is affected, the period takes over
-        // afterwards. Like PeriodicScheduler::setDelay the delay is held by
-        // the task rank, so it can only be set on a task that is scheduled on
-        // the timer : false is returned for a task that isn't linked or that
-        // is waiting for an event. A running task may call it on itself to
-        // shift its next execution.
+        /**
+         * @brief Sets the delay before the next execution of a scheduled task.
+         * The period takes over afterwards. May be called by the task itself.
+         *
+         * @param inTask Task instance.
+         * @param inDelay Delay value.
+         * @return true if the task was re-sorted.
+         * @return false if the task isn't linked or is waiting for an event.
+         */
         bool setDelay(ITasklet& inTask, tick_t inDelay);
 
-        // Unschedules a task, from whichever list it sits in, and refreshes
-        // the next deadline so that a platform driven by scheduleNextWakeup
-        // stops waiting for a task that is gone.
-        //
-        // ITask::removeTask() does the same unlinking but without the
-        // ExecutionLock : calling it from outside the task's own run() races
-        // the list walk this scheduler does from its dispatch context. Go
-        // through here instead.
+        /**
+         * @brief Removes a task from the scheduler.
+         * Unlike ITask::removeTask(), safe to call from outside the task's run().
+         *
+         * @param inTask Task instance.
+         */
         void removeTask(ITasklet& inTask);
 
-        // A scheduler is itself a task, so it may be nested in another one and
-        // unscheduled from it. Re-exposed because the overload above would
-        // otherwise hide it.
+        /**
+         * @brief Removes the scheduler from its own parent scheduler.
+         */
         using ITask<uint8_t>::removeTask;
 
-        // Tells the scheduler that time may have moved on, and wakes it if a
-        // deadline has come round. Called from a periodic tick (ISR or
-        // thread), which is also expected to be what moves the clock that
-        // backend getTick reads : this only looks at that clock, it does not
-        // advance anything.
-        //
-        // A platform on a one-shot timer implements backend scheduleNextWakeup
-        // instead and never calls this. One of the two is required.
+        /**
+         * @brief Wakes the scheduler if a deadline is due. Call from a periodic
+         * tick, unless the backend implements scheduleNextWakeup.
+         */
         void poll();
 
-        // current time, read from the backend's clock
+        /**
+         * @brief Returns the current time, read from the backend's clock.
+         *
+         * @return tick_t Current tick.
+         */
         tick_t now() const;
 
-        // return next timer deadline (tick) if any. Returns true and writes
-        // the deadline into `out` when a timer is armed, otherwise returns false.
+        /**
+         * @brief Get the next timer deadline, if any.
+         *
+         * @param out Absolute tick of the next deadline, untouched if none.
+         * @return true if a timer is armed.
+         * @return false otherwise.
+         */
         bool tryGetNextDeadline(tick_t& out) const;
 
-        // called from an ISR
+        /**
+         * @brief Signals an event to the tasks waiting for it. ISR safe.
+         *
+         * @param inEventID Event identifier, below event_count.
+         */
         void signalEvent(event_id_t inEventID);
 
     protected:
@@ -197,12 +230,10 @@ namespace ucosm {
         using task_list_t = ulink::List<itask_t>;
         using base_t = IScheduler<ITasklet, ITask<uint8_t>>;
 
-        // called from low priority context
+        // called from the dispatch context
         void run() override;
 
-        // Sorts a task into a list on its plain rank. Used for the lists
-        // ranked by priority - the run list and the event lists - where
-        // the rank is a value to compare, not a point in time.
+        // Sorts a task by plain rank, for the priority-ranked lists.
         static void insertSort(task_list_t& inList, itask_t& inTask);
 
         static void mergeSortedLists(task_list_t& ioList, task_list_t& inList);
@@ -211,23 +242,10 @@ namespace ucosm {
 
         void pushReadyTimerTasks(task_list_t& ioList, tick_t inNow);
 
-        // Sorts a task into the timer list, wherever it was before.
-        //
-        // Deadlines are cyclic, so the list is ordered by the delay separating
-        // each task from the cursor rather than by the raw rank : ordering on
-        // the rank would put a deadline that has wrapped past zero in front of
-        // the cursor, which is the one place getNextTask() never looks.
-        //
-        // The cursor is therefore always the head of the list, at a delay of
-        // zero from itself. Called under an ExecutionLock.
-        void insertTimerLocked(itask_t& inTask);
-
-        // Arms a timer task inDelay ticks from now and sorts it into the
-        // timer list, wherever it was before. Called under an ExecutionLock.
+        // Arms a timer task inDelay ticks from now. Called under an ExecutionLock.
         void armTimerLocked(ITasklet& inTask, tick_t inDelay);
 
-        // Publishes the next deadline, returning false when no task is
-        // sleeping; otherwise writes it into outDeadline.
+        // Publishes the next deadline, returns false when there is none.
         bool updateNextTimerLocked(tick_t& outDeadline);
 
         void updateNextTimerLocked() {
@@ -252,15 +270,15 @@ namespace ucosm {
 
         ulink::List<ITask<priority_t>>& mTimerList { base_t::mTasks };
         task_list_t mEventTaskLists[event_count];
+        // set from ISRs, consumed by run()
         Bitset<event_count> mPendingEvents;
+        // written under an ExecutionLock only, read from ISRs
         Bitset<event_count> mSubscribedEvents;
         uatom::Atomic<bool> mHasTimerTask { false };
         uatom::Atomic<tick_t> mNextTimer { 0 };
         uatom::Atomic<tick_t> mCursorRank { 0 };
 
-        // Last (hasDeadline, deadline) reported to mBackend.scheduleNextWakeup.
-        // Only ever touched from updateNextTimerLocked(), which always runs
-        // under an ExecutionLock, so these don't need to be atomic.
+        // last published deadline, only accessed under an ExecutionLock
         bool mNotifiedHasTimer = false;
         tick_t mNotifiedDeadline = 0;
 
@@ -268,7 +286,6 @@ namespace ucosm {
     };
 
 
-    // called from background and foreground tasks
     template<event_id_t event_count>
     bool TaskletScheduler<event_count>::addTask(ITasklet& inTask) {
 
@@ -287,17 +304,15 @@ namespace ucosm {
 
             inTask.setRank(inTask.getPriority());
             insertSort(mEventTaskLists[itID], inTask);
-            mSubscribedEvents.set(itID);
+            mSubscribedEvents.setLocked(itID);
         }
         else {
-            // unconfigured task
             return false;
         }
 
         return true;
     }
 
-    // called from background and foreground tasks
     template<event_id_t event_count>
     bool TaskletScheduler<event_count>::addTask(ITasklet& inTask, tick_t inDelay) {
 
@@ -312,14 +327,12 @@ namespace ucosm {
         return true;
     }
 
-    // called from background and foreground tasks
     template<event_id_t event_count>
     bool TaskletScheduler<event_count>::setDelay(ITasklet& inTask, tick_t inDelay) {
 
         ExecutionLock guard(*this);
 
         if (!inTask.isLinked() || !inTask.isWaitingForTimer()) {
-            // nothing to re-sort : the task isn't scheduled on the timer
             return false;
         }
 
@@ -328,72 +341,13 @@ namespace ucosm {
         return true;
     }
 
-    // called from background and foreground tasks
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::insertTimerLocked(itask_t& inTask) {
-
-        const auto cursor = this->mCursorTask.getRank();
-        const auto delay = getDeadlineDelay(cursor, inTask.getRank());
-
-        // Only the part after the cursor is walked : everything the cursor
-        // has already gone past belongs to the round being retired, and a
-        // deadline armed now always comes after it. Tasks due at the same
-        // tick keep their FIFO order.
-        //
-        // The list spans delays [0, tail delay], so the walk starts from
-        // whichever end is closer : a short period re-arms near the cursor,
-        // a long one near the tail, and a deadline at or past the tail - all
-        // tasks sharing one period, or the longest period - is appended
-        // without walking at all.
-        //
-        // The task itself is skipped : setDelay() re-sorts a task that is
-        // still linked here, and inserting a node next to itself would
-        // corrupt the list.
-        auto& back = mTimerList.back();
-        const auto backDelay = getDeadlineDelay(cursor, back.getRank());
-
-        if (&back != &inTask && delay >= backDelay) {
-            // also covers an empty timer list, where back is the cursor
-            mTimerList.push_back(inTask);
-            return;
-        }
-
-        if (delay <= backDelay / 2) {
-            task_list_t::iterator it(&this->mCursorTask);
-            ++it;
-
-            const auto endIt = mTimerList.end();
-
-            // the task itself compares equal, so it is walked past
-            while (it != endIt && getDeadlineDelay(cursor, it->getRank()) <= delay) {
-                ++it;
-            }
-
-            // insert_before(end()) appends, so the last slot needs no special case.
-            mTimerList.insert_before(it, inTask);
-        }
-        else {
-            task_list_t::reverse_iterator it = mTimerList.rbegin();
-            const task_list_t::reverse_iterator cursorIt(&this->mCursorTask);
-
-            while (it != cursorIt &&
-                (&*it == &inTask || getDeadlineDelay(cursor, it->getRank()) > delay)) {
-                ++it;
-            }
-
-            mTimerList.insert_after(task_list_t::iterator(&*it), inTask);
-        }
-    }
-
-    // called from background and foreground tasks
     template<event_id_t event_count>
     void TaskletScheduler<event_count>::armTimerLocked(ITasklet& inTask, tick_t inDelay) {
         inTask.setRank(makeDeadline(now(), inDelay));
-        insertTimerLocked(inTask);
+        this->insertByDeadline(inTask);
         updateNextTimerLocked();
     }
 
-    // called from background and foreground tasks
     template<event_id_t event_count>
     void TaskletScheduler<event_count>::removeTask(ITasklet& inTask) {
 
@@ -401,23 +355,18 @@ namespace ucosm {
 
         inTask.ITasklet::removeTask();
 
-        // The task may have been the one the platform is waiting for : tell it
-        // what is left, rather than letting it wake up for a deadline that no
-        // longer belongs to anyone.
+        // the platform may have been waiting for this task
         updateNextTimerLocked();
     }
 
-    // called from ISR
     template<event_id_t event_count>
     void TaskletScheduler<event_count>::poll() {
 
-        if (!mHasTimerTask.load(std::memory_order_acquire)) {
-            // nothing waiting for the timer, so no deadline to come round
+        // relaxed : a stale read only costs a spurious or one tick late wake-up
+        if (!mHasTimerTask.load(std::memory_order_relaxed)) {
             return;
         }
 
-        // mHasTimerTask is stored last, with release, by
-        // updateNextTimerLocked() : the acquire above already orders these.
         const auto next = mNextTimer.load(std::memory_order_relaxed);
         const auto cursor = mCursorRank.load(std::memory_order_relaxed);
 
@@ -427,13 +376,11 @@ namespace ucosm {
 
     }
 
-    // called from ISR, foregreound and background (anywhere)
     template<event_id_t event_count>
     tick_t TaskletScheduler<event_count>::now() const {
         return mBackend.getTick();
     }
 
-    // called from ISR, background, foreground (anywhere)
     template<event_id_t event_count>
     bool TaskletScheduler<event_count>::tryGetNextDeadline(tick_t& out) const {
         if (!mHasTimerTask.load(std::memory_order_acquire)) {
@@ -443,7 +390,6 @@ namespace ucosm {
         return true;
     }
 
-    // called from ISR, background, foreground (anywhere)
     template<event_id_t event_count>
     void TaskletScheduler<event_count>::signalEvent(event_id_t inEventID) {
 
@@ -453,23 +399,17 @@ namespace ucosm {
 
         mPendingEvents.set(inEventID);
 
-        // program low priority function for tasklet execution
         requestExecution();
     }
 
-    // called from foreground
     template<event_id_t event_count>
     void TaskletScheduler<event_count>::pushReadyEventTasks(task_list_t& ioList) {
-        // pull pending events into run list
-        Bitset<event_count> pendingEventsCopy;
-        mPendingEvents.fetchAndClear(pendingEventsCopy);
-
-        pendingEventsCopy.forEach(
+        mPendingEvents.consume(
             [&] (uint8_t i) {
                 auto& list = mEventTaskLists[i];
                 if (list.empty()) {
-                    // task(s) have been destroyed
-                    mSubscribedEvents.reset(i);
+                    // task(s) have been removed
+                    mSubscribedEvents.resetLocked(i);
                 }
                 else {
                     mergeSortedLists(ioList, list);
@@ -478,23 +418,14 @@ namespace ucosm {
         );
     }
 
-    // called from foreground
     template<event_id_t event_count>
     void TaskletScheduler<event_count>::pushReadyTimerTasks(task_list_t& ioList, tick_t inNow) {
-        // pull expired timers into run list
-
-        auto* task = this->getNextTask();
+        auto* task = this->selectReadyTask(inNow);
         if (!task) {
-            // no timer tasks in the list
             return;
         }
 
         const auto cursor = this->mCursorTask.getRank();
-
-        if (!isDeadlineDue(cursor, task->getRank(), inNow)) {
-            // no timer task ready
-            return;
-        }
 
         // the first task is known to be due, the loop checks the ones after it
         for (task_list_t::iterator it(task), endIt = mTimerList.end(); it != endIt; ) {
@@ -506,13 +437,8 @@ namespace ucosm {
                 break;
             }
 
-            // The task configuration is left untouched : a task that does
-            // not reconfigure itself in run() is re-armed with the same delay
-            // duration, which makes its delay act as a period.
             auto& pendTask = static_cast<ITasklet&>(node);
-            // Captured before the rank gets overwritten for run-list
-            // ordering below : run() anchors the next deadline on this
-            // value rather than on dispatch time, see run().
+            // run() anchors the next deadline on it, not on dispatch time
             pendTask.setScheduledDeadline(node.getRank());
             pendTask.setRank(pendTask.getPriority());
             insertSort(ioList, pendTask);
@@ -520,12 +446,11 @@ namespace ucosm {
             it = nextIt;
         }
 
-        // track the tick value used for deadline comparisons to remain wrap-safe
         this->mCursorTask.setRank(inNow);
-        mCursorRank.store(inNow, std::memory_order_release);
+        // relaxed : poll() is its only reader, and reads it relaxed
+        mCursorRank.store(inNow, std::memory_order_relaxed);
     }
 
-    // called from foreground
     template<event_id_t event_count>
     void TaskletScheduler<event_count>::run() {
 
@@ -537,31 +462,23 @@ namespace ucosm {
 
             pushReadyEventTasks(runList);
 
-            // Read once per pass : the time timer deadlines are checked
-            // against, and the anchor for a task that switches from
-            // waitingForEvent to waitingForTimer inside run() below. That task
-            // was never due at a deadline, so its first period counts from
-            // the moment it became ready instead, the same way a timer
-            // task's counts from the deadline it was due at - see
-            // pushReadyTimerTasks().
+            // also anchors a task switching from event to timer in its run()
             const auto readyTick = now();
 
             pushReadyTimerTasks(runList, readyTick);
 
-            // execute the run list's tasks
             while (!runList.empty()) {
 
                 auto& t = static_cast<ITasklet&>(runList.front());
 
                 const bool wasWaitingForTimer = t.isWaitingForTimer();
 
+                this->mCurrentTask = &t;
+
                 t.run();
 
                 if (!t.isLinked() || runList.empty() || &runList.front() != &t) {
-                    // the task removed itself, or rescheduled itself through
-                    // the scheduler : it already left the run list. The
-                    // emptiness check comes first, front() on an empty list
-                    // is a fault.
+                    // the task removed or rescheduled itself
                     continue;
                 }
 
@@ -570,11 +487,7 @@ namespace ucosm {
                 if (t.isWaitingForTimer()) {
 
                     if (!wasWaitingForTimer) {
-                        // Just configured itself with setPeriod() from a
-                        // waitingForEvent state : it has no due-deadline
-                        // to anchor on, unlike a task that was already
-                        // waiting for the timer and keeps whatever
-                        // pushReadyTimerTasks stamped it with.
+                        // switched from event to timer : no deadline to anchor on
                         t.setScheduledDeadline(readyTick);
                     }
 
@@ -582,13 +495,8 @@ namespace ucosm {
 
                     auto deadline = makeDeadline(t.getScheduledDeadline(), period);
 
-                    // If the task took longer to run than its own period,
-                    // the computed deadline already lies in the past. Left
-                    // as is, it would sort to the far end of the timer list
-                    // and never come due again, or make a backend fire its
-                    // one-shot wake-up immediately, over and over. Detecting
-                    // that case below and re-arming from now instead keeps
-                    // the scheduler running.
+                    // overran its period : re-arm from now, a past deadline
+                    // would sort to the far end of the list
                     const auto after = now();
 
                     if (isDeadlinePassed(after, deadline)) {
@@ -596,34 +504,25 @@ namespace ucosm {
                     }
 
                     t.setRank(deadline);
-                    insertTimerLocked(t);
+                    this->insertByDeadline(t);
                 }
                 else if (t.isWaitingForEvent() && itID < event_count) {
-                    // push into event list
-                    mSubscribedEvents.set(itID);
+                    mSubscribedEvents.setLocked(itID);
                     t.setRank(t.getPriority());
                     insertSort(mEventTaskLists[itID], t);
                 }
                 else {
-                    // The task disposed of itself or is waiting for an
-                    // event this scheduler doesn't have : there is no list
-                    // to push it into. It must still leave the run list, which
-                    // would otherwise keep running it forever.
+                    // disposed, or waiting for an unknown event
                     t.removeTask();
                 }
             }
 
-            // The cursor and the deadline are owned by this context : read
-            // them directly rather than back from the atomics published for
-            // poll().
             tick_t nextDeadline;
             const bool hasTimerDue =
                 updateNextTimerLocked(nextDeadline) &&
-                isDeadlineDue(
-                    this->mCursorTask.getRank(),
+                this->isDue(
                     nextDeadline,
-                    // re-read, so that the time the tasks just spent running
-                    // counts towards the next deadline being due
+                    // re-read to account for the time spent running tasks
                     now()
                 );
 
@@ -631,9 +530,10 @@ namespace ucosm {
                 break;
             }
         }
+
+        this->mCurrentTask = nullptr;
     }
 
-    // called from background and foreground tasks
     template<event_id_t event_count>
     void TaskletScheduler<event_count>::insertSort(task_list_t& inList, itask_t& inTask) {
 
@@ -650,9 +550,7 @@ namespace ucosm {
             return;
         }
 
-        // Walked from the back : equal ranks keep their FIFO order, and the
-        // task is linked once at its final place instead of being appended
-        // and then moved.
+        // walked from the back to keep FIFO order for equal ranks
         auto it = inList.rbegin();
         while (it->getRank() > rank) {
             ++it;
@@ -661,7 +559,6 @@ namespace ucosm {
         inList.insert_after(task_list_t::iterator(&*it), inTask);
     }
 
-    // called from foreground task
     template<event_id_t event_count>
     void TaskletScheduler<event_count>::mergeSortedLists(task_list_t& ioList, task_list_t& inList) {
 
@@ -674,32 +571,27 @@ namespace ucosm {
             return;
         }
 
-        // Fast-path: all nodes in `inList` come after `ioList` -> splice to end
+        // inList goes after ioList
         if (inList.front().getRank() >= ioList.back().getRank()) {
             ioList.splice(ioList.end(), inList);
             return;
         }
 
-        // Fast-path: all nodes in `inList` come before `ioList` -> splice to front
+        // inList goes before ioList
         if (inList.back().getRank() <= ioList.front().getRank()) {
             ioList.splice(ioList.begin(), inList);
             return;
         }
 
-        // Merge in linear time by walking both lists and splicing single nodes
-        // from `inList` into their correct position in `ioList`.
         auto it_io = ioList.begin();
         while (!inList.empty()) {
             auto& inNode = inList.front();
 
-            // Advance io iterator until it points to the first node
-            // with rank > inNode.rank (insert before it).
             while (it_io != ioList.end() && it_io->getRank() <= inNode.getRank()) {
                 ++it_io;
             }
 
             if (it_io == ioList.end()) {
-                // Remaining nodes in inList are >= all ioList nodes -> splice the rest
                 ioList.splice(ioList.end(), inList);
                 break;
             }
@@ -708,26 +600,25 @@ namespace ucosm {
         }
     }
 
-    // called from background and foreground
     template<event_id_t event_count>
     bool TaskletScheduler<event_count>::updateNextTimerLocked(tick_t& outDeadline) {
 
-        bool hasTimer;
+        bool hasTimer = false;
         tick_t deadline = 0;
 
         if (auto* nextTask = this->getNextTask()) {
             deadline = nextTask->getRank();
-            mNextTimer.store(deadline, std::memory_order_relaxed);
-            mHasTimerTask.store(true, std::memory_order_release);
             hasTimer = true;
         }
-        else {
-            mHasTimerTask.store(false, std::memory_order_release);
-            hasTimer = false;
-        }
 
+        // only written when changed, to save barriers
         if (hasTimer != mNotifiedHasTimer ||
             (hasTimer && deadline != mNotifiedDeadline)) {
+            if (hasTimer) {
+                mNextTimer.store(deadline, std::memory_order_relaxed);
+            }
+            // stored last, with release, for tryGetNextDeadline()
+            mHasTimerTask.store(hasTimer, std::memory_order_release);
             mNotifiedHasTimer = hasTimer;
             mNotifiedDeadline = deadline;
             mBackend.scheduleNextWakeup(hasTimer, deadline);
@@ -742,6 +633,8 @@ namespace ucosm {
         mBackend.requestTaskletExecution();
     }
 
+    // Written either with set() from any context, or with setLocked() /
+    // resetLocked() by one writer at a time, never both.
     template<uint8_t size>
     struct Bitset {
 
@@ -749,26 +642,38 @@ namespace ucosm {
             if (i >= size) { return; }
             const uint8_t idx = static_cast<uint8_t>(i >> 5);
             const uint32_t mask = static_cast<uint32_t>(1u << (i & 0x1F));
-            // release only : set() publishes nothing it would need to read back
             mStorage[idx].fetch_or(mask, std::memory_order_release);
         }
 
-        void reset(uint8_t i) {
+        // relaxed : the bits are a filter, they publish nothing
+        void setLocked(uint8_t i) {
             if (i >= size) { return; }
             const uint8_t idx = static_cast<uint8_t>(i >> 5);
             const uint32_t mask = static_cast<uint32_t>(1u << (i & 0x1F));
-            mStorage[idx].fetch_and(static_cast<uint32_t>(~mask), std::memory_order_acq_rel);
+            const uint32_t v = mStorage[idx].load(std::memory_order_relaxed);
+            if ((v & mask) == 0u) {
+                mStorage[idx].store(v | mask, std::memory_order_relaxed);
+            }
+        }
+
+        void resetLocked(uint8_t i) {
+            if (i >= size) { return; }
+            const uint8_t idx = static_cast<uint8_t>(i >> 5);
+            const uint32_t mask = static_cast<uint32_t>(1u << (i & 0x1F));
+            const uint32_t v = mStorage[idx].load(std::memory_order_relaxed);
+            if ((v & mask) != 0u) {
+                mStorage[idx].store(v & ~mask, std::memory_order_relaxed);
+            }
         }
 
         bool get(uint8_t i) const {
             if (i >= size) { return false; }
             const uint32_t mask = static_cast<uint32_t>(1u << (i & 0x1F));
-            const uint32_t v = mStorage[i >> 5].load(std::memory_order_acquire);
+            const uint32_t v = mStorage[i >> 5].load(std::memory_order_relaxed);
             return (v & mask) != 0u;
         }
 
-        // A hint only : a bit it reports is consumed by fetchAndClear(), which
-        // carries the ordering.
+        // a hint only, consume() carries the ordering
         bool any() const {
             for (uint8_t i = 0; i < storage_size; ++i) {
                 if (mStorage[i].load(std::memory_order_relaxed) != 0) {
@@ -778,28 +683,16 @@ namespace ucosm {
             return false;
         }
 
-        // Atomically snapshot all bits and clear them.
-        // Each word is individually exchanged, so an ISR can set a bit in a
-        // later word between exchanges — that bit will appear in the
-        // snapshot AND remain set in *this.  Callers must handle that
-        // scenario (e.g. re-checking or tolerating duplicate processing).
-        //
-        // dest is expected to be a local snapshot, private to the caller :
-        // it is written and read back relaxed, the exchange alone carries
-        // the ordering.
-        void fetchAndClear(Bitset& dest) {
-            for (uint8_t i = 0; i < storage_size; ++i) {
-                dest.mStorage[i].store(
-                    mStorage[i].exchange(0u, std::memory_order_acq_rel),
-                    std::memory_order_relaxed);
-            }
-        }
-
-        // Meant for a snapshot filled by fetchAndClear(), see above.
+        // Clears the set bits and calls f(index) for each. A bit set meanwhile
+        // may be left for the next call, so callers loop while any().
         template<typename F>
-        void forEach(F&& f) const {
+        void consume(F&& f) {
             for (uint8_t wordIndex = 0; wordIndex < storage_size; ++wordIndex) {
-                uint32_t v = mStorage[wordIndex].load(std::memory_order_relaxed);
+                if (mStorage[wordIndex].load(std::memory_order_relaxed) == 0u) {
+                    continue;
+                }
+                // pairs with the release in set()
+                uint32_t v = mStorage[wordIndex].exchange(0u, std::memory_order_acquire);
                 while (v) {
                     const uint8_t bitOffset = firstSetBit(v);
                     const uint8_t globalIdx = static_cast<uint8_t>((wordIndex << 5) + bitOffset);
@@ -813,12 +706,10 @@ namespace ucosm {
     private:
 
         static uint8_t firstSetBit(uint32_t v) {
-            // use builtin to avoid the loop when available
 #if (defined(__clang__) || defined(__GNUC__)) && (!defined(__arm__) || defined(__ARM_FEATURE_CLZ))
             return static_cast<uint8_t>(__builtin_ctz(v));
 #elif defined(__arm__)
-            // no CLZ on ARMv6-M : isolate the lowest set bit and look it up
-            // with a de Bruijn sequence rather than calling libgcc's __ctzsi2
+            // no CLZ on ARMv6-M : de Bruijn lookup instead of libgcc's __ctzsi2
             static constexpr uint8_t lookup[32] = {
                 0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
                 31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
@@ -838,12 +729,12 @@ namespace ucosm {
     template<>
     struct Bitset<0> {
         void set(uint8_t) {}
-        void reset(uint8_t) {}
+        void setLocked(uint8_t) {}
+        void resetLocked(uint8_t) {}
         bool get(uint8_t) const { return false; }
         bool any() const { return false; }
-        void fetchAndClear(Bitset&) {}
         template<typename F>
-        void forEach(F&&) const {}
+        void consume(F&&) {}
     };
 
 }

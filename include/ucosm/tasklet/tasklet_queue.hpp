@@ -34,19 +34,8 @@
 namespace ucosm {
 
     /**
-     * @brief Message queue that wakes a tasklet when a message is sent.
-     *
-     * Pairs a MessageQueue with a scheduler event : each successful
-     * trySend() signals the event, so a tasklet waiting for it is run to
-     * receive the message. Typically filled from an ISR and drained by the
-     * tasklet.
-     *
-     * Events are coalesced : several sends before the tasklet runs wake it
-     * once, so run() must drain the queue, calling tryReceive() until it
-     * returns false. A message sent while no tasklet waits for the event
-     * does not wake anything, it is received on the next wake-up.
-     *
-     * Same single producer single consumer rules as MessageQueue.
+     * @brief SPSC MessageQueue that signals an event to wake a tasklet on send.
+     * Wake-ups are coalesced, so the tasklet must drain the queue on each run.
      *
      * @tparam T Message type (must be trivially copyable)
      * @tparam Size Number of messages the queue holds, a power of 2
@@ -62,6 +51,8 @@ namespace ucosm {
         static constexpr size_t capacity = MessageQueue<T, Size>::capacity;
 
         /**
+         * @brief Construct a new tasklet queue object.
+         *
          * @param inScheduler Scheduler of the tasklet to wake up.
          * @param inEventID Event the tasklet waits for.
          */
@@ -82,8 +73,7 @@ namespace ucosm {
         }
 
         /**
-         * @brief Send as many messages as fit and wake the tasklet once.
-         * Producer side.
+         * @brief Send as many messages as fit and wake the tasklet once. Producer side.
          * @return Number of messages queued, from the start of messages
          */
         size_t trySend(const T* messages, size_t count) noexcept {

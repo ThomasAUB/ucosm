@@ -37,20 +37,7 @@ namespace ucosm {
 
     /**
      * @brief Lock-free, wait-free single producer single consumer queue.
-     *
-     * Passes messages between two contexts of different priorities - an ISR
-     * and a task, or two tasks - without blocking or dynamic allocation.
-     * The send functions must only be called from one context and the
-     * receive functions from one other context.
-     *
-     * Built for small MCUs :
-     * - the indices run freely and are masked on access, so all Size slots
-     *   hold a message;
-     * - each side keeps a private copy of the other side's index, and only
-     *   reads the shared one when the queue looks full (send) or empty
-     *   (receive) : a send or a receive usually costs a single barrier,
-     *   none with UCOSM_SINGLE_CORE (see memory_order.hpp);
-     * - the bulk overloads move several messages for the cost of one.
+     * Send from one context only, receive from one other context only.
      *
      * @tparam T Message type (must be trivially copyable)
      * @tparam Size Number of messages the queue holds, a power of 2
@@ -65,7 +52,6 @@ namespace ucosm {
     public:
         using message_t = T;
 
-        // number of messages the queue can hold
         static constexpr size_t capacity = Size;
 
         /**
@@ -113,7 +99,6 @@ namespace ucosm {
                 return 0;
             }
 
-            // the slots may wrap past the end of the buffer
             const size_t start = write & mask;
             const size_t first = (count < Size - start) ? count : Size - start;
             copy(mBuffer + start, messages, first);
@@ -198,8 +183,7 @@ namespace ucosm {
          * @return Number of messages (may be stale)
          */
         size_t size() const noexcept {
-            // read index first : it never passes the write index, so the
-            // difference can't underflow, whichever side calls this
+            // read index first : it never passes the write index
             const size_t read = detail::loadAcquire(mReadIndex);
             const size_t write = detail::loadAcquire(mWriteIndex);
             const size_t count = write - read;
@@ -219,7 +203,7 @@ namespace ucosm {
 
         static constexpr size_t mask = Size - 1;
 
-        // A loop rather than memcpy, which a small count wouldn't amortize.
+        // cheaper than memcpy for small counts
         static void copy(T* outDst, const T* inSrc, size_t inCount) noexcept {
             for (size_t i = 0; i < inCount; ++i) {
                 outDst[i] = inSrc[i];

@@ -196,3 +196,182 @@ TEST_CASE("UCOSM_SLEEP_UNTIL pacing") {
     CHECK(t.mBodyTicks.size() == 1);
     CHECK(t.mBodyTicks[0] == 0);
 }
+
+#include "ucosm/tasklet/tasklet_scheduler.hpp"
+
+namespace {
+
+    // Synchronous tasklet platform : run() is invoked by hand, time moves only
+    // when a test moves it.
+    uint32_t sTaskletNow = 0;
+    void (*sTaskletHandler)(void*) = nullptr;
+    void* sTaskletContext = nullptr;
+
+    const ucosm::TaskletBackend resumable_backend {
+        +[] () { return sTaskletNow; },
+        nullptr,
+        +[] (void (*inHandler)(void*), void* inContext) {
+            sTaskletHandler = inHandler;
+            sTaskletContext = inContext;
+        }
+    };
+
+    void runTasklets() {
+        if (sTaskletHandler) {
+            sTaskletHandler(sTaskletContext);
+        }
+    }
+
+}
+
+TEST_CASE("Resumable tasklet : sleep, event wait and end") {
+
+    sTaskletNow = 0;
+
+    struct Task : ucosm::IResumableTasklet {
+
+        std::vector<int> mSteps;
+
+        void run() override {
+
+            UCOSM_START;
+
+            mSteps.push_back(1);
+
+            UCOSM_SLEEP_FOR(100);
+
+            mSteps.push_back(2);
+
+            UCOSM_WAIT_EVENT(0);
+
+            mSteps.push_back(3);
+
+            UCOSM_SLEEP_FOR(50);
+
+            mSteps.push_back(4);
+
+            UCOSM_END;
+        }
+    };
+
+    ucosm::TaskletScheduler<1> sched(resumable_backend);
+
+    Task t;
+    t.setPeriod(10);
+    REQUIRE(sched.addTask(t));
+
+    sTaskletNow = 9;
+    runTasklets();
+    CHECK(t.mSteps.empty());
+
+    sTaskletNow = 10;
+    runTasklets();
+    REQUIRE(t.mSteps.size() == 1);
+    CHECK(t.getPeriod() == 100);
+
+    sTaskletNow = 109;
+    runTasklets();
+    CHECK(t.mSteps.size() == 1);
+
+    sTaskletNow = 110;
+    runTasklets();
+    REQUIRE(t.mSteps.size() == 2);
+    CHECK(t.isWaitingForEvent());
+    CHECK(t.getEventID() == 0);
+
+    // no timer is left armed while waiting for the event
+    sTaskletNow = 10'000;
+    runTasklets();
+    CHECK(t.mSteps.size() == 2);
+
+    sched.signalEvent(0);
+    runTasklets();
+    REQUIRE(t.mSteps.size() == 3);
+    CHECK(t.isWaitingForTimer());
+    CHECK(t.getPeriod() == 50);
+
+    sTaskletNow = 10'050;
+    runTasklets();
+    REQUIRE(t.mSteps.size() == 4);
+    CHECK(t.mSteps == std::vector<int> { 1, 2, 3, 4 });
+    CHECK(!t.isLinked());
+}
+
+TEST_CASE("Resumable tasklet : UCOSM_SLEEP_UNTIL re-arms with the check period") {
+
+    sTaskletNow = 0;
+    static bool sFlag = false;
+    sFlag = false;
+
+    struct Task : ucosm::IResumableTasklet {
+
+        int mEntries = 0;
+        bool mDone = false;
+
+        void run() override {
+
+            UCOSM_START;
+
+            ++mEntries;
+
+            UCOSM_SLEEP_UNTIL(sFlag, 100);
+
+            mDone = true;
+            UCOSM_END;
+        }
+    };
+
+    ucosm::TaskletScheduler<1> sched(resumable_backend);
+
+    Task t;
+    t.setPeriod(1);
+    REQUIRE(sched.addTask(t));
+
+    sTaskletNow = 1;
+    runTasklets();
+    CHECK(t.getPeriod() == 100);
+
+    for (uint32_t n = 101; n <= 301; n += 100) {
+        sTaskletNow = n;
+        runTasklets();
+        CHECK(t.getPeriod() == 100);
+        CHECK(!t.mDone);
+    }
+
+    sFlag = true;
+    sTaskletNow = 401;
+    runTasklets();
+    CHECK(t.mDone);
+    CHECK(!t.isLinked());
+    CHECK(t.mEntries == 1);
+}
+
+namespace {
+
+    // The case label in UCOSM_START must not depend on members of a
+    // dependent base.
+    template<typename T>
+    struct TemplatedResumableTask : ucosm::ResumableTask<ucosm::IPeriodicTask> {
+        T mRuns = 0;
+        void run() override {
+            UCOSM_START;
+            ++mRuns;
+            UCOSM_YIELD;
+            ++mRuns;
+            UCOSM_END;
+        }
+    };
+
+}
+
+TEST_CASE("Resumable task : templated user task") {
+
+    ucosm::PeriodicScheduler sched(+[] () -> uint32_t { return 0; });
+
+    TemplatedResumableTask<int> t;
+    sched.addTask(t);
+    while (!sched.empty()) {
+        sched.run();
+    }
+    CHECK(t.mRuns == 2);
+}

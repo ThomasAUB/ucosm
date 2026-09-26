@@ -28,16 +28,17 @@
 #pragma once
 
 #include "ucosm/periodic/iperiodic_task.hpp"
+#include "ucosm/tasklet/itasklet.hpp"
 
 #define UCOSM_START                                         \
     do {                                                    \
         switch(this->mLine) {                               \
-        case init_task_state: {
+        case ucosm::detail::resumable_init_state: {
 
 
 
 #define UCOSM_SLEEP_FOR(tick)                               \
-            this->setPeriod(static_cast<tick_t>(tick));     \
+            this->setPeriod(static_cast<ucosm::tick_t>(tick)); \
             this->mLine = __LINE__;                         \
             return;                                         \
         }                                                   \
@@ -61,14 +62,24 @@
 
 
 
+// Tasklet only : suspends until the event is signaled.
+#define UCOSM_WAIT_EVENT(event_id)                          \
+            this->waitForEvent(event_id);                   \
+            this->mLine = __LINE__;                         \
+            return;                                         \
+        }                                                   \
+        case __LINE__: {
+
+
+
 #define UCOSM_RESTART                                       \
-            this->mLine = init_task_state;                  \
+            this->mLine = ucosm::detail::resumable_init_state; \
             return;               
 
 
 
 #define UCOSM_END                                           \
-            this->mLine = init_task_state;                  \
+            this->mLine = ucosm::detail::resumable_init_state; \
             this->removeTask();                             \
             return;                                         \
         }                                                   \
@@ -83,41 +94,35 @@
 
 namespace ucosm {
 
+    namespace detail {
+        // Not a member, so that UCOSM_START also finds it from a templated task.
+        static constexpr int resumable_init_state = -1;
+    }
+
     /**
-     * @brief Resumable task with coroutine-like behavior.
+     * @brief Coroutine-like task, written with the UCOSM_* macros.
+     * On a tasklet, UCOSM_YIELD sleeps for one tick.
      *
-     * Allows writing tasks that can yield execution and resume later,
-     * similar to cooperative multitasking or coroutines.
-     *
-     * Usage:
-     * @code
-     * struct MyTask : IResumableTask {
-     *     void run() override {
-     *         UCOSM_START
-     *         // Initialization code
-     *         UCOSM_SLEEP_FOR(1000)  // Wait 1 second
-     *         // More code
-     *         UCOSM_YIELD       // Yield to other tasks
-     *         // Final code
-     *         UCOSM_END
-     *     }
-     * };
-     * @endcode
+     * @tparam base_t IPeriodicTask or ITasklet.
      */
-    struct IResumableTask : IPeriodicTask {
+    template<typename base_t>
+    struct ResumableTask : base_t {
+
+        using base_t::base_t;
 
         /**
-         * @brief Reset task to initial state.
-         * Useful for restarting completed tasks.
+         * @brief Reset task to initial state, e.g. to restart a completed task.
          */
         void reset() {
-            mLine = init_task_state;
+            mLine = detail::resumable_init_state;
             this->setPeriod(0);
         }
 
     protected:
-        static constexpr int init_task_state = -1;
-        int mLine = init_task_state;
+        int mLine = detail::resumable_init_state;
     };
+
+    using IResumableTask = ResumableTask<IPeriodicTask>;
+    using IResumableTasklet = ResumableTask<ITasklet>;
 
 }
