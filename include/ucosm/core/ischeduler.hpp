@@ -29,13 +29,13 @@
 
 #include "ulink.hpp"
 #include "itask.hpp"
+#include "deadline.hpp"
 
 namespace ucosm {
 
-    using idle_task_t = void(*)();
-
     /**
-     * @brief Scheduler.
+     * @brief Base scheduler : a deadline-sorted task list headed by a cursor.
+     * The cursor rank must never move past a deadline still in the list.
      *
      * @tparam task_t Task type to schedule.
      * @tparam sched_task_t Scheduler task type
@@ -43,36 +43,21 @@ namespace ucosm {
     template<typename task_t, typename sched_task_t>
     struct IScheduler : sched_task_t {
 
-        /**
-         * @brief Construct a new scheduler object.
-         *
-         * @param inIdleTask Function to execute when there is no task to run.
-         */
-        IScheduler(idle_task_t inIdleTask = nullptr) :
-            mIdleTask(inIdleTask) {
+        IScheduler() {
             mTasks.push_front(mCursorTask);
         }
 
         /**
-         * @brief Adds a task to the scheduler.
-         *
-         * @param inTask Task instance.
-         * @return true if the task was successfully added.
-         * @return false otherwise.
-         */
-        virtual bool addTask(task_t& inTask);
-
-        /**
          * @brief Returns the currently executed task.
          *
-         * @return task_t* Pointer to the task.
+         * @return task_t* Pointer to the task, nullptr outside of a task
+         * execution.
          */
         task_t* thisTask();
 
         /**
          * @brief Returns the number of task in the scheduler.
-         * This function will traverse the task list in order to count them.
-         * This function might perform poorly if the scheduler contains a lot of tasks.
+         * Walks the whole task list.
          *
          * @return std::size_t Number of task.
          */
@@ -92,18 +77,11 @@ namespace ucosm {
         void clear();
 
         /**
-         * @brief Set the idle function.
-         *
-         * @param inIdleTask Function to call on idle.
-         */
-        void setIdleTask(idle_task_t inIdleTask);
-
-        /**
          * @brief Pushes task names into a given stream.
          *
          * @tparam stream_t Stream type.
          * @param inStream Stream instance.
-         * @param inSep Character used to separate task names.
+         * @param inSeparator String used to separate task names.
          */
         template<typename stream_t>
         void list(stream_t&& inStream, std::string_view inSeparator = "\n");
@@ -121,13 +99,20 @@ namespace ucosm {
         using itask_t = ITask<task_rank_t>;
         using const_task_iterator = typename ulink::List<itask_t>::const_iterator;
 
-        bool sortTask(itask_t& inTask);
-
+        // Returns the task with the earliest deadline, or nullptr if none.
         task_t* getNextTask();
 
-        ulink::List<itask_t> mTasks;
+        // Sorts a task into the list, wherever it was before. Ordered by delay
+        // from the cursor rather than raw rank, so that wrapped deadlines sort right.
+        void insertByDeadline(itask_t& inTask);
 
-        idle_task_t mIdleTask;
+        // Tells if a deadline is due at inNow, wrap-safe thanks to the cursor.
+        bool isDue(task_rank_t inDeadline, task_rank_t inNow) const;
+
+        // Returns the next task if it is due at inNow, nullptr otherwise.
+        task_t* selectReadyTask(task_rank_t inNow);
+
+        ulink::List<itask_t> mTasks;
 
         task_t* mCurrentTask = nullptr;
 
@@ -143,25 +128,8 @@ namespace ucosm {
     };
 
     template<typename task_t, typename sched_rank_t>
-    bool IScheduler<task_t, sched_rank_t>::addTask(task_t& inTask) {
-        // Check if task is already linked to prevent double-adding
-        if (inTask.isLinked()) {
-            return false;
-        }
-
-        if (!inTask.init()) {
-            return false;
-        }
-
-        mTasks.insert_after(&mCursorTask, inTask);
-        inTask.setRank(mCursorTask.getRank());
-        this->sortTask(inTask);
-        return true;
-    }
-
-    template<typename task_t, typename sched_rank_t>
     task_t* IScheduler<task_t, sched_rank_t>::thisTask() {
-        return static_cast<task_t*>(mCurrentTask);
+        return mCurrentTask;
     }
 
     template<typename task_t, typename sched_rank_t>
@@ -181,11 +149,6 @@ namespace ucosm {
     }
 
     template<typename task_t, typename sched_rank_t>
-    void IScheduler<task_t, sched_rank_t>::setIdleTask(idle_task_t inIdleTask) {
-        mIdleTask = inIdleTask;
-    }
-
-    template<typename task_t, typename sched_rank_t>
     template<typename stream_t>
     void IScheduler<task_t, sched_rank_t>::list(
         stream_t&& inStream,
@@ -199,67 +162,85 @@ namespace ucosm {
     template<typename task_t, typename sched_rank_t>
     typename task_t::rank_t IScheduler<task_t, sched_rank_t>::getNextRank() const {
 
-        auto& front = mTasks.front();
-        auto& back = mTasks.back();
-
-        if (&front == &back) {
-            // only the cursor task is in the list
+        if (empty()) {
             return 0;
         }
 
-        if (&this->mCursorTask == &back) {
-            return this->mTasks.front().getRank();
-        }
-        else {
-            return this->mCursorTask.next()->getRank();
-        }
-
+        return mCursorTask.next()->getRank();
     }
 
     template<typename task_t, typename sched_rank_t>
     task_t* IScheduler<task_t, sched_rank_t>::getNextTask() {
 
-        auto& front = mTasks.front();
-        auto& back = mTasks.back();
-
-        if (&front == &back) {
-            // only the cursor task is in the list
+        if (empty()) {
             return nullptr;
         }
 
-        if (&mCursorTask == &back) {
-            // cursor is last
-            // update cursor
-            mTasks.push_front(mCursorTask);
-            return static_cast<task_t*>(&front);
-        }
-        else {
-            return mCursorTask.next();
-        }
-
+        return mCursorTask.next();
     }
 
     template<typename task_t, typename sched_rank_t>
-    bool IScheduler<task_t, sched_rank_t>::sortTask(itask_t& inTask) {
+    void IScheduler<task_t, sched_rank_t>::insertByDeadline(itask_t& inTask) {
 
-        const auto rank = inTask.getRank();
+        using task_list_t = ulink::List<itask_t>;
 
-        if (rank < mTasks.front().getRank()) {
+        const auto cursor = mCursorTask.getRank();
+        const auto delay = getDeadlineDelay(cursor, inTask.getRank());
 
-            mTasks.push_front(inTask);
+        // Walked from the closest end, keeping FIFO order for equal deadlines.
+        // The task itself is skipped : it may still be linked here.
+        auto& back = mTasks.back();
+        const auto backDelay = getDeadlineDelay(cursor, back.getRank());
 
-        }
-        else if (rank > mTasks.back().getRank()) {
-
+        if (&back != &inTask && delay >= backDelay) {
             mTasks.push_back(inTask);
+            return;
+        }
 
+        if (delay <= backDelay / 2) {
+            typename task_list_t::iterator it(&mCursorTask);
+            ++it;
+
+            const auto endIt = mTasks.end();
+
+            // the task itself compares equal, so it is walked past
+            while (it != endIt && getDeadlineDelay(cursor, it->getRank()) <= delay) {
+                ++it;
+            }
+
+            mTasks.insert_before(it, inTask);
         }
         else {
-            return inTask.updateRank();
+            typename task_list_t::reverse_iterator it = mTasks.rbegin();
+            const typename task_list_t::reverse_iterator cursorIt(&mCursorTask);
+
+            while (it != cursorIt &&
+                (&*it == &inTask || getDeadlineDelay(cursor, it->getRank()) > delay)) {
+                ++it;
+            }
+
+            mTasks.insert_after(typename task_list_t::iterator(&*it), inTask);
+        }
+    }
+
+    template<typename task_t, typename sched_rank_t>
+    bool IScheduler<task_t, sched_rank_t>::isDue(
+        task_rank_t inDeadline,
+        task_rank_t inNow
+    ) const {
+        return isDeadlineDue(mCursorTask.getRank(), inDeadline, inNow);
+    }
+
+    template<typename task_t, typename sched_rank_t>
+    task_t* IScheduler<task_t, sched_rank_t>::selectReadyTask(task_rank_t inNow) {
+
+        auto* candidate = getNextTask();
+
+        if (candidate && !isDue(candidate->getRank(), inNow)) {
+            return nullptr;
         }
 
-        return true;
-
+        return candidate;
     }
 
 }

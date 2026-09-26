@@ -1,7 +1,7 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * MIT License                                                                     *
  *                                                                                 *
- * Copyright (c) 2024 Thomas AUBERT                                                *
+ * Copyright (c) 2026 Thomas AUBERT                                                *
  *                                                                                 *
  * Permission is hereby granted, free of charge, to any person obtaining a copy    *
  * of this software and associated documentation files (the "Software"), to deal   *
@@ -25,42 +25,40 @@
  *                                                                                 *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+
 #pragma once
 
-#include "ucosm/core/itask.hpp"
-#include <stdint.h>
+#include <atomic>
 
-namespace ucosm {
+// Set to 1 when all contexts sharing a sync object run on one core : barriers
+// are then replaced by compiler fences. Keep 0 for multi-core sharing.
+#ifndef UCOSM_SINGLE_CORE
+#define UCOSM_SINGLE_CORE 0
+#endif
 
-    /**
-     * @brief Completely fair scheduler.
-     */
-    struct ICFSTask : ITask<uint32_t> {
+namespace ucosm::detail {
 
-        using tick_t = uint32_t;
+    // Loads a value published by storeRelease() in another context.
+    template<typename atomic_t>
+    inline auto loadAcquire(const atomic_t& inAtomic) noexcept {
+#if UCOSM_SINGLE_CORE
+        const auto value = inAtomic.load(std::memory_order_relaxed);
+        std::atomic_signal_fence(std::memory_order_acquire);
+        return value;
+#else
+        return inAtomic.load(std::memory_order_acquire);
+#endif
+    }
 
-        using priority_t = uint8_t;
-
-        /**
-         * @brief Set the task priority.
-         *
-         * @param inPriority Priority value between 0 (highest) and 16 (lowest)
-         */
-        void setPriority(priority_t inPriority) {
-            mPriority = (inPriority > 16) ? 16 : inPriority;
-        }
-
-        /**
-         * @brief Get the task priority.
-         *
-         * @return priority_t Priority value.
-         */
-        priority_t getPriority() const { return mPriority; }
-
-    private:
-
-        priority_t mPriority = 2;
-
-    };
+    // Publishes a value, and every write made before it, to another context.
+    template<typename atomic_t, typename value_t>
+    inline void storeRelease(atomic_t& outAtomic, value_t inValue) noexcept {
+#if UCOSM_SINGLE_CORE
+        std::atomic_signal_fence(std::memory_order_release);
+        outAtomic.store(inValue, std::memory_order_relaxed);
+#else
+        outAtomic.store(inValue, std::memory_order_release);
+#endif
+    }
 
 }

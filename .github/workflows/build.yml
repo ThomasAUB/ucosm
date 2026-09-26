@@ -4,7 +4,6 @@ on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["main"]
 
 jobs:
   build:
@@ -43,7 +42,7 @@ jobs:
             c_compiler: cl
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set reusable strings
         # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
@@ -71,3 +70,74 @@ jobs:
         # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
         # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: ctest --build-config ${{ matrix.build_type }}
+
+  # Bare-metal Cortex-M build check : nothing runs, the check links for each
+  # core, so a warning or an __atomic_* call the core has no instruction for
+  # (ARMv6-M, ARMv8-M baseline) fails the job.
+  arm:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cpu: cortex-m0
+          - cpu: cortex-m0plus
+          - cpu: cortex-m3
+          - cpu: cortex-m4
+            fpu: fpv4-sp-d16
+          - cpu: cortex-m7
+            fpu: fpv5-d16
+          - cpu: cortex-m23
+          - cpu: cortex-m33
+            fpu: fpv5-sp-d16
+
+    name: arm (${{ matrix.cpu }})
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi libstdc++-arm-none-eabi-newlib
+
+      - name: Configure CMake
+        run: >
+          cmake -B ${{ github.workspace }}/build
+          -DUCOSM_ARM_CPU=${{ matrix.cpu }}
+          -DUCOSM_ARM_FPU=${{ matrix.fpu }}
+          -DCMAKE_BUILD_TYPE=MinSizeRel
+          -S ${{ github.workspace }}/tests/arm
+
+      - name: Build
+        run: cmake --build ${{ github.workspace }}/build
+
+  # AddressSanitizer + UndefinedBehaviorSanitizer build. Catches the
+  # CallableTask nullptr-assignment class of bugs, leaks, and UB. TSAN is
+  # intentionally not enabled here: the tasklet scheduler has known data
+  # races in the intrusive list path that are tracked as a follow-up.
+  sanitizer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake (ASAN + UBSAN)
+        run: >
+          cmake -B ${{ github.workspace }}/build
+          -DCMAKE_CXX_COMPILER=g++
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          -S ${{ github.workspace }}
+
+      - name: Build
+        run: cmake --build ${{ github.workspace }}/build
+
+      - name: Test
+        working-directory: ${{ github.workspace }}/build
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=0
+          UBSAN_OPTIONS: halt_on_error=1:abort_on_error=0:print_stacktrace=1
+        run: ctest --output-on-failure

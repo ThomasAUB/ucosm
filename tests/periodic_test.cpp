@@ -8,6 +8,8 @@
 
 TEST_CASE("Periodic task test") {
 
+    StreamSilencer silence(std::cout);
+
     SUBCASE("Timer overflow test") {
 
         struct Task : ucosm::IPeriodicTask {
@@ -98,10 +100,6 @@ TEST_CASE("Periodic task test") {
 
             Task(int inID) : mID(inID) {}
 
-            void deinit() override {
-                mIsDeinit = true;
-            }
-
             void run() override {
 
                 auto currentTime = getMillis();
@@ -142,7 +140,6 @@ TEST_CASE("Periodic task test") {
             }
 
             uint8_t count = 0;
-            bool mIsDeinit = false;
 
         private:
             double mAverageError = 0;
@@ -180,8 +177,8 @@ TEST_CASE("Periodic task test") {
 
         CHECK(sched.size() == 2);
         CHECK(!sched.empty());
-        CHECK(!t1.mIsDeinit);
-        CHECK(!t2.mIsDeinit);
+        CHECK(t1.isLinked());
+        CHECK(t2.isLinked());
 
         std::cout << "\n=== Periodic Scheduler start ===\n" << std::endl;
 
@@ -191,8 +188,8 @@ TEST_CASE("Periodic task test") {
 
         CHECK(t1.error() == 0);
         CHECK(t2.error() == 0);
-        CHECK(t1.mIsDeinit);
-        CHECK(t2.mIsDeinit);
+        CHECK(!t1.isLinked());
+        CHECK(!t2.isLinked());
 
         std::cout << "\n=== Periodic Scheduler end ===\n" << std::endl;
     }
@@ -237,6 +234,136 @@ TEST_CASE("Periodic task test") {
         // about 500 us in release and 1200 in debug
         std::cout << "relocation benchmark : " << durationSum << std::endl;
 
+    }
+
+    SUBCASE("Remove task from within run") {
+
+        struct Task : ucosm::IPeriodicTask {
+            void run() override {
+                mCounter++;
+                if (mCounter >= 3) {
+                    this->removeTask();
+                }
+            }
+            int mCounter = 0;
+        };
+
+        static uint32_t sClock = 0;
+
+        ucosm::PeriodicScheduler sched(
+            +[]() { return sClock; }
+        );
+
+        Task t;
+        t.setPeriod(1);
+        sched.addTask(t);
+
+        CHECK(sched.size() == 1);
+
+        for (int i = 0; i < 10 && !sched.empty(); ++i) {
+            sClock++;
+            sched.run();
+        }
+
+        CHECK(t.mCounter == 3);
+        CHECK(sched.empty());
+    }
+
+    SUBCASE("Wrapped deadline set while the cursor is behind it") {
+
+        // The cursor sits on a deadline just before the wrap while t0 is
+        // armed past it. A deadline armed now, also past the wrap, used to
+        // sort in front of the cursor and never be looked at again.
+
+        struct Task : ucosm::IPeriodicTask {
+            void run() override { ++mRunCounter; }
+            uint32_t mRunCounter = 0;
+        };
+
+        static uint32_t sClock = 0;
+
+        ucosm::PeriodicScheduler sched(
+            +[]() { return sClock; }
+        );
+
+        Task t0;
+        Task t1;
+        t0.setPeriod(0x200);
+        t1.setPeriod(0x1000);
+
+        sClock = 0xFFFFFF00;
+        sched.addTask(t0);
+        sched.run();
+        CHECK(t0.mRunCounter == 1);
+
+        sClock = 0xFFFFFF10;
+        sched.run();
+
+        REQUIRE(sched.addTask(t1));
+        REQUIRE(sched.setDelay(t1, 0x110));
+
+        sClock = 0x1F;
+        sched.run();
+        CHECK(t1.mRunCounter == 0);
+
+        sClock = 0x20;
+        sched.run();
+        CHECK(t1.mRunCounter == 1);
+        CHECK(t0.mRunCounter == 1);
+
+        sClock = 0x100;
+        sched.run();
+        CHECK(t0.mRunCounter == 2);
+    }
+
+    SUBCASE("First task added far from tick zero") {
+
+        // The cursor starts at zero : a task added at a large tick with a
+        // deadline wrapping past zero must not be seen as already due.
+
+        struct Task : ucosm::IPeriodicTask {
+            void run() override { ++mRunCounter; }
+            uint32_t mRunCounter = 0;
+        };
+
+        static uint32_t sClock = 0;
+
+        ucosm::PeriodicScheduler sched(
+            +[]() { return sClock; }
+        );
+
+        Task t;
+        t.setPeriod(0x100);
+
+        sClock = 0xFFFFFFF0;
+        sched.addTask(t);
+        REQUIRE(sched.setDelay(t, 0x20));
+
+        sched.run();
+        CHECK(t.mRunCounter == 0);
+
+        sClock = 0x0F;
+        sched.run();
+        CHECK(t.mRunCounter == 0);
+
+        sClock = 0x10;
+        sched.run();
+        CHECK(t.mRunCounter == 1);
+    }
+
+    SUBCASE("setDelay on an unscheduled task") {
+
+        struct Task : ucosm::IPeriodicTask {
+            void run() override {}
+        };
+
+        ucosm::PeriodicScheduler sched(
+            +[]() -> uint32_t { return 0; }
+        );
+
+        Task t;
+        CHECK_FALSE(sched.setDelay(t, 10));
+        CHECK(sched.empty());
     }
 
 }

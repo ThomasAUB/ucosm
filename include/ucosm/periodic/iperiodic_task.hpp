@@ -52,7 +52,7 @@ namespace ucosm {
         /**
          * @brief Get the task period.
          *
-         * @return tick_t Period  value.
+         * @return tick_t Period value.
          */
         tick_t getPeriod() const { return mPeriod; }
 

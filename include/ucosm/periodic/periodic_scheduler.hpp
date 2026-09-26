@@ -27,10 +27,13 @@
 
 #pragma once
 
+#include "ucosm/core/deadline.hpp"
 #include "ucosm/core/ischeduler.hpp"
 #include "iperiodic_task.hpp"
 
 namespace ucosm {
+
+    using idle_task_t = void(*)();
 
     /**
      * @brief Periodic scheduler.
@@ -42,16 +45,42 @@ namespace ucosm {
 
         using get_tick_t = IPeriodicTask::tick_t(*)();
 
+        /**
+         * @brief Construct a new periodic scheduler object.
+         *
+         * @param inGetTick Function returning the current tick.
+         * @param inIdleTask Function to execute when there is no task to run.
+         */
         PeriodicScheduler(get_tick_t inGetTick, idle_task_t inIdleTask = nullptr) :
-            IScheduler<IPeriodicTask, sched_task_t>(inIdleTask),
+            mIdleTask(inIdleTask),
             mGetTick(inGetTick) {}
 
         /**
-         * @brief Delay the task.
+         * @brief Adds a task to the scheduler, due right away.
          *
-         * @param inDelay Delay value.
+         * @param inTask Task instance.
+         * @return true if the task was successfully added.
+         * @return false otherwise.
          */
-        void setDelay(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay);
+        virtual bool addTask(IPeriodicTask& inTask);
+
+        /**
+         * @brief Set the idle function.
+         *
+         * @param inIdleTask Function to call on idle.
+         */
+        void setIdleTask(idle_task_t inIdleTask);
+
+        /**
+         * @brief Sets the delay before the next execution of a scheduled task.
+         * The period takes over afterwards.
+         *
+         * @param inTask Task instance.
+         * @param inDelay Delay value.
+         * @return true if the task was re-sorted.
+         * @return false if the task isn't scheduled.
+         */
+        bool setDelay(IPeriodicTask& inTask, IPeriodicTask::tick_t inDelay);
 
         /**
          * @brief Runs the next ready tasks.
@@ -60,17 +89,54 @@ namespace ucosm {
 
     protected:
 
+        using base_t = IScheduler<IPeriodicTask, sched_task_t>;
+        using typename base_t::itask_t;
+        using typename base_t::task_rank_t;
+
+        // Runs the task, then re-arms it one period after reference if still linked.
+        void runAndRearm(IPeriodicTask& task, task_rank_t reference);
+
+        idle_task_t mIdleTask;
+
         get_tick_t mGetTick;
 
     };
 
     template<typename sched_rank_t>
-    void PeriodicScheduler<sched_rank_t>::setDelay(
+    bool PeriodicScheduler<sched_rank_t>::addTask(IPeriodicTask& inTask) {
+        if (inTask.isLinked()) {
+            return false;
+        }
+
+        const auto tick = mGetTick();
+
+        if (this->empty()) {
+            // bring an idle cursor to the current tick, keeping it wrap-safe
+            this->mCursorTask.setRank(tick);
+        }
+
+        inTask.setRank(tick);
+        this->insertByDeadline(inTask);
+        return true;
+    }
+
+    template<typename sched_rank_t>
+    void PeriodicScheduler<sched_rank_t>::setIdleTask(idle_task_t inIdleTask) {
+        mIdleTask = inIdleTask;
+    }
+
+    template<typename sched_rank_t>
+    bool PeriodicScheduler<sched_rank_t>::setDelay(
         IPeriodicTask& inTask,
         IPeriodicTask::tick_t inDelay
     ) {
-        inTask.setRank(mGetTick() + inDelay);
-        this->sortTask(inTask);
+        if (!inTask.isLinked()) {
+            return false;
+        }
+
+        inTask.setRank(makeDeadline(mGetTick(), inDelay));
+        this->insertByDeadline(inTask);
+        return true;
     }
 
     template<typename sched_rank_t>
@@ -78,46 +144,34 @@ namespace ucosm {
 
         const auto tick = mGetTick();
 
-        this->mCurrentTask = this->getNextTask();
-
-        if (this->mCurrentTask) {
-
-            const auto cursorRank = this->mCursorTask.getRank();
-            const auto deltaTask = this->mCurrentTask->getRank() - cursorRank;
-            const auto deltaTick = tick - cursorRank;
-
-            if (deltaTick < deltaTask) {
-                // task is not ready
-                this->mCurrentTask = nullptr;
-            }
-
-        }
+        this->mCurrentTask = this->selectReadyTask(tick);
 
         if (!this->mCurrentTask) {
-            // no task to run
-            if (this->mIdleTask) {
-                this->mIdleTask();
+            if (mIdleTask) {
+                mIdleTask();
             }
             return;
         }
 
-        this->mCursorTask.setRank(this->mCurrentTask->getRank());
-        this->mCurrentTask->run();
-
-        // Check if task is still linked after execution
-        if (this->mCurrentTask->isLinked()) {
-
-            // the task is still in the list
-            // update the task rank
-            this->mCurrentTask->setRank(
-                tick +
-                this->mCurrentTask->getPeriod()
-            );
-
-            this->sortTask(*this->mCurrentTask);
-        }
+        // catch-up semantics : re-armed from the current tick
+        this->runAndRearm(*this->mCurrentTask, tick);
 
         this->mCurrentTask = nullptr;
+    }
+
+    template<typename sched_rank_t>
+    void PeriodicScheduler<sched_rank_t>::runAndRearm(IPeriodicTask& task, task_rank_t reference) {
+
+        // earliest deadline in the list, so no task falls behind the cursor
+        this->mCursorTask.setRank(task.getRank());
+
+        task.run();
+
+        if (task.isLinked()) {
+            task.setRank(makeDeadline(reference, task.getPeriod()));
+
+            this->insertByDeadline(task);
+        }
     }
 
 }

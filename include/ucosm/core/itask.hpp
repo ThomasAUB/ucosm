@@ -42,26 +42,13 @@ namespace ucosm {
 
         using rank_t = _rank_t;
 
+        virtual ~ITask() = default;
+
         /**
          * @brief Runs the task.
          * Typically called by the scheduler when the task is ready.
          */
         virtual void run() = 0;
-
-        /**
-         * @brief Initializes the task.
-         * Typically called by the scheduler when the task is added.
-         *
-         * @return true if the task was successfully initialized.
-         * @return false otherwise.
-         */
-        virtual bool init() { return true; }
-
-        /**
-         * @brief Deinitializes the task.
-         * Called when the task is removed.
-         */
-        virtual void deinit() {}
 
         /**
          * @brief Removes the task from the scheduler.
@@ -74,14 +61,6 @@ namespace ucosm {
          * @return std::string_view Task name.
          */
         virtual std::string_view name() { return ""; }
-
-        /**
-         * @brief Updates the task position in the list according to its rank value.
-         *
-         * @return true if the task was moved in the list
-         * @return false otherwise.
-         */
-        bool updateRank();
 
         /**
          * @brief Sets the task rank value.
@@ -109,9 +88,6 @@ namespace ucosm {
 
     template<typename rank_t>
     void ITask<rank_t>::removeTask() {
-        if (this->isLinked()) {
-            deinit();
-        }
         ulink::Node<ITask<rank_t>>::remove();
     }
 
@@ -123,57 +99,6 @@ namespace ucosm {
     template<typename rank_t>
     rank_t ITask<rank_t>::getRank() const {
         return mRank;
-    }
-
-    template<typename rank_t>
-    bool ITask<rank_t>::updateRank() {
-
-        if (!this->isLinked()) {
-            return false;
-        }
-
-        auto* prevTask = this->prev->prev;
-        auto* nextTask = this->next->next;
-
-        if (prevTask && mRank < this->prev->mRank) {
-            // move task to the left
-
-            while (prevTask->prev && mRank < prevTask->mRank) {
-                prevTask = prevTask->prev;
-            }
-
-            // insert after prevTask
-
-            this->ulink::Node<ITask<rank_t>>::remove();
-
-            this->prev = prevTask;
-            this->next = prevTask->next;
-            this->prev->next = this;
-            this->next->prev = this;
-
-        }
-        else if (nextTask && this->next->mRank < mRank) {
-            // move task to the right
-
-            while (nextTask->next && nextTask->mRank < mRank) {
-                nextTask = nextTask->next;
-            }
-
-            // insert before nextTask
-
-            this->ulink::Node<ITask<rank_t>>::remove();
-
-            this->next = nextTask;
-            this->prev = nextTask->prev;
-            this->next->prev = this;
-            this->prev->next = this;
-
-        }
-        else {
-            return false;
-        }
-
-        return true;
     }
 
 }

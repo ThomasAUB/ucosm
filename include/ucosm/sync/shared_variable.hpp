@@ -1,7 +1,7 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * MIT License                                                                     *
  *                                                                                 *
- * Copyright (c) 2024 Thomas AUBERT                                                *
+ * Copyright (c) 2026 Thomas AUBERT                                                *
  *                                                                                 *
  * Permission is hereby granted, free of charge, to any person obtaining a copy    *
  * of this software and associated documentation files (the "Software"), to deal   *
@@ -25,70 +25,78 @@
  *                                                                                 *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+
 #pragma once
 
-#include "ucosm/core/ischeduler.hpp"
-#include "icfs_task.hpp"
+#include <stdint.h>
+#include <type_traits>
+#include "uatom.hpp"
+#include "memory_order.hpp"
 
 namespace ucosm {
 
     /**
-     * @brief Completely fair scheduler.
+     * @brief Lock-free value shared between contexts, versioned on each store.
+     * Single writer, any number of readers.
      *
-     * @tparam sched_task_t Scheduler task type
+     * @tparam T Value type (trivially copyable and lock-free on the platform)
      */
-    template<typename sched_task_t = ITask<int8_t>>
-    struct CFSScheduler : IScheduler<ICFSTask, sched_task_t> {
+    template<typename T>
+    class SharedVariable {
+        static_assert(std::is_trivially_copyable<T>::value,
+            "Type must be trivially copyable");
+        static_assert(uatom::Atomic<T>::is_always_lock_free,
+            "Type must be lock-free on this platform (use smaller types on MCU)");
 
-        using get_tick_t = ICFSTask::tick_t(*)();
+    public:
 
-        CFSScheduler(get_tick_t inGetTick, idle_task_t inIdleTask = nullptr) :
-            IScheduler<ICFSTask, sched_task_t>(inIdleTask),
-            mGetTick(inGetTick) {}
+        using version_t = uint32_t;
 
         /**
-         * @brief Runs the task that has the lower execution time.
+         * @brief Construct with initial value.
+         * @param initialValue Initial value
          */
-        void run() override;
+        explicit SharedVariable(const T& initialValue = T{}) noexcept :
+            mValue(initialValue) {}
+
+        /**
+         * @brief Store a new value and bump the version. Writer side.
+         * @param newValue New value to store
+         */
+        void store(const T& newValue) noexcept {
+            const version_t version = mVersion.load(std::memory_order_relaxed);
+            detail::storeRelease(mValue, newValue);
+            detail::storeRelease(mVersion, static_cast<version_t>(version + 1));
+        }
+
+        /**
+         * @brief Read the current value.
+         * @return Current value
+         */
+        T load() const noexcept {
+            return detail::loadAcquire(mValue);
+        }
+
+        /**
+         * @brief Get current version number.
+         * @return Version number (increments on each store)
+         */
+        version_t getVersion() const noexcept {
+            return detail::loadAcquire(mVersion);
+        }
+
+        /**
+         * @brief Check if value has been stored since a given version.
+         * @param lastVersion Version previously returned by getVersion()
+         * @return true if value has been updated
+         */
+        bool hasChanged(version_t lastVersion) const noexcept {
+            return detail::loadAcquire(mVersion) != lastVersion;
+        }
 
     private:
-
-        get_tick_t mGetTick;
-
+        uatom::Atomic<version_t> mVersion { 0 };
+        uatom::Atomic<T> mValue;
     };
-
-    template<typename sched_rank_t>
-    void CFSScheduler<sched_rank_t>::run() {
-
-        this->mCurrentTask = this->getNextTask();
-
-        if (!this->mCurrentTask) {
-            // no task to run
-            if (this->mIdleTask) {
-                this->mIdleTask();
-            }
-            return;
-        }
-
-        const auto startTimeStamp = mGetTick();
-        const auto currentRank = this->mCurrentTask->getRank();
-
-        this->mCursorTask.setRank(currentRank);
-        this->mCurrentTask->run();
-
-        // Check if task is still linked after execution
-        if (this->mCurrentTask->isLinked()) {
-
-            auto taskDuration = mGetTick() - startTimeStamp;
-
-            taskDuration <<= this->mCurrentTask->getPriority();
-            taskDuration += currentRank;
-
-            this->mCurrentTask->setRank(taskDuration);
-            this->sortTask(*this->mCurrentTask);
-        }
-
-        this->mCurrentTask = nullptr;
-    }
 
 }
