@@ -10,7 +10,7 @@
 
 namespace {
 
-    constexpr ucosm::interrupt_id_t exti_interrupt = 0;
+    constexpr ucosm::event_id_t exti_event = 0;
 
     volatile std::uint32_t g_sink = 0;
 
@@ -18,7 +18,7 @@ namespace {
         void run() override { g_sink = g_sink + 1; }
     };
 
-    struct InterruptTasklet : ucosm::ITasklet {
+    struct EventTasklet : ucosm::ITasklet {
         void run() override { g_sink = g_sink + 2; }
     };
 
@@ -33,7 +33,7 @@ namespace {
     ucosm::TaskletScheduler<2> g_tasklets { tasklet_backend };
 
     PeriodicTasklet g_periodicTasklet;
-    InterruptTasklet g_interruptTasklet;
+    EventTasklet g_eventTasklet;
 
 }
 
@@ -46,7 +46,7 @@ extern "C" void PendSV_Handler() {
 }
 
 extern "C" void EXTI0_IRQHandler() {
-    g_tasklets.signalInterrupt(exti_interrupt);
+    g_tasklets.signalEvent(exti_event);
 }
 
 int main() {
@@ -54,8 +54,8 @@ int main() {
     g_periodicTasklet.setPeriod(10);
     g_tasklets.addTask(g_periodicTasklet);
 
-    g_interruptTasklet.waitForInterrupt(exti_interrupt);
-    g_tasklets.addTask(g_interruptTasklet);
+    g_eventTasklet.waitForEvent(exti_event);
+    g_tasklets.addTask(g_eventTasklet);
 
     ucosm::PeriodicScheduler<> periodic(get_tick);
     BlinkTask blink;

@@ -34,9 +34,9 @@ namespace ucosm {
 
     using tick_t = uint32_t;
     using priority_t = tick_t;
-    using interrupt_id_t = uint8_t;
+    using event_id_t = uint8_t;
 
-    template<interrupt_id_t interrupt_count>
+    template<event_id_t event_count>
     struct TaskletScheduler;
 
     struct ITasklet : ITask<priority_t> {
@@ -50,41 +50,42 @@ namespace ucosm {
         }
 
         void setPeriod(tick_t inPeriod) {
-            mState = eState::sleeping;
-            mPeriod = inPeriod > 0 ? inPeriod : 1;
-            mInterruptID = invalid_interrupt_id;
+            mState = eState::waitingForTimer;
+            mWakeupSource = inPeriod > 0 ? inPeriod : 1;
         }
 
+        // 0 when the task is not waiting for the timer.
         tick_t getPeriod() const {
-            return mPeriod;
+            return isWaitingForTimer() ? mWakeupSource : 0;
         }
 
-        void waitForInterrupt(interrupt_id_t inInterruptID) {
-            mInterruptID = inInterruptID;
-            mState = eState::waitingForInterrupt;
-            mPeriod = 0;
+        void waitForEvent(event_id_t inEventID) {
+            mState = eState::waitingForEvent;
+            mWakeupSource = inEventID;
         }
 
         void dispose() {
             mState = eState::unconfigured;
-            mInterruptID = invalid_interrupt_id;
-            mPeriod = 0;
+            mWakeupSource = 0;
         }
 
-        bool isSleeping() const {
-            return mState == eState::sleeping;
+        bool isWaitingForTimer() const {
+            return mState == eState::waitingForTimer;
         }
 
-        bool isWaitingForInterrupt() const {
-            return mState == eState::waitingForInterrupt;
+        bool isWaitingForEvent() const {
+            return mState == eState::waitingForEvent;
         }
 
         bool isConfigured() const {
             return mState != eState::unconfigured;
         }
 
-        interrupt_id_t getInterruptID() const {
-            return mInterruptID;
+        // invalid_event_id when the task is not waiting for an event.
+        event_id_t getEventID() const {
+            return isWaitingForEvent() ?
+                static_cast<event_id_t>(mWakeupSource) :
+                invalid_event_id;
         }
 
         ~ITasklet() = default;
@@ -98,7 +99,7 @@ namespace ucosm {
 
     private:
 
-        template<interrupt_id_t>
+        template<event_id_t>
         friend struct TaskletScheduler;
 
         void setScheduledDeadline(tick_t inDeadline) {
@@ -111,16 +112,19 @@ namespace ucosm {
 
         enum class eState : uint8_t {
             unconfigured,
-            sleeping,
-            waitingForInterrupt
+            waitingForTimer,
+            waitingForEvent
         };
 
-        static constexpr interrupt_id_t invalid_interrupt_id = static_cast<interrupt_id_t>(-1);
+        static constexpr event_id_t invalid_event_id = static_cast<event_id_t>(-1);
 
         priority_t mPriority = static_cast<priority_t>(-1);
-        tick_t mPeriod = 0;
         tick_t mScheduledDeadline = 0;
-        interrupt_id_t mInterruptID = invalid_interrupt_id;
+
+        // A task waits either for the timer or for an event, never both :
+        // holds the period or the event id, as mState tells. Read it
+        // through getPeriod() / getEventID(), which check mState.
+        tick_t mWakeupSource = 0;
         eState mState = eState::unconfigured;
     };
 

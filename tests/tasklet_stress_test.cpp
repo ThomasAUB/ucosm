@@ -70,13 +70,13 @@ namespace {
         }
     };
 
-    constexpr interrupt_id_t stress_interrupts = 3;
+    constexpr event_id_t stress_events = 3;
     constexpr tick_t max_delay = 60;
 
     // Exposes the scheduler lists so the test can check their invariants.
-    struct InspectedScheduler : TaskletScheduler<stress_interrupts> {
+    struct InspectedScheduler : TaskletScheduler<stress_events> {
 
-        using TaskletScheduler<stress_interrupts>::TaskletScheduler;
+        using TaskletScheduler<stress_events>::TaskletScheduler;
 
         // Returns the number of tasks found in all lists, or -1 when an
         // invariant is broken.
@@ -110,8 +110,8 @@ namespace {
                 return -1;
             }
 
-            // interrupt lists : sorted by priority, which is also the rank
-            for (auto& list : this->mBlockedTaskLists) {
+            // event lists : sorted by priority, which is also the rank
+            for (auto& list : this->mEventTaskLists) {
                 bool first = true;
                 priority_t previous = 0;
                 for (auto& t : list) {
@@ -131,7 +131,7 @@ namespace {
             return count;
         }
 
-        // Every sleeping task must be strictly in the future once the
+        // Every timer task must be strictly in the future once the
         // scheduler settled, and no further away than the longest delay the
         // test ever asks for.
         bool noTimerOverdue() {
@@ -158,7 +158,7 @@ namespace {
             ++mRuns;
             switch (mRng() % 8) {
                 case 0: setPeriod(1 + mRng() % 40); break;
-                case 1: waitForInterrupt(static_cast<interrupt_id_t>(mRng() % stress_interrupts)); break;
+                case 1: waitForEvent(static_cast<event_id_t>(mRng() % stress_events)); break;
                 case 2: this->removeTask(); break;
                 case 3: g_sched->setDelay(*this, mRng() % max_delay); break;
                 case 4: dispose(); break;
@@ -173,7 +173,7 @@ namespace {
     void configureRandomly(ChaosTask& ioTask, Rng& ioRng) {
         ioTask.setPriority(ioRng() % 8);
         if (ioRng() % 3 == 0) {
-            ioTask.waitForInterrupt(static_cast<interrupt_id_t>(ioRng() % stress_interrupts));
+            ioTask.waitForEvent(static_cast<event_id_t>(ioRng() % stress_events));
         }
         else {
             ioTask.setPeriod(1 + ioRng() % 40);
@@ -230,7 +230,7 @@ TEST_CASE("TaskletScheduler - stress : lists stay consistent under random operat
                     sched.removeTask(task);
                     break;
                 case 4:
-                    sched.signalInterrupt(static_cast<interrupt_id_t>(rng() % stress_interrupts));
+                    sched.signalEvent(static_cast<event_id_t>(rng() % stress_events));
                     pump();
                     break;
                 default:
@@ -278,7 +278,7 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
     using clock = std::chrono::steady_clock;
 
     constexpr int task_count = 64;
-    constexpr interrupt_id_t interrupt_count = 8;
+    constexpr event_id_t event_count = 8;
     constexpr uint32_t ticks = 50'000;
 
     // Mixed periods spread the deadlines over the timer list, a single
@@ -287,10 +287,10 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
 
         resetHarness(0);
 
-        TaskletScheduler<interrupt_count> sched(stress_backend);
+        TaskletScheduler<event_count> sched(stress_backend);
 
         CountTask timerTasks[task_count];
-        CountTask interruptTasks[interrupt_count];
+        CountTask eventTasks[event_count];
 
         for (int i = 0; i < task_count; ++i) {
             timerTasks[i].setPriority(i % 7);
@@ -298,10 +298,10 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
             REQUIRE(sched.addTask(timerTasks[i]));
         }
 
-        for (interrupt_id_t i = 0; i < interrupt_count; ++i) {
-            interruptTasks[i].setPriority(i);
-            interruptTasks[i].waitForInterrupt(i);
-            REQUIRE(sched.addTask(interruptTasks[i]));
+        for (event_id_t i = 0; i < event_count; ++i) {
+            eventTasks[i].setPriority(i);
+            eventTasks[i].waitForEvent(i);
+            REQUIRE(sched.addTask(eventTasks[i]));
         }
 
         const auto start = clock::now();
@@ -309,7 +309,7 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
         for (uint32_t k = 0; k < ticks; ++k) {
             ++g_now;
             sched.poll();
-            sched.signalInterrupt(static_cast<interrupt_id_t>(k % interrupt_count));
+            sched.signalEvent(static_cast<event_id_t>(k % event_count));
             pump();
         }
 
@@ -323,8 +323,8 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
             executions += t.mCount;
         }
 
-        for (auto& t : interruptTasks) {
-            CHECK(t.mCount == ticks / interrupt_count);
+        for (auto& t : eventTasks) {
+            CHECK(t.mCount == ticks / event_count);
             executions += t.mCount;
         }
 

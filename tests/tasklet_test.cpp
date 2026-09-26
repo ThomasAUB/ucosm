@@ -36,8 +36,8 @@ struct SchedulerBarrier final {
 // let the scheduler pend its handler if a deadline has come round. The two
 // are separate because the scheduler keeps no clock of its own - it reads the
 // one the backend gives it, and poll() only makes it look.
-template<ucosm::interrupt_id_t interrupt_count>
-void tick(ucosm::TaskletScheduler<interrupt_count>& inScheduler, ucosm::tick_t inInc = 1) {
+template<ucosm::event_id_t event_count>
+void tick(ucosm::TaskletScheduler<event_count>& inScheduler, ucosm::tick_t inInc = 1) {
     advance_tick(inInc);
     inScheduler.poll();
 }
@@ -119,7 +119,7 @@ TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
 
 }
 
-TEST_CASE("TaskletScheduler - concurrent signalInterrupt calls") {
+TEST_CASE("TaskletScheduler - concurrent signalEvent calls") {
 
     using namespace ucosm;
 
@@ -130,8 +130,8 @@ TEST_CASE("TaskletScheduler - concurrent signalInterrupt calls") {
     std::mutex m;
     std::condition_variable cv;
 
-    struct ISRTask : ucosm::ITasklet {
-        ISRTask(int id, std::vector<int>* out, std::mutex* m, std::condition_variable* cv) :
+    struct EventTask : ucosm::ITasklet {
+        EventTask(int id, std::vector<int>* out, std::mutex* m, std::condition_variable* cv) :
             mID(id), mOut(out), mM(m), mCV(cv) {}
         void run() override {
             {
@@ -147,28 +147,28 @@ TEST_CASE("TaskletScheduler - concurrent signalInterrupt calls") {
         std::condition_variable* mCV;
     };
 
-    ISRTask a(1, &executed, &m, &cv);
-    ISRTask b(2, &executed, &m, &cv);
-    ISRTask c(3, &executed, &m, &cv);
+    EventTask a(1, &executed, &m, &cv);
+    EventTask b(2, &executed, &m, &cv);
+    EventTask c(3, &executed, &m, &cv);
 
     a.setPriority(10);
     b.setPriority(5);
     c.setPriority(15);
 
-    a.waitForInterrupt(0);
-    b.waitForInterrupt(1);
-    c.waitForInterrupt(2);
+    a.waitForEvent(0);
+    b.waitForEvent(1);
+    c.waitForEvent(2);
 
     REQUIRE(sched.addTask(a));
     REQUIRE(sched.addTask(b));
     REQUIRE(sched.addTask(c));
 
-    // Suspend low-priority execution while we concurrently set pending interrupts
+    // Suspend low-priority execution while we concurrently set pending events
     suspend_low_priority_execution();
 
-    std::thread th1([&] { sched.signalInterrupt(0); });
-    std::thread th2([&] { sched.signalInterrupt(1); });
-    std::thread th3([&] { sched.signalInterrupt(2); });
+    std::thread th1([&] { sched.signalEvent(0); });
+    std::thread th2([&] { sched.signalEvent(1); });
+    std::thread th3([&] { sched.signalEvent(2); });
 
     th1.join(); th2.join(); th3.join();
 
@@ -188,7 +188,7 @@ TEST_CASE("TaskletScheduler - concurrent signalInterrupt calls") {
 
 }
 
-TEST_CASE("TaskletScheduler - combined sleep and ISR ordering") {
+TEST_CASE("TaskletScheduler - combined timer and event ordering") {
 
     using namespace ucosm;
 
@@ -216,28 +216,28 @@ TEST_CASE("TaskletScheduler - combined sleep and ISR ordering") {
         std::condition_variable* mCV;
     };
 
-    MixedTask sleepMid(1, &executed, &m, &cv); // mid priority but sleeps
-    MixedTask isrHigh(2, &executed, &m, &cv);    // high priority, ISR
-    MixedTask isrLow(3, &executed, &m, &cv);    // low priority, ISR
+    MixedTask timerMid(1, &executed, &m, &cv); // mid priority but waits for the timer
+    MixedTask eventHigh(2, &executed, &m, &cv);    // high priority, event
+    MixedTask eventLow(3, &executed, &m, &cv);    // low priority, event
 
-    sleepMid.setPriority(10);
-    isrHigh.setPriority(5); // high priority
-    isrLow.setPriority(20);
+    timerMid.setPriority(10);
+    eventHigh.setPriority(5); // high priority
+    eventLow.setPriority(20);
 
-    // sleepHigh will wake at tick 50
-    sleepMid.setPeriod(50);
-    isrHigh.waitForInterrupt(0);
-    isrLow.waitForInterrupt(1);
+    // timerMid will wake at tick 50
+    timerMid.setPeriod(50);
+    eventHigh.waitForEvent(0);
+    eventLow.waitForEvent(1);
 
-    REQUIRE(sched.addTask(sleepMid));
-    REQUIRE(sched.addTask(isrHigh));
-    REQUIRE(sched.addTask(isrLow));
+    REQUIRE(sched.addTask(timerMid));
+    REQUIRE(sched.addTask(eventHigh));
+    REQUIRE(sched.addTask(eventLow));
 
-    // Queue both interrupts and the timer wake-up before allowing the low-priority worker to run.
+    // Queue both events and the timer wake-up before allowing the low-priority worker to run.
     suspend_low_priority_execution();
     tick(sched, 50);
-    sched.signalInterrupt(0);
-    sched.signalInterrupt(1);
+    sched.signalEvent(0);
+    sched.signalEvent(1);
     resume_low_priority_execution();
 
     REQUIRE(waitForExecutions(m, cv, executed, 3));
@@ -249,7 +249,7 @@ TEST_CASE("TaskletScheduler - combined sleep and ISR ordering") {
 
 }
 
-TEST_CASE("TaskletScheduler - interrupt ordering") {
+TEST_CASE("TaskletScheduler - event ordering") {
 
     using namespace ucosm;
 
@@ -289,18 +289,18 @@ TEST_CASE("TaskletScheduler - interrupt ordering") {
     t2.setPriority(5);
     t3.setPriority(20);
 
-    t1.waitForInterrupt(0);
-    t2.waitForInterrupt(1);
-    t3.waitForInterrupt(2);
+    t1.waitForEvent(0);
+    t2.waitForEvent(1);
+    t3.waitForEvent(2);
 
     REQUIRE(sched.addTask(t1));
     REQUIRE(sched.addTask(t2));
     REQUIRE(sched.addTask(t3));
 
-    // signal all interrupts; run handler asynchronously
-    sched.signalInterrupt(0);
-    sched.signalInterrupt(1);
-    sched.signalInterrupt(2);
+    // signal all events; run handler asynchronously
+    sched.signalEvent(0);
+    sched.signalEvent(1);
+    sched.signalEvent(2);
 
     REQUIRE(waitForExecutions(m, cv, executed, 3, std::chrono::seconds(2)));
 
@@ -341,7 +341,7 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
         std::condition_variable* mCV;
     };
 
-    SUBCASE("sleeping task reconfigured to wait for an interrupt") {
+    SUBCASE("timer task reconfigured to wait for an event") {
 
         ReconfigurableTask t(1, &executed, &m, &cv);
 
@@ -349,31 +349,31 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
         REQUIRE(sched.addTask(t));
 
         // Change its mind before the deadline: it should now run on the
-        // interrupt instead, not on tick().
-        t.waitForInterrupt(0);
+        // event instead, not on tick().
+        t.waitForEvent(0);
         REQUIRE(sched.addTask(t));
 
         tick(sched, 50);
         CHECK(executed.empty());
 
-        sched.signalInterrupt(0);
+        sched.signalEvent(0);
         REQUIRE(waitForExecutions(m, cv, executed, 1));
         CHECK(executed[0] == 1);
     }
 
-    SUBCASE("interrupt task reconfigured to sleep") {
+    SUBCASE("event task reconfigured to wait for the timer") {
 
         ReconfigurableTask t(2, &executed, &m, &cv);
 
-        t.waitForInterrupt(0);
+        t.waitForEvent(0);
         REQUIRE(sched.addTask(t));
 
         // Change its mind: it should now run on the timer instead, not on
-        // the interrupt it was previously waiting for.
+        // the event it was previously waiting for.
         t.setPeriod(10);
         REQUIRE(sched.addTask(t));
 
-        sched.signalInterrupt(0);
+        sched.signalEvent(0);
         CHECK(executed.empty());
 
         tick(sched, 10);
@@ -396,7 +396,7 @@ TEST_CASE("TaskletScheduler - unconfigured task is rejected") {
 
     NeverConfiguredTask t;
 
-    // Never went through setPeriod()/waitForInterrupt(): nothing to
+    // Never went through setPeriod()/waitForEvent(): nothing to
     // schedule, so addTask() must refuse rather than silently guessing.
     CHECK_FALSE(sched.addTask(t));
     CHECK_FALSE(sched.addTask(t, 10));
@@ -414,8 +414,8 @@ TEST_CASE("TaskletScheduler - timer wake ordering") {
     std::mutex m;
     std::condition_variable cv;
 
-    struct SleepTask : ucosm::ITasklet {
-        SleepTask(int id, std::vector<int>* out, std::mutex* m, std::condition_variable* cv) :
+    struct TimerTask : ucosm::ITasklet {
+        TimerTask(int id, std::vector<int>* out, std::mutex* m, std::condition_variable* cv) :
             mID(id), mOut(out), mM(m), mCV(cv) {}
 
         void run() override {
@@ -433,11 +433,11 @@ TEST_CASE("TaskletScheduler - timer wake ordering") {
         std::condition_variable* mCV;
     };
 
-    SleepTask s1(1, &executed, &m, &cv);
-    SleepTask s2(2, &executed, &m, &cv);
-    SleepTask s3(3, &executed, &m, &cv);
+    TimerTask s1(1, &executed, &m, &cv);
+    TimerTask s2(2, &executed, &m, &cv);
+    TimerTask s3(3, &executed, &m, &cv);
 
-    // set sleep durations so they wake in order 2,1,3
+    // set periods so they wake in order 2,1,3
     s1.setPeriod(50);
     s2.setPeriod(10);
     s3.setPeriod(100);
@@ -636,7 +636,7 @@ TEST_CASE("TaskletScheduler - a task disposing of itself is dropped") {
 
 }
 
-TEST_CASE("TaskletScheduler - interrupt subscription is kept across runs") {
+TEST_CASE("TaskletScheduler - event subscription is kept across runs") {
 
     using namespace ucosm;
 
@@ -648,7 +648,7 @@ TEST_CASE("TaskletScheduler - interrupt subscription is kept across runs") {
     std::condition_variable cv;
 
     // Symmetrically with setPeriod(), a task that leaves its state untouched
-    // stays subscribed to the interrupt it was waiting for.
+    // stays subscribed to the event it was waiting for.
     struct SubscribedTask : ucosm::ITasklet {
         SubscribedTask(int id, std::vector<int>* out, std::mutex* m, std::condition_variable* cv) :
             mID(id), mOut(out), mM(m), mCV(cv) {}
@@ -667,13 +667,13 @@ TEST_CASE("TaskletScheduler - interrupt subscription is kept across runs") {
 
     SubscribedTask t(1, &executed, &m, &cv);
 
-    t.waitForInterrupt(0);
+    t.waitForEvent(0);
     REQUIRE(sched.addTask(t));
 
-    sched.signalInterrupt(0);
+    sched.signalEvent(0);
     REQUIRE(waitForExecutions(m, cv, executed, 1));
 
-    sched.signalInterrupt(0);
+    sched.signalEvent(0);
     REQUIRE(waitForExecutions(m, cv, executed, 2));
 
     {
@@ -682,7 +682,7 @@ TEST_CASE("TaskletScheduler - interrupt subscription is kept across runs") {
         sched.removeTask(t);
     }
 
-    sched.signalInterrupt(0);
+    sched.signalEvent(0);
 
     CHECK_FALSE(waitForExecutions(m, cv, executed, 3, std::chrono::milliseconds(100)));
 
@@ -848,7 +848,7 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
 
     tick_t nextDeadline = 0;
 
-    SUBCASE("on a sleeping task") {
+    SUBCASE("on a timer task") {
 
         WaitingTask t(1, &executed, &m, &cv);
 
@@ -875,19 +875,19 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
         }
     }
 
-    SUBCASE("on a task waiting for an interrupt") {
+    SUBCASE("on a task waiting for an event") {
 
         WaitingTask t(2, &executed, &m, &cv);
 
-        t.waitForInterrupt(0);
+        t.waitForEvent(0);
         REQUIRE(sched.addTask(t));
 
-        // a delay is meaningless for an interrupt : the task is left alone,
+        // a delay is meaningless for an event : the task is left alone,
         // switching it to the timer is setPeriod()'s job
         CHECK_FALSE(sched.setDelay(t, 10));
         CHECK_FALSE(sched.tryGetNextDeadline(nextDeadline));
 
-        sched.signalInterrupt(0);
+        sched.signalEvent(0);
         REQUIRE(waitForExecutions(m, cv, executed, 1));
 
         {

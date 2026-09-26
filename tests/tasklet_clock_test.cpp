@@ -138,8 +138,8 @@ namespace {
     // What a periodic tick interrupt does : move the clock, then let the
     // scheduler look at it. Without the poll() nothing would happen - the
     // scheduler is never told the time on its own.
-    template<interrupt_id_t interrupt_count>
-    void tickInterrupt(TaskletScheduler<interrupt_count>& inScheduler, tick_t inDelta) {
+    template<event_id_t event_count>
+    void tickInterrupt(TaskletScheduler<event_count>& inScheduler, tick_t inDelta) {
         g_now += inDelta;
         inScheduler.poll();
         pumpPending();
@@ -396,25 +396,25 @@ TEST_CASE("TaskletScheduler - one-shot timer : a task faster than its period kee
     CHECK(g_wakeupDeadline == tick_t(150));
 }
 
-TEST_CASE("TaskletScheduler - one-shot timer : an interrupt task runs without any deadline") {
+TEST_CASE("TaskletScheduler - one-shot timer : an event task runs without any deadline") {
 
     resetHarness();
     TaskletScheduler<2> sched(oneshot_backend);
 
     CountTask task;
-    task.waitForInterrupt(1);
+    task.waitForEvent(1);
     REQUIRE(sched.addTask(task));
 
-    // nothing sleeping, so the platform's timer stays off
+    // nothing waiting for the timer, so the platform's timer stays off
     CHECK_FALSE(g_wakeupArmed);
 
     g_now = 9'999;
 
-    sched.signalInterrupt(1);
+    sched.signalEvent(1);
     pump();
     CHECK(task.mCount == 1);
 
-    sched.signalInterrupt(1);
+    sched.signalEvent(1);
     pump();
     CHECK(task.mCount == 2);
 
@@ -545,9 +545,9 @@ TEST_CASE("TaskletScheduler - periodic tick : a tick jump larger than a period d
     CHECK(task.mCount == 2);
 }
 
-TEST_CASE("TaskletScheduler - an interrupt task that gives itself a period is armed from now") {
+TEST_CASE("TaskletScheduler - an event task that gives itself a period is armed from now") {
 
-    // A task dispatched from an interrupt was never due at a deadline, so it
+    // A task dispatched from an event was never due at a deadline, so it
     // has none to anchor a period on. Anchoring it on whatever it last
     // carried - zero, for a task that never came off the timer list - would
     // arm it far behind the clock : due again in the very same pass, then
@@ -567,16 +567,16 @@ TEST_CASE("TaskletScheduler - an interrupt task that gives itself a period is ar
     };
 
     SwitchTask task;
-    task.waitForInterrupt(1);
+    task.waitForEvent(1);
     REQUIRE(sched.addTask(task));
 
-    // time passes before the interrupt arrives
+    // time passes before the event arrives
     tickInterrupt(sched, 5'000);
 
-    sched.signalInterrupt(1);
+    sched.signalEvent(1);
     pumpPending();
 
-    // it ran once, for the interrupt - not a second time in the same pass
+    // it ran once, for the event - not a second time in the same pass
     CHECK(task.mCount == 1);
 
     tick_t nextDeadline = 0;
@@ -636,10 +636,10 @@ TEST_CASE("TaskletScheduler - null optional hooks are replaced by no-ops") {
     {
         TaskletScheduler<1> sched(TaskletBackend { getTick });
 
-        CountTask interruptTask;
-        interruptTask.waitForInterrupt(0);
-        REQUIRE(sched.addTask(interruptTask));
-        sched.signalInterrupt(0);
+        CountTask eventTask;
+        eventTask.waitForEvent(0);
+        REQUIRE(sched.addTask(eventTask));
+        sched.signalEvent(0);
 
         CountTask timerTask;
         timerTask.setPeriod(10);
@@ -648,7 +648,7 @@ TEST_CASE("TaskletScheduler - null optional hooks are replaced by no-ops") {
         sched.poll();
 
         sched.removeTask(timerTask);
-        sched.removeTask(interruptTask);
+        sched.removeTask(eventTask);
     }
 
     // none of the harness hooks was reached
