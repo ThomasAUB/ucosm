@@ -134,7 +134,7 @@ namespace ucosm {
 
     template<typename task_t, typename sched_rank_t>
     bool IScheduler<task_t, sched_rank_t>::empty() const {
-        return (&mTasks.front() == &mTasks.back());
+        return (&*mTasks.rbegin() == &mCursorTask);
     }
 
     template<typename task_t, typename sched_rank_t>
@@ -189,7 +189,7 @@ namespace ucosm {
 
         // Walked from the closest end, keeping FIFO order for equal deadlines.
         // The task itself is skipped : it may still be linked here.
-        auto& back = mTasks.back();
+        auto& back = *mTasks.rbegin();
         const auto backDelay = getDeadlineDelay(cursor, back.getRank());
 
         if (&back != &inTask && delay >= backDelay) {

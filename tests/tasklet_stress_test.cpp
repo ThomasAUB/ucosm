@@ -90,7 +90,7 @@ namespace {
             bool cursorSeen = false;
             tick_t previousDelay = 0;
 
-            for (auto& t : this->mTimerList) {
+            for (auto& t : this->timerList()) {
                 if (&t == &this->mCursorTask) {
                     cursorSeen = true;
                     continue;
@@ -135,7 +135,7 @@ namespace {
         // scheduler settled, and no further away than the longest delay the
         // test ever asks for.
         bool noTimerOverdue() {
-            for (auto& t : this->mTimerList) {
+            for (auto& t : this->timerList()) {
                 if (&t == &this->mCursorTask) {
                     continue;
                 }

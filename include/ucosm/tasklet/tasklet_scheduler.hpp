@@ -268,8 +268,8 @@ namespace ucosm {
             TaskletScheduler& mScheduler;
         };
 
-        ulink::List<ITask<priority_t>>& mTimerList { base_t::mTasks };
-        task_list_t mEventTaskLists[event_count];
+        task_list_t& timerList() { return base_t::mTasks; }
+
         // set from ISRs, consumed by run()
         Bitset<event_count> mPendingEvents;
         // written under an ExecutionLock only, read from ISRs
@@ -278,11 +278,13 @@ namespace ucosm {
         uatom::Atomic<tick_t> mNextTimer { 0 };
         uatom::Atomic<tick_t> mCursorRank { 0 };
 
+        TaskletBackend mBackend;
+
         // last published deadline, only accessed under an ExecutionLock
         bool mNotifiedHasTimer = false;
         tick_t mNotifiedDeadline = 0;
 
-        TaskletBackend mBackend;
+        task_list_t mEventTaskLists[event_count];
     };
 
 
@@ -428,7 +430,7 @@ namespace ucosm {
         const auto cursor = this->mCursorTask.getRank();
 
         // the first task is known to be due, the loop checks the ones after it
-        for (task_list_t::iterator it(task), endIt = mTimerList.end(); it != endIt; ) {
+        for (task_list_t::iterator it(task), endIt = timerList().end(); it != endIt; ) {
             auto& node = *it;
             task_list_t::iterator nextIt = it;
             ++nextIt;
@@ -469,7 +471,7 @@ namespace ucosm {
 
             while (!runList.empty()) {
 
-                auto& t = static_cast<ITasklet&>(runList.front());
+                auto& t = static_cast<ITasklet&>(*runList.begin());
 
                 const bool wasWaitingForTimer = t.isWaitingForTimer();
 
@@ -477,7 +479,7 @@ namespace ucosm {
 
                 t.run();
 
-                if (!t.isLinked() || runList.empty() || &runList.front() != &t) {
+                if (!t.isLinked() || runList.empty() || &*runList.begin() != &t) {
                     // the task removed or rescheduled itself
                     continue;
                 }
@@ -544,7 +546,7 @@ namespace ucosm {
             return;
         }
 
-        const auto frontRank = inList.front().getRank();
+        const auto frontRank = inList.begin()->getRank();
         if (rank < frontRank) {
             inList.push_front(inTask);
             return;
@@ -572,20 +574,20 @@ namespace ucosm {
         }
 
         // inList goes after ioList
-        if (inList.front().getRank() >= ioList.back().getRank()) {
+        if (inList.begin()->getRank() >= ioList.rbegin()->getRank()) {
             ioList.splice(ioList.end(), inList);
             return;
         }
 
         // inList goes before ioList
-        if (inList.back().getRank() <= ioList.front().getRank()) {
+        if (inList.rbegin()->getRank() <= ioList.begin()->getRank()) {
             ioList.splice(ioList.begin(), inList);
             return;
         }
 
         auto it_io = ioList.begin();
         while (!inList.empty()) {
-            auto& inNode = inList.front();
+            auto& inNode = *inList.begin();
 
             while (it_io != ioList.end() && it_io->getRank() <= inNode.getRank()) {
                 ++it_io;

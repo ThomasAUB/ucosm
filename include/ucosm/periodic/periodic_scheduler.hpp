@@ -144,17 +144,19 @@ namespace ucosm {
 
         const auto tick = mGetTick();
 
-        this->mCurrentTask = this->selectReadyTask(tick);
+        auto* task = this->selectReadyTask(tick);
 
-        if (!this->mCurrentTask) {
+        if (!task) {
             if (mIdleTask) {
                 mIdleTask();
             }
             return;
         }
 
+        this->mCurrentTask = task;
+
         // catch-up semantics : re-armed from the current tick
-        this->runAndRearm(*this->mCurrentTask, tick);
+        this->runAndRearm(*task, tick);
 
         this->mCurrentTask = nullptr;
     }
