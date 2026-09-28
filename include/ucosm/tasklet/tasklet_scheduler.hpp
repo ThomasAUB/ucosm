@@ -276,7 +276,8 @@ namespace ucosm {
         Bitset<event_count> mSubscribedEvents;
         uatom::Atomic<bool> mHasTimerTask { false };
         uatom::Atomic<tick_t> mNextTimer { 0 };
-        uatom::Atomic<tick_t> mCursorRank { 0 };
+        // mirrors mCursor for poll(), which may run from an ISR
+        uatom::Atomic<tick_t> mPublishedCursor { 0 };
 
         TaskletBackend mBackend;
 
@@ -370,7 +371,7 @@ namespace ucosm {
         }
 
         const auto next = mNextTimer.load(std::memory_order_relaxed);
-        const auto cursor = mCursorRank.load(std::memory_order_relaxed);
+        const auto cursor = mPublishedCursor.load(std::memory_order_relaxed);
 
         if (isDeadlineDue(cursor, next, now())) {
             requestExecution();
@@ -427,7 +428,7 @@ namespace ucosm {
             return;
         }
 
-        const auto cursor = this->mCursorTask.getRank();
+        const auto cursor = this->mCursor;
 
         // the first task is known to be due, the loop checks the ones after it
         for (task_list_t::iterator it(task), endIt = timerList().end(); it != endIt; ) {
@@ -448,9 +449,9 @@ namespace ucosm {
             it = nextIt;
         }
 
-        this->mCursorTask.setRank(inNow);
+        this->mCursor = inNow;
         // relaxed : poll() is its only reader, and reads it relaxed
-        mCursorRank.store(inNow, std::memory_order_relaxed);
+        mPublishedCursor.store(inNow, std::memory_order_relaxed);
     }
 
     template<event_id_t event_count>

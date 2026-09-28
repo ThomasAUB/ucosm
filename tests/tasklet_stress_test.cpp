@@ -84,30 +84,18 @@ namespace {
 
             int count = 0;
 
-            // timer list : nothing before the cursor, then sorted by the
-            // delay separating each deadline from the cursor
-            const auto cursor = this->mCursorTask.getRank();
-            bool cursorSeen = false;
+            // timer list : sorted by the delay separating each deadline
+            // from the cursor
+            const auto cursor = this->mCursor;
             tick_t previousDelay = 0;
 
             for (auto& t : this->timerList()) {
-                if (&t == &this->mCursorTask) {
-                    cursorSeen = true;
-                    continue;
-                }
-                if (!cursorSeen) {
-                    return -1;
-                }
                 const auto delay = getDeadlineDelay(cursor, t.getRank());
                 if (delay < previousDelay) {
                     return -1;
                 }
                 previousDelay = delay;
                 ++count;
-            }
-
-            if (!cursorSeen) {
-                return -1;
             }
 
             // event lists : sorted by priority, which is also the rank
@@ -136,9 +124,6 @@ namespace {
         // test ever asks for.
         bool noTimerOverdue() {
             for (auto& t : this->timerList()) {
-                if (&t == &this->mCursorTask) {
-                    continue;
-                }
                 const auto delay = getDeadlineDelay(g_now, t.getRank());
                 if (delay == 0 || delay > max_delay) {
                     return false;

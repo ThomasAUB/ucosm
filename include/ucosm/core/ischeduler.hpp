@@ -34,18 +34,14 @@
 namespace ucosm {
 
     /**
-     * @brief Base scheduler : a deadline-sorted task list headed by a cursor.
-     * The cursor rank must never move past a deadline still in the list.
+     * @brief Base scheduler : a deadline-sorted task list, ordered from a cursor.
+     * The cursor must never move past a deadline still in the list.
      *
      * @tparam task_t Task type to schedule.
      * @tparam sched_task_t Scheduler task type
      */
     template<typename task_t, typename sched_task_t>
     struct IScheduler : sched_task_t {
-
-        IScheduler() {
-            mTasks.push_front(mCursorTask);
-        }
 
         /**
          * @brief Returns the currently executed task.
@@ -116,14 +112,8 @@ namespace ucosm {
 
         task_t* mCurrentTask = nullptr;
 
-        struct CursorTask final : itask_t {
-            void run() override {}
-            std::string_view name() override { return ">"; }
-            auto* next() { return static_cast<task_t*>(this->itask_t::next); }
-            const auto* next() const { return static_cast<const task_t*>(this->itask_t::next); }
-        };
-
-        CursorTask mCursorTask;
+        // reference tick of the wrap-safe deadline comparisons
+        task_rank_t mCursor = task_rank_t();
 
     };
 
@@ -134,18 +124,17 @@ namespace ucosm {
 
     template<typename task_t, typename sched_rank_t>
     bool IScheduler<task_t, sched_rank_t>::empty() const {
-        return (&*mTasks.rbegin() == &mCursorTask);
+        return mTasks.empty();
     }
 
     template<typename task_t, typename sched_rank_t>
     void IScheduler<task_t, sched_rank_t>::clear() {
         mTasks.clear();
-        mTasks.push_front(mCursorTask);
     }
 
     template<typename task_t, typename sched_rank_t>
     std::size_t IScheduler<task_t, sched_rank_t>::size() const {
-        return (mTasks.size() - 1);
+        return mTasks.size();
     }
 
     template<typename task_t, typename sched_rank_t>
@@ -166,7 +155,7 @@ namespace ucosm {
             return 0;
         }
 
-        return mCursorTask.next()->getRank();
+        return mTasks.front().getRank();
     }
 
     template<typename task_t, typename sched_rank_t>
@@ -176,7 +165,7 @@ namespace ucosm {
             return nullptr;
         }
 
-        return mCursorTask.next();
+        return &static_cast<task_t&>(mTasks.front());
     }
 
     template<typename task_t, typename sched_rank_t>
@@ -184,7 +173,12 @@ namespace ucosm {
 
         using task_list_t = ulink::List<itask_t>;
 
-        const auto cursor = mCursorTask.getRank();
+        if (mTasks.empty()) {
+            mTasks.push_back(inTask);
+            return;
+        }
+
+        const auto cursor = mCursor;
         const auto delay = getDeadlineDelay(cursor, inTask.getRank());
 
         // Walked from the closest end, keeping FIFO order for equal deadlines.
@@ -198,9 +192,7 @@ namespace ucosm {
         }
 
         if (delay <= backDelay / 2) {
-            typename task_list_t::iterator it(&mCursorTask);
-            ++it;
-
+            auto it = mTasks.begin();
             const auto endIt = mTasks.end();
 
             // the task itself compares equal, so it is walked past
@@ -212,14 +204,19 @@ namespace ucosm {
         }
         else {
             typename task_list_t::reverse_iterator it = mTasks.rbegin();
-            const typename task_list_t::reverse_iterator cursorIt(&mCursorTask);
+            const auto rendIt = mTasks.rend();
 
-            while (it != cursorIt &&
+            while (it != rendIt &&
                 (&*it == &inTask || getDeadlineDelay(cursor, it->getRank()) > delay)) {
                 ++it;
             }
 
-            mTasks.insert_after(typename task_list_t::iterator(&*it), inTask);
+            if (it == rendIt) {
+                mTasks.push_front(inTask);
+            }
+            else {
+                mTasks.insert_after(typename task_list_t::iterator(&*it), inTask);
+            }
         }
     }
 
@@ -228,7 +225,7 @@ namespace ucosm {
         task_rank_t inDeadline,
         task_rank_t inNow
     ) const {
-        return isDeadlineDue(mCursorTask.getRank(), inDeadline, inNow);
+        return isDeadlineDue(mCursor, inDeadline, inNow);
     }
 
     template<typename task_t, typename sched_rank_t>
