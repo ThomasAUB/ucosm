@@ -112,7 +112,7 @@ namespace ucosm {
 
         if (this->empty()) {
             // bring an idle cursor to the current tick, keeping it wrap-safe
-            this->mCursorTask.setRank(tick);
+            this->mCursor = tick;
         }
 
         inTask.setRank(tick);
@@ -165,7 +165,7 @@ namespace ucosm {
     void PeriodicScheduler<sched_rank_t>::runAndRearm(IPeriodicTask& task, task_rank_t reference) {
 
         // earliest deadline in the list, so no task falls behind the cursor
-        this->mCursorTask.setRank(task.getRank());
+        this->mCursor = task.getRank();
 
         task.run();
 
