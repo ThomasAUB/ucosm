@@ -86,11 +86,11 @@ namespace ucosm {
     namespace detail {
 
         // Stand-ins for null backend hooks, so that call sites need no test.
-        inline void noopHook() {}
-        inline void noopHandlerInstaller(void (*)(void*), void*) {}
-        inline void noopScheduleNextWakeup(bool, tick_t) {}
+        constexpr void noopHook() {}
+        constexpr void noopHandlerInstaller(void (*)(void*), void*) {}
+        constexpr void noopScheduleNextWakeup(bool, tick_t) {}
 
-        inline void fillDefaultHooks(TaskletBackend& ioBackend) {
+        constexpr void fillDefaultHooks(TaskletBackend& ioBackend) {
             if (!ioBackend.requestTaskletExecution) {
                 ioBackend.requestTaskletExecution = noopHook;
             }
@@ -127,10 +127,12 @@ namespace ucosm {
 
         /**
          * @brief Construct a new tasklet scheduler object.
+         * Constant-initializable from a constexpr backend without installHandler,
+         * e.g. a static placeholder usable before any dynamic initialization.
          *
          * @param inBackend Platform hooks, copied by the scheduler.
          */
-        TaskletScheduler(const TaskletBackend& inBackend) :
+        constexpr TaskletScheduler(const TaskletBackend& inBackend) :
             mBackend(inBackend) {
             detail::fillDefaultHooks(mBackend);
             mBackend.installHandler(
