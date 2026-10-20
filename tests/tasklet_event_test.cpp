@@ -517,3 +517,35 @@ TEST_CASE("TaskletEvent - signals during a dispatch are all delivered") {
         CHECK(t.mRuns == 1);
     }
 }
+
+TEST_CASE("TaskletEvent - adding a waiting task again keeps it waiting once") {
+
+    resetHarness();
+    TaskletScheduler sched(event_backend);
+    TaskletEvent event;
+
+    std::vector<int> log;
+    RecordTask t1(1, log);
+    RecordTask t2(2, log);
+    RecordTask t3(3, log);
+
+    t1.setPriority(1);
+    t2.setPriority(2);
+    t3.setPriority(2);
+
+    for (auto* t : { &t1, &t2, &t3 }) {
+        t->waitForEvent(event);
+        REQUIRE(sched.addTask(*t));
+    }
+
+    // last of the list, then in the middle among equal ranks, then first
+    REQUIRE(sched.addTask(t3));
+    REQUIRE(sched.addTask(t2));
+    REQUIRE(sched.addTask(t1));
+
+    event.signal();
+    pump();
+
+    // re-adding moves a task behind its equals, like a fresh add
+    CHECK(log == std::vector<int> { 1, 3, 2 });
+}

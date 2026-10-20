@@ -435,6 +435,10 @@ namespace ucosm {
             return true;
         }
 
+        // the task may already wait for this event : insertSort() must not
+        // meet it while walking the waiters
+        inTask.ITasklet::removeTask();
+
         return waitForEventLocked(inTask);
     }
 
