@@ -66,6 +66,7 @@ namespace ucosm {
                 "Callable object must be nothrow move constructible."
                 );
             ::new(mStorage) decayed(std::forward<callable_t>(c));
+            mInvoke = &invoke_impl<decayed>;
             mOps = &ops_table<decayed>;
         }
 
@@ -77,60 +78,31 @@ namespace ucosm {
         CallableTask(void(T::* f)(), T* obj)
             : CallableTask([obj, f] () { (obj->*f)(); }) {}
 
-        CallableTask(const CallableTask& other) noexcept {
-            if (other.mOps && other.mOps->copy) {
-                other.mOps->copy(other.mStorage, this->mStorage);
-                mOps = other.mOps;
-            }
-            else {
-                mOps = &empty_ops;
-            }
+        // the task_t base, scheduler state, is never copied nor moved
+        CallableTask(const CallableTask& other) noexcept : task_t() {
+            copyFrom(other);
         }
 
-        CallableTask(CallableTask&& other) noexcept {
-            if (other.mOps && other.mOps->move) {
-                other.mOps->move(other.mStorage, this->mStorage);
-                mOps = other.mOps;
-                other.mOps = &empty_ops;
-            }
-            else {
-                mOps = &empty_ops;
-                other.mOps = &empty_ops;
-            }
+        CallableTask(CallableTask&& other) noexcept : task_t() {
+            moveFrom(other);
         }
 
         ~CallableTask() {
-            if (mOps && mOps->destroy) {
-                mOps->destroy(mStorage);
-            }
+            destroy();
         }
 
         CallableTask& operator=(CallableTask&& other) noexcept {
             if (this != &other) {
-                if (mOps && mOps->destroy) { mOps->destroy(mStorage); }
-                if (other.mOps && other.mOps->move) {
-                    other.mOps->move(other.mStorage, this->mStorage);
-                    mOps = other.mOps;
-                    other.mOps = &empty_ops;
-                }
-                else {
-                    mOps = &empty_ops;
-                    other.mOps = &empty_ops;
-                }
+                destroy();
+                moveFrom(other);
             }
             return *this;
         }
 
         CallableTask& operator=(const CallableTask& other) noexcept {
             if (this != &other) {
-                if (mOps && mOps->destroy) { mOps->destroy(mStorage); }
-                if (other.mOps && other.mOps->copy) {
-                    other.mOps->copy(other.mStorage, this->mStorage);
-                    mOps = other.mOps;
-                }
-                else {
-                    mOps = &empty_ops;
-                }
+                destroy();
+                copyFrom(other);
             }
             return *this;
         }
@@ -138,11 +110,14 @@ namespace ucosm {
     private:
 
         void run() override {
-            mOps->invoke(mStorage, *this);
+            mInvoke(mStorage, *this);
         }
 
+        using invoke_t = void(*)(std::byte*, task_t&) noexcept;
+
+        // invoke is kept out of the table, in the object : run() then
+        // costs one load before the jump instead of two dependent ones
         struct Operations {
-            void(*invoke)(std::byte*, task_t&) noexcept;
             void (*move)(std::byte*, std::byte*) noexcept;
             void (*copy)(const std::byte*, std::byte*) noexcept;
             void (*destroy)(std::byte*) noexcept;
@@ -177,7 +152,6 @@ namespace ucosm {
 
         template<typename callable_t>
         static constexpr Operations ops_table = {
-            &invoke_impl<callable_t>,
             &move_impl<callable_t>,
             std::is_copy_constructible_v<callable_t> ? &copy_impl<callable_t> : nullptr,
             std::is_trivially_destructible_v<callable_t> ? nullptr : &destroy_impl<callable_t>
@@ -188,17 +162,53 @@ namespace ucosm {
         }
 
         static constexpr Operations empty_ops = {
-            &invoke_empty,
             nullptr,
             nullptr,
             nullptr
         };
 
+        void reset() {
+            mInvoke = &invoke_empty;
+            mOps = &empty_ops;
+        }
+
+        void destroy() {
+            if (mOps->destroy) {
+                mOps->destroy(mStorage);
+            }
+        }
+
+        // a callable that can't be copied leaves this task empty
+        void copyFrom(const CallableTask& other) {
+            if (other.mOps->copy) {
+                other.mOps->copy(other.mStorage, this->mStorage);
+                mInvoke = other.mInvoke;
+                mOps = other.mOps;
+            }
+            else {
+                reset();
+            }
+        }
+
+        void moveFrom(CallableTask& other) {
+            if (other.mOps->move) {
+                other.mOps->move(other.mStorage, this->mStorage);
+                mInvoke = other.mInvoke;
+                mOps = other.mOps;
+            }
+            else {
+                reset();
+            }
+            other.reset();
+        }
+
         static constexpr size_t storage_size = 4 * sizeof(uintptr_t);
         static constexpr size_t storage_align = alignof(std::max_align_t);
 
-        alignas(storage_align) std::byte mStorage[storage_size];
+        // mInvoke first, on the vptr's cache line : the only member run() reads
+        invoke_t mInvoke = &invoke_empty;
         const Operations* mOps = &empty_ops;
+        alignas(storage_align) std::byte mStorage[storage_size];
 
     };
 
