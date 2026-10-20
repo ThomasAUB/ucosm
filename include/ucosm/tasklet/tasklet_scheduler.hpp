@@ -114,8 +114,10 @@ namespace ucosm {
     static_assert(uatom::Atomic<bool>::is_always_lock_free, "Atomic will be slow");
 
     struct TaskletScheduler;
+    struct TaskletEvent;
 
     static_assert(uatom::Atomic<TaskletScheduler*>::is_always_lock_free, "Atomic will be slow");
+    static_assert(uatom::Atomic<TaskletEvent*>::is_always_lock_free, "Atomic will be slow");
 
     /**
      * @brief Event tasklets wait for, owned by the code that signals it.
@@ -125,7 +127,10 @@ namespace ucosm {
      * It binds to the scheduler of its first waiter, and is released once no
      * task waits for it anymore. Signals sent while unbound are dropped.
      *
-     * signal() takes no critical section.
+     * signal() pushes the event on its scheduler's pending list, so that a
+     * dispatch only visits the signaled events. The push is one short
+     * uatom::CriticalSection : the contexts signaling a scheduler and
+     * dispatching it must share one core, and run privileged on Cortex-M.
      */
     struct TaskletEvent : ulink::Node<TaskletEvent> {
 
@@ -160,8 +165,9 @@ namespace ucosm {
 
         // written under the scheduler's ExecutionLock, read by signal()
         uatom::Atomic<TaskletScheduler*> mScheduler { nullptr };
-        // set by signal(), consumed by the scheduler's run()
-        uatom::Atomic<bool> mPending { false };
+        // Link in the pending list of mScheduler : nullptr while not pending,
+        // this when last. Written under a uatom::CriticalSection only.
+        TaskletEvent* mNextPending = nullptr;
         // sorted by priority, accessed under the scheduler's ExecutionLock
         ulink::List<ITask<priority_t>> mWaiters;
     };
@@ -250,13 +256,6 @@ namespace ucosm {
         void poll();
 
         /**
-         * @brief Returns the current time, read from the backend's clock.
-         *
-         * @return tick_t Current tick.
-         */
-        tick_t now() const;
-
-        /**
          * @brief Get the next timer deadline, if any.
          *
          * @param out Absolute tick of the next deadline, untouched if none.
@@ -293,8 +292,16 @@ namespace ucosm {
         // Unbinds an event and unlinks its waiters. Called under an ExecutionLock.
         void releaseEventLocked(TaskletEvent& inEvent);
 
-        // Called by TaskletEvent::signal(), from any context.
-        void notifyPendingEvent();
+        // Takes the pending list whole, leaving signal() an empty one.
+        TaskletEvent* takePending();
+
+        // Merges the waiters of a pending list into ioList, and unlinks its
+        // events. Called under an ExecutionLock.
+        void drainPendingLocked(TaskletEvent* inList, task_list_t& ioList);
+
+        // Unlinks an event if pending, for its destructor. Called under an
+        // ExecutionLock.
+        void unlinkPendingLocked(TaskletEvent& inEvent);
 
         // Arms a timer task inDelay ticks from now. Called under an ExecutionLock.
         void armTimerLocked(ITasklet& inTask, tick_t inDelay);
@@ -326,8 +333,12 @@ namespace ucosm {
 
         static task_list_t& waiters(TaskletEvent& inEvent) { return inEvent.mWaiters; }
 
-        // set from any context, consumed by run() : some event may be pending
-        uatom::Atomic<bool> mHasPendingEvents { false };
+        // Pushed by signal(), taken whole by run(), both under a
+        // uatom::CriticalSection. Atomic for run() to peek at it outside one.
+        uatom::Atomic<TaskletEvent*> mPendingHead { nullptr };
+        // pending events taken off mPendingHead by an event destructor, for
+        // run() to drain. Only accessed under an ExecutionLock
+        TaskletEvent* mCollected = nullptr;
         uatom::Atomic<bool> mHasTimerTask { false };
         uatom::Atomic<tick_t> mNextTimer { 0 };
         // mirrors mCursor for poll(), which may run from an ISR
@@ -356,6 +367,9 @@ namespace ucosm {
 
         TaskletScheduler::ExecutionLock guard(*scheduler);
 
+        // only a bound event is ever pending
+        scheduler->unlinkPendingLocked(*this);
+
         for (auto& t : mWaiters) {
             // waiting again would reach a dead event
             static_cast<ITasklet&>(t).dispose();
@@ -364,21 +378,30 @@ namespace ucosm {
         scheduler->releaseEventLocked(*this);
     }
 
+    // An event is pushed only on the pending list of the scheduler it is bound
+    // to, which unbinds it only once unlinked : see drainPendingLocked(). The
+    // critical section also orders what was written before the signal before
+    // the run of the woken tasks.
     inline void TaskletEvent::signal() {
 
-        // relaxed : the scheduler outlives the binding, nothing else is read
-        auto* scheduler = mScheduler.load(std::memory_order_relaxed);
+        TaskletScheduler* scheduler;
 
-        if (!scheduler) {
-            // no waiter
-            return;
+        {
+            const uatom::CriticalSection cs;
+
+            scheduler = mScheduler.load(std::memory_order_relaxed);
+
+            if (!scheduler || mNextPending) {
+                // no waiter, or already listed : coalesced
+                return;
+            }
+
+            auto* head = scheduler->mPendingHead.load(std::memory_order_relaxed);
+            mNextPending = head ? head : this;
+            scheduler->mPendingHead.store(this, std::memory_order_relaxed);
         }
 
-        // release : pairs with the acquire in pushReadyEventTasks(), so that
-        // the woken tasks see what was written before the signal
-        mPending.store(true, std::memory_order_release);
-
-        scheduler->notifyPendingEvent();
+        scheduler->requestExecution();
     }
 
 
@@ -389,6 +412,15 @@ namespace ucosm {
         mBackend.installHandler(nullptr, nullptr);
 
         // no ExecutionLock : the backend may already be unusable
+        for (auto* list : { mCollected, takePending() }) {
+            while (list) {
+                auto* next = list->mNextPending;
+                list->mNextPending = nullptr;
+                list = (next == list) ? nullptr : next;
+            }
+        }
+        mCollected = nullptr;
+
         while (!mEvents.empty()) {
             releaseEventLocked(*mEvents.begin());
         }
@@ -433,7 +465,7 @@ namespace ucosm {
     }
 
     inline void TaskletScheduler::armTimerLocked(ITasklet& inTask, tick_t inDelay) {
-        inTask.setRank(makeDeadline(now(), inDelay));
+        inTask.setRank(makeDeadline(mBackend.getTick(), inDelay));
         this->insertByDeadline(inTask);
         updateNextTimerLocked();
     }
@@ -458,11 +490,9 @@ namespace ucosm {
                 return false;
             }
 
-            // signals sent while nobody was waiting are dropped
-            event.mPending.store(false, std::memory_order_relaxed);
+            // unbound, so not pending : signals sent meanwhile were dropped
             mEvents.push_back(event);
-            // release : orders the reset above before any signal() binding it
-            event.mScheduler.store(this, std::memory_order_release);
+            event.mScheduler.store(this, std::memory_order_relaxed);
         }
 
         inTask.setRank(inTask.getPriority());
@@ -477,10 +507,77 @@ namespace ucosm {
         inEvent.remove();
     }
 
-    inline void TaskletScheduler::notifyPendingEvent() {
-        // release : pairs with the acquire in pushReadyEventTasks()
-        mHasPendingEvents.store(true, std::memory_order_release);
-        requestExecution();
+    inline TaskletEvent* TaskletScheduler::takePending() {
+        const uatom::CriticalSection cs;
+        auto* list = mPendingHead.load(std::memory_order_relaxed);
+        mPendingHead.store(nullptr, std::memory_order_relaxed);
+        return list;
+    }
+
+    inline void TaskletScheduler::drainPendingLocked(TaskletEvent* inList, task_list_t& ioList) {
+
+        while (inList) {
+
+            auto& event = *inList;
+            // read before the clear below lets signal() relink the event
+            auto* next = event.mNextPending;
+            inList = (next == &event) ? nullptr : next;
+
+            if (event.mWaiters.empty()) {
+                // task(s) have been removed. Unbound before the clear, so
+                // that a signal() seeing the clear sees it unbound.
+                releaseEventLocked(event);
+            }
+            else {
+                mergeSortedLists(ioList, event.mWaiters);
+            }
+
+            const uatom::CriticalSection cs;
+            event.mNextPending = nullptr;
+        }
+    }
+
+    inline void TaskletScheduler::unlinkPendingLocked(TaskletEvent& inEvent) {
+
+        // relinks events signal() may be reading
+        const uatom::CriticalSection cs;
+
+        if (!inEvent.mNextPending) {
+            return;
+        }
+
+        // moves the pending list to the front of mCollected, which holds
+        // inEvent if the list doesn't
+        for (auto* list = takePending(); list; ) {
+            auto* next = list->mNextPending;
+            const bool isLast = (next == list);
+            list->mNextPending = mCollected ? mCollected : list;
+            mCollected = list;
+            list = isLast ? nullptr : next;
+        }
+
+        TaskletEvent* previous = nullptr;
+
+        for (auto* event = mCollected; event; previous = event, event = event->mNextPending) {
+
+            const bool isLast = (event->mNextPending == event);
+
+            if (event == &inEvent) {
+                if (previous) {
+                    previous->mNextPending = isLast ? previous : event->mNextPending;
+                }
+                else {
+                    mCollected = isLast ? nullptr : event->mNextPending;
+                }
+                break;
+            }
+
+            if (isLast) {
+                break;
+            }
+        }
+
+        inEvent.mNextPending = nullptr;
     }
 
     inline void TaskletScheduler::removeTask(ITasklet& inTask) {
@@ -503,14 +600,10 @@ namespace ucosm {
         const auto next = mNextTimer.load(std::memory_order_relaxed);
         const auto cursor = mPublishedCursor.load(std::memory_order_relaxed);
 
-        if (isDeadlineDue(cursor, next, now())) {
+        if (isDeadlineDue(cursor, next, mBackend.getTick())) {
             requestExecution();
         }
 
-    }
-
-    inline tick_t TaskletScheduler::now() const {
-        return mBackend.getTick();
     }
 
     inline bool TaskletScheduler::tryGetNextDeadline(tick_t& out) const {
@@ -522,33 +615,20 @@ namespace ucosm {
     }
 
     // Called with an empty run list : every waiting task is then in its
-    // event's list, so an event found without waiters has none left.
+    // event's list, so a signaled event found without waiters has none left.
     // Releasing it any later, e.g. as soon as its waiters are merged, would
     // drop the signals sent while they run.
     inline void TaskletScheduler::pushReadyEventTasks(task_list_t& ioList) {
 
-        // relaxed load first : on ARMv6-M the exchange masks interrupts
-        if (!mHasPendingEvents.load(std::memory_order_relaxed) ||
-            !mHasPendingEvents.exchange(false, std::memory_order_acquire)) {
-            return;
+        if (mCollected) {
+            auto* collected = mCollected;
+            mCollected = nullptr;
+            drainPendingLocked(collected, ioList);
         }
 
-        for (auto it = mEvents.begin(), endIt = mEvents.end(); it != endIt; ) {
-
-            auto& event = *it;
-            ++it;
-
-            const bool isPending =
-                event.mPending.load(std::memory_order_relaxed) &&
-                event.mPending.exchange(false, std::memory_order_acquire);
-
-            if (event.mWaiters.empty()) {
-                // task(s) have been removed
-                releaseEventLocked(event);
-            }
-            else if (isPending) {
-                mergeSortedLists(ioList, event.mWaiters);
-            }
+        // peeked first, to skip the critical section when nothing is pending
+        if (mPendingHead.load(std::memory_order_relaxed)) {
+            drainPendingLocked(takePending(), ioList);
         }
     }
 
@@ -595,7 +675,7 @@ namespace ucosm {
             pushReadyEventTasks(runList);
 
             // also anchors a task switching from event to timer in its run()
-            const auto readyTick = now();
+            const auto readyTick = mBackend.getTick();
 
             pushReadyTimerTasks(runList, readyTick);
 
@@ -627,7 +707,7 @@ namespace ucosm {
 
                     // overran its period : re-arm from now, a past deadline
                     // would sort to the far end of the list
-                    const auto after = now();
+                    const auto after = mBackend.getTick();
 
                     if (isDeadlinePassed(after, deadline)) {
                         deadline = makeDeadline(after, period);
@@ -648,11 +728,14 @@ namespace ucosm {
                 this->isDue(
                     nextDeadline,
                     // re-read to account for the time spent running tasks
-                    now()
+                    mBackend.getTick()
                 );
 
             // a hint only, pushReadyEventTasks() carries the ordering
-            if (!(hasTimerDue || mHasPendingEvents.load(std::memory_order_relaxed))) {
+            const bool hasPendingEvent =
+                mCollected || mPendingHead.load(std::memory_order_relaxed);
+
+            if (!(hasTimerDue || hasPendingEvent)) {
                 break;
             }
         }

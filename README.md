@@ -139,7 +139,8 @@ A tasklet runs on a period (`setPeriod`) or waits for an event (`waitForEvent`);
 
 A `TaskletEvent` is identified by its address, not by a number: modules that each declare their own events can never collide, and the scheduler has no event count to size.
 
-- `signal()` is ISR safe and takes no critical section, even on ARMv6-M.
+- `signal()` is ISR safe. It pushes the event on its scheduler's pending list in one short `uatom::CriticalSection`, so a dispatch only visits signaled events.
+- The contexts signaling a scheduler and dispatching it must run on one core, privileged on Cortex-M: the critical section masks interrupts there.
 - `waitForEvent()` takes a `const TaskletEvent&`, so an owner can expose its event to other modules as wait-only, keeping `signal()` to itself.
 - An event binds to the scheduler of its first waiter and is released once it has none left. Waiting for it from another scheduler meanwhile fails in `addTask`.
 - Destroying an event unschedules and disposes the tasks still waiting for it.
