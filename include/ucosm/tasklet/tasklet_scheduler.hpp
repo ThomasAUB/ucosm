@@ -296,8 +296,9 @@ namespace ucosm {
         TaskletEvent* takePending();
 
         // Merges the waiters of a pending list into ioList, and unlinks its
-        // events. Called under an ExecutionLock.
-        void drainPendingLocked(TaskletEvent* inList, task_list_t& ioList);
+        // events. An event without waiters is released if inMayRelease,
+        // otherwise kept pending in mCollected. Called under an ExecutionLock.
+        void drainPendingLocked(TaskletEvent* inList, task_list_t& ioList, bool inMayRelease);
 
         // Unlinks an event if pending, for its destructor. Called under an
         // ExecutionLock.
@@ -336,8 +337,9 @@ namespace ucosm {
         // Pushed by signal(), taken whole by run(), both under a
         // uatom::CriticalSection. Atomic for run() to peek at it outside one.
         uatom::Atomic<TaskletEvent*> mPendingHead { nullptr };
-        // pending events taken off mPendingHead by an event destructor, for
-        // run() to drain. Only accessed under an ExecutionLock
+        // pending events taken off mPendingHead by an event destructor, or
+        // deferred by a drain within a dispatch, for run() to drain with an
+        // empty run list. Only accessed under an ExecutionLock
         TaskletEvent* mCollected = nullptr;
         uatom::Atomic<bool> mHasTimerTask { false };
         uatom::Atomic<tick_t> mNextTimer { 0 };
@@ -518,7 +520,11 @@ namespace ucosm {
         return list;
     }
 
-    inline void TaskletScheduler::drainPendingLocked(TaskletEvent* inList, task_list_t& ioList) {
+    inline void TaskletScheduler::drainPendingLocked(
+        TaskletEvent* inList,
+        task_list_t& ioList,
+        bool inMayRelease
+    ) {
 
         while (inList) {
 
@@ -526,6 +532,15 @@ namespace ucosm {
             // read before the clear below lets signal() relink the event
             auto* next = event.mNextPending;
             inList = (next == &event) ? nullptr : next;
+
+            if (event.mWaiters.empty() && !inMayRelease) {
+                // its waiters may be in the run list : kept pending until it
+                // is empty, so that a signal sent while they run isn't dropped
+                const uatom::CriticalSection cs;
+                event.mNextPending = mCollected ? mCollected : &event;
+                mCollected = &event;
+                continue;
+            }
 
             if (event.mWaiters.empty()) {
                 // task(s) have been removed. Unbound before the clear, so
@@ -627,12 +642,12 @@ namespace ucosm {
         if (mCollected) {
             auto* collected = mCollected;
             mCollected = nullptr;
-            drainPendingLocked(collected, ioList);
+            drainPendingLocked(collected, ioList, true);
         }
 
         // peeked first, to skip the critical section when nothing is pending
         if (mPendingHead.load(std::memory_order_relaxed)) {
-            drainPendingLocked(takePending(), ioList);
+            drainPendingLocked(takePending(), ioList, true);
         }
     }
 
@@ -684,6 +699,13 @@ namespace ucosm {
             pushReadyTimerTasks(runList, readyTick);
 
             while (!runList.empty()) {
+
+                // waiters signaled since the last task are merged by priority,
+                // so that a higher one runs next rather than after the batch.
+                // Peeked first : one load when nothing is pending
+                if (mPendingHead.load(std::memory_order_relaxed)) {
+                    drainPendingLocked(takePending(), runList, false);
+                }
 
                 auto& t = static_cast<ITasklet&>(*runList.begin());
 
