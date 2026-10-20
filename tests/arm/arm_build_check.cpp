@@ -9,18 +9,16 @@
 
 namespace {
 
-    constexpr ucosm::event_id_t exti_event = 0;
-
     volatile std::uint32_t g_sink = 0;
 
     struct PeriodicTasklet : ucosm::ITasklet {
         void run() override { g_sink = g_sink + 1; }
     };
 
-    ucosm::TaskletScheduler<2> g_tasklets { tasklet_backend };
+    ucosm::TaskletScheduler g_tasklets { tasklet_backend };
 
     // filled by the EXTI interrupt, drained by the event tasklet
-    ucosm::TaskletQueue<std::uint32_t, 8, 2> g_extiQueue { g_tasklets, exti_event };
+    ucosm::TaskletQueue<std::uint32_t, 8> g_extiQueue;
 
     ucosm::SharedVariable<std::uint32_t> g_lastExti;
 
@@ -59,7 +57,7 @@ int main() {
     g_periodicTasklet.setPeriod(10);
     g_tasklets.addTask(g_periodicTasklet);
 
-    g_eventTasklet.waitForEvent(exti_event);
+    g_eventTasklet.waitForEvent(g_extiQueue.event());
     g_tasklets.addTask(g_eventTasklet);
 
     ucosm::PeriodicScheduler<> periodic(get_tick);

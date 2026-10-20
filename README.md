@@ -80,7 +80,7 @@ Tasklets move long or blocking work out of interrupts: an ISR posts the work, an
 ```cpp
 #include "ucosm/tasklet/tasklet_scheduler.hpp"
 
-constexpr ucosm::event_id_t button_event = 0;
+ucosm::TaskletEvent button_event;  // owned by the code that signals it
 
 ucosm::TaskletBackend backend {
     get_tick,                        // required: reads the platform clock
@@ -90,7 +90,7 @@ ucosm::TaskletBackend backend {
     resume_low_priority_execution    // restores it
 };
 
-ucosm::TaskletScheduler<1> sched(backend);  // template arg: number of event IDs
+ucosm::TaskletScheduler sched(backend);
 
 struct BlinkTask : ucosm::ITasklet {
     void run() override { toggleLed(); }
@@ -100,7 +100,7 @@ struct ButtonTask : ucosm::ITasklet {
     void run() override { handleButton(); }
 } button;
 
-extern "C" void EXTI0_IRQHandler() { sched.signalEvent(button_event); }
+extern "C" void EXTI0_IRQHandler() { button_event.signal(); }
 extern "C" void SysTick_Handler()  { sched.poll(); }
 
 int main() {
@@ -131,8 +131,18 @@ Null optional hooks are replaced by no-ops. The clock alone never wakes a task, 
 A tasklet runs on a period (`setPeriod`) or waits for an event (`waitForEvent`); `addTask` refuses one with neither.
 
 - The configuration persists across runs unless `run()` changes it. Events are coalesced.
+- Signals sent while no task waits for an event are dropped.
 - Periods are counted from the previous deadline, so dispatch latency doesn't accumulate. A task finishing more than a period late restarts from the current time, and missed deadlines are dropped. A period of 0 means the next tick.
 - `addTask(task, delay)` and `setDelay(task, delay)` delay only the next execution.
+
+### Events
+
+A `TaskletEvent` is identified by its address, not by a number: modules that each declare their own events can never collide, and the scheduler has no event count to size.
+
+- `signal()` is ISR safe and takes no critical section, even on ARMv6-M.
+- `waitForEvent()` takes a `const TaskletEvent&`, so an owner can expose its event to other modules as wait-only, keeping `signal()` to itself.
+- An event binds to the scheduler of its first waiter and is released once it has none left. Waiting for it from another scheduler meanwhile fails in `addTask`.
+- Destroying an event unschedules and disposes the tasks still waiting for it.
 
 ### Stopping a task
 
@@ -156,7 +166,7 @@ Coroutine-like tasks that yield and resume where they left off, useful for state
 | `UCOSM_YIELD` | Resumes on the next execution (one tick on a tasklet) |
 | `UCOSM_SLEEP_FOR(tick)` | Waits for `tick` scheduler ticks |
 | `UCOSM_SLEEP_UNTIL(condition, check_period)` | Checks `condition` every `check_period` ticks until true |
-| `UCOSM_WAIT_EVENT(id)` | Tasklets only: waits for `signalEvent(id)` |
+| `UCOSM_WAIT_EVENT(event)` | Tasklets only: waits for `event.signal()` |
 | `UCOSM_RESTART` | Restarts from the beginning |
 | `UCOSM_END` | Ends the task and removes it from its scheduler |
 
@@ -213,15 +223,13 @@ The `sync` primitives pass data between contexts (ISR to task, task to task) wit
 |------|-------------|
 | `MessageQueue<T, Size>` | Lock-free SPSC queue (`Size` a power of 2), with bulk `trySend`/`tryReceive` overloads |
 | `SharedVariable<T>` | Single-writer lock-free value; `hasChanged(lastVersion)` detects updates |
-| `TaskletQueue<T, Size, event_count>` | `MessageQueue` that signals a tasklet event on each send |
+| `TaskletQueue<T, Size>` | `MessageQueue` that signals its tasklet event on each send |
 
 ```cpp
 #include "ucosm/tasklet/tasklet_queue.hpp"
 
-constexpr ucosm::event_id_t uart_rx_event = 0;
-
-ucosm::TaskletScheduler<1> sched(backend);
-ucosm::TaskletQueue<uint8_t, 64, 1> rxQueue(sched, uart_rx_event);
+ucosm::TaskletScheduler sched(backend);
+ucosm::TaskletQueue<uint8_t, 64> rxQueue;
 
 struct RxTask : ucosm::ITasklet {
     void run() override {
@@ -235,7 +243,7 @@ struct RxTask : ucosm::ITasklet {
 extern "C" void UART_IRQHandler() { rxQueue.trySend(UART->DR); }
 
 int main() {
-    rxTask.waitForEvent(uart_rx_event);
+    rxTask.waitForEvent(rxQueue.event());
     sched.addTask(rxTask);
     // ...
 }

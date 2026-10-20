@@ -11,9 +11,7 @@
 
 namespace {
 
-    constexpr ucosm::event_id_t rx_event = 1;
-
-    using Queue = ucosm::TaskletQueue<int, 8, 2>;
+    using Queue = ucosm::TaskletQueue<int, 8>;
 
     // Drains the queue each time it is woken up, as a tasklet fed by an ISR
     // would.
@@ -49,13 +47,12 @@ namespace {
 TEST_CASE("TaskletQueue - a send wakes the tasklet") {
 
     reset_tick();
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
-    Queue queue(sched, rx_event);
-    CHECK(queue.getEventID() == rx_event);
+    Queue queue;
 
     ConsumerTask consumer(queue);
-    consumer.waitForEvent(rx_event);
+    consumer.waitForEvent(queue.event());
     REQUIRE(sched.addTask(consumer));
 
     REQUIRE(queue.trySend(42));
@@ -72,12 +69,12 @@ TEST_CASE("TaskletQueue - a send wakes the tasklet") {
 TEST_CASE("TaskletQueue - messages from an ISR-like thread arrive in order") {
 
     reset_tick();
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
-    Queue queue(sched, rx_event);
+    Queue queue;
 
     ConsumerTask consumer(queue);
-    consumer.waitForEvent(rx_event);
+    consumer.waitForEvent(queue.event());
     REQUIRE(sched.addTask(consumer));
 
     constexpr int count = 1000;
@@ -112,12 +109,12 @@ TEST_CASE("TaskletQueue - messages from an ISR-like thread arrive in order") {
 TEST_CASE("TaskletQueue - a bulk send wakes the tasklet") {
 
     reset_tick();
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
-    Queue queue(sched, rx_event);
+    Queue queue;
 
     ConsumerTask consumer(queue);
-    consumer.waitForEvent(rx_event);
+    consumer.waitForEvent(queue.event());
     REQUIRE(sched.addTask(consumer));
 
     const int values[3] = { 7, 8, 9 };
@@ -135,10 +132,10 @@ TEST_CASE("TaskletQueue - a bulk send wakes the tasklet") {
 TEST_CASE("TaskletQueue - a full queue refuses the message") {
 
     reset_tick();
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
     // no tasklet subscribed : nothing drains the queue
-    Queue queue(sched, rx_event);
+    Queue queue;
 
     for (std::size_t i = 0; i < Queue::capacity; ++i) {
         REQUIRE(queue.trySend(static_cast<int>(i)));

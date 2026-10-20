@@ -10,6 +10,7 @@ set(TARGET_SRC
 	resumable_test.cpp
 	sync_test.cpp
 	tasklet_clock_test.cpp
+	tasklet_event_test.cpp
 	tasklet_queue_test.cpp
 	tasklet_stress_test.cpp
 	tasklet_test.cpp

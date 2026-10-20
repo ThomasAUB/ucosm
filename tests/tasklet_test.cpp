@@ -36,8 +36,7 @@ struct SchedulerBarrier final {
 // let the scheduler pend its handler if a deadline has come round. The two
 // are separate because the scheduler keeps no clock of its own - it reads the
 // one the backend gives it, and poll() only makes it look.
-template<ucosm::event_id_t event_count>
-void tick(ucosm::TaskletScheduler<event_count>& inScheduler, ucosm::tick_t inInc = 1) {
+void tick(ucosm::TaskletScheduler& inScheduler, ucosm::tick_t inInc = 1) {
     advance_tick(inInc);
     inScheduler.poll();
 }
@@ -56,7 +55,7 @@ TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
     std::vector<int> executed;
     std::mutex m;
@@ -119,12 +118,13 @@ TEST_CASE("TaskletScheduler - timer wrap-around behavior") {
 
 }
 
-TEST_CASE("TaskletScheduler - concurrent signalEvent calls") {
+TEST_CASE("TaskletScheduler - concurrent TaskletEvent::signal calls") {
 
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<4> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
+    ucosm::TaskletEvent events[4];
 
     std::vector<int> executed;
     std::mutex m;
@@ -155,9 +155,9 @@ TEST_CASE("TaskletScheduler - concurrent signalEvent calls") {
     b.setPriority(5);
     c.setPriority(15);
 
-    a.waitForEvent(0);
-    b.waitForEvent(1);
-    c.waitForEvent(2);
+    a.waitForEvent(events[0]);
+    b.waitForEvent(events[1]);
+    c.waitForEvent(events[2]);
 
     REQUIRE(sched.addTask(a));
     REQUIRE(sched.addTask(b));
@@ -166,9 +166,9 @@ TEST_CASE("TaskletScheduler - concurrent signalEvent calls") {
     // Suspend low-priority execution while we concurrently set pending events
     suspend_low_priority_execution();
 
-    std::thread th1([&] { sched.signalEvent(0); });
-    std::thread th2([&] { sched.signalEvent(1); });
-    std::thread th3([&] { sched.signalEvent(2); });
+    std::thread th1([&] { events[0].signal(); });
+    std::thread th2([&] { events[1].signal(); });
+    std::thread th3([&] { events[2].signal(); });
 
     th1.join(); th2.join(); th3.join();
 
@@ -193,7 +193,8 @@ TEST_CASE("TaskletScheduler - combined timer and event ordering") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<4> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
+    ucosm::TaskletEvent events[4];
 
     std::vector<int> executed;
     std::mutex m;
@@ -226,8 +227,8 @@ TEST_CASE("TaskletScheduler - combined timer and event ordering") {
 
     // timerMid will wake at tick 50
     timerMid.setPeriod(50);
-    eventHigh.waitForEvent(0);
-    eventLow.waitForEvent(1);
+    eventHigh.waitForEvent(events[0]);
+    eventLow.waitForEvent(events[1]);
 
     REQUIRE(sched.addTask(timerMid));
     REQUIRE(sched.addTask(eventHigh));
@@ -236,8 +237,8 @@ TEST_CASE("TaskletScheduler - combined timer and event ordering") {
     // Queue both events and the timer wake-up before allowing the low-priority worker to run.
     suspend_low_priority_execution();
     tick(sched, 50);
-    sched.signalEvent(0);
-    sched.signalEvent(1);
+    events[0].signal();
+    events[1].signal();
     resume_low_priority_execution();
 
     REQUIRE(waitForExecutions(m, cv, executed, 3));
@@ -254,7 +255,8 @@ TEST_CASE("TaskletScheduler - event ordering") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<4> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
+    ucosm::TaskletEvent events[4];
 
     std::vector<int> executed;
     std::mutex m;
@@ -289,18 +291,18 @@ TEST_CASE("TaskletScheduler - event ordering") {
     t2.setPriority(5);
     t3.setPriority(20);
 
-    t1.waitForEvent(0);
-    t2.waitForEvent(1);
-    t3.waitForEvent(2);
+    t1.waitForEvent(events[0]);
+    t2.waitForEvent(events[1]);
+    t3.waitForEvent(events[2]);
 
     REQUIRE(sched.addTask(t1));
     REQUIRE(sched.addTask(t2));
     REQUIRE(sched.addTask(t3));
 
     // signal all events; run handler asynchronously
-    sched.signalEvent(0);
-    sched.signalEvent(1);
-    sched.signalEvent(2);
+    events[0].signal();
+    events[1].signal();
+    events[2].signal();
 
     REQUIRE(waitForExecutions(m, cv, executed, 3, std::chrono::seconds(2)));
 
@@ -318,7 +320,8 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
+    ucosm::TaskletEvent events[2];
 
     std::vector<int> executed;
     std::mutex m;
@@ -350,13 +353,13 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
 
         // Change its mind before the deadline: it should now run on the
         // event instead, not on tick().
-        t.waitForEvent(0);
+        t.waitForEvent(events[0]);
         REQUIRE(sched.addTask(t));
 
         tick(sched, 50);
         CHECK(executed.empty());
 
-        sched.signalEvent(0);
+        events[0].signal();
         REQUIRE(waitForExecutions(m, cv, executed, 1));
         CHECK(executed[0] == 1);
     }
@@ -365,7 +368,7 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
 
         ReconfigurableTask t(2, &executed, &m, &cv);
 
-        t.waitForEvent(0);
+        t.waitForEvent(events[0]);
         REQUIRE(sched.addTask(t));
 
         // Change its mind: it should now run on the timer instead, not on
@@ -373,7 +376,7 @@ TEST_CASE("TaskletScheduler - re-adding after reconfiguring updates its type") {
         t.setPeriod(10);
         REQUIRE(sched.addTask(t));
 
-        sched.signalEvent(0);
+        events[0].signal();
         CHECK(executed.empty());
 
         tick(sched, 10);
@@ -388,7 +391,7 @@ TEST_CASE("TaskletScheduler - unconfigured task is rejected") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
     struct NeverConfiguredTask : ucosm::ITasklet {
         void run() override {}
@@ -408,7 +411,7 @@ TEST_CASE("TaskletScheduler - timer wake ordering") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
     std::vector<int> executed;
     std::mutex m;
@@ -490,7 +493,7 @@ TEST_CASE("TaskletScheduler - the period is kept across runs") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
     std::vector<int> executed;
     std::mutex m;
@@ -580,7 +583,7 @@ TEST_CASE("TaskletScheduler - a task disposing of itself is dropped") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
     std::vector<int> executed;
     std::mutex m;
@@ -641,7 +644,8 @@ TEST_CASE("TaskletScheduler - event subscription is kept across runs") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
+    ucosm::TaskletEvent events[2];
 
     std::vector<int> executed;
     std::mutex m;
@@ -667,13 +671,13 @@ TEST_CASE("TaskletScheduler - event subscription is kept across runs") {
 
     SubscribedTask t(1, &executed, &m, &cv);
 
-    t.waitForEvent(0);
+    t.waitForEvent(events[0]);
     REQUIRE(sched.addTask(t));
 
-    sched.signalEvent(0);
+    events[0].signal();
     REQUIRE(waitForExecutions(m, cv, executed, 1));
 
-    sched.signalEvent(0);
+    events[0].signal();
     REQUIRE(waitForExecutions(m, cv, executed, 2));
 
     {
@@ -682,7 +686,7 @@ TEST_CASE("TaskletScheduler - event subscription is kept across runs") {
         sched.removeTask(t);
     }
 
-    sched.signalEvent(0);
+    events[0].signal();
 
     CHECK_FALSE(waitForExecutions(m, cv, executed, 3, std::chrono::milliseconds(100)));
 
@@ -693,7 +697,7 @@ TEST_CASE("TaskletScheduler - delay applies once, then the period takes over") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
     std::vector<int> executed;
     std::mutex m;
@@ -751,7 +755,7 @@ TEST_CASE("TaskletScheduler - a task can delay its next execution from run()") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
 
     std::vector<int> executed;
     std::mutex m;
@@ -762,7 +766,7 @@ TEST_CASE("TaskletScheduler - a task can delay its next execution from run()") {
     struct SelfDelayingTask : ucosm::ITasklet {
         SelfDelayingTask(
             int id,
-            ucosm::TaskletScheduler<2>* sched,
+            ucosm::TaskletScheduler* sched,
             std::vector<int>* out,
             std::mutex* m,
             std::condition_variable* cv
@@ -784,7 +788,7 @@ TEST_CASE("TaskletScheduler - a task can delay its next execution from run()") {
         }
         int mID;
         bool mDelayed = false;
-        ucosm::TaskletScheduler<2>* mSched;
+        ucosm::TaskletScheduler* mSched;
         std::vector<int>* mOut;
         std::mutex* mM;
         std::condition_variable* mCV;
@@ -824,7 +828,8 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
     using namespace ucosm;
 
     ClockOrigin origin;
-    ucosm::TaskletScheduler<2> sched(tasklet_backend);
+    ucosm::TaskletScheduler sched(tasklet_backend);
+    ucosm::TaskletEvent events[2];
 
     std::vector<int> executed;
     std::mutex m;
@@ -879,7 +884,7 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
 
         WaitingTask t(2, &executed, &m, &cv);
 
-        t.waitForEvent(0);
+        t.waitForEvent(events[0]);
         REQUIRE(sched.addTask(t));
 
         // a delay is meaningless for an event : the task is left alone,
@@ -887,7 +892,7 @@ TEST_CASE("TaskletScheduler - setDelay re-arms a scheduled task") {
         CHECK_FALSE(sched.setDelay(t, 10));
         CHECK_FALSE(sched.tryGetNextDeadline(nextDeadline));
 
-        sched.signalEvent(0);
+        events[0].signal();
         REQUIRE(waitForExecutions(m, cv, executed, 1));
 
         {

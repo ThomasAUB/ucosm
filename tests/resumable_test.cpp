@@ -231,6 +231,7 @@ TEST_CASE("Resumable tasklet : sleep, event wait and end") {
     struct Task : ucosm::IResumableTasklet {
 
         std::vector<int> mSteps;
+        ucosm::TaskletEvent mWakeEvent;
 
         void run() override {
 
@@ -242,7 +243,7 @@ TEST_CASE("Resumable tasklet : sleep, event wait and end") {
 
             mSteps.push_back(2);
 
-            UCOSM_WAIT_EVENT(0);
+            UCOSM_WAIT_EVENT(mWakeEvent);
 
             mSteps.push_back(3);
 
@@ -254,7 +255,7 @@ TEST_CASE("Resumable tasklet : sleep, event wait and end") {
         }
     };
 
-    ucosm::TaskletScheduler<1> sched(resumable_backend);
+    ucosm::TaskletScheduler sched(resumable_backend);
 
     Task t;
     t.setPeriod(10);
@@ -277,14 +278,14 @@ TEST_CASE("Resumable tasklet : sleep, event wait and end") {
     runTasklets();
     REQUIRE(t.mSteps.size() == 2);
     CHECK(t.isWaitingForEvent());
-    CHECK(t.getEventID() == 0);
+    CHECK(t.getEvent() == &t.mWakeEvent);
 
     // no timer is left armed while waiting for the event
     sTaskletNow = 10'000;
     runTasklets();
     CHECK(t.mSteps.size() == 2);
 
-    sched.signalEvent(0);
+    t.mWakeEvent.signal();
     runTasklets();
     REQUIRE(t.mSteps.size() == 3);
     CHECK(t.isWaitingForTimer());
@@ -321,7 +322,7 @@ TEST_CASE("Resumable tasklet : UCOSM_SLEEP_UNTIL re-arms with the check period")
         }
     };
 
-    ucosm::TaskletScheduler<1> sched(resumable_backend);
+    ucosm::TaskletScheduler sched(resumable_backend);
 
     Task t;
     t.setPeriod(1);

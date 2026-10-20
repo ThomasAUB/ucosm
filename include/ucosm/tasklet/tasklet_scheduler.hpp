@@ -113,16 +113,63 @@ namespace ucosm {
     static_assert(uatom::Atomic<tick_t>::is_always_lock_free, "Atomic will be slow");
     static_assert(uatom::Atomic<bool>::is_always_lock_free, "Atomic will be slow");
 
-    template<uint8_t size>
-    struct Bitset;
+    struct TaskletScheduler;
+
+    static_assert(uatom::Atomic<TaskletScheduler*>::is_always_lock_free, "Atomic will be slow");
+
+    /**
+     * @brief Event tasklets wait for, owned by the code that signals it.
+     *
+     * An event is identified by its address : events of independent modules
+     * can't collide, and their number isn't bounded by the scheduler.
+     * It binds to the scheduler of its first waiter, and is released once no
+     * task waits for it anymore. Signals sent while unbound are dropped.
+     *
+     * signal() takes no critical section.
+     */
+    struct TaskletEvent : ulink::Node<TaskletEvent> {
+
+        constexpr TaskletEvent() = default;
+
+        /**
+         * @brief Destroy the event object. The tasks still waiting for it are
+         * unscheduled and left unconfigured.
+         * @note Must not run while one of its waiters runs.
+         */
+        ~TaskletEvent();
+
+        TaskletEvent(const TaskletEvent&) = delete;
+        TaskletEvent& operator=(const TaskletEvent&) = delete;
+
+        /**
+         * @brief Wakes the tasks waiting for the event. ISR safe.
+         * Signals are coalesced until the waiters run.
+         */
+        void signal();
+
+    private:
+
+        friend struct TaskletScheduler;
+
+        template<typename>
+        friend class ulink::List;
+
+        // the links belong to the scheduler's event list
+        using ulink::Node<TaskletEvent>::remove;
+        using ulink::Node<TaskletEvent>::isLinked;
+
+        // written under the scheduler's ExecutionLock, read by signal()
+        uatom::Atomic<TaskletScheduler*> mScheduler { nullptr };
+        // set by signal(), consumed by the scheduler's run()
+        uatom::Atomic<bool> mPending { false };
+        // sorted by priority, accessed under the scheduler's ExecutionLock
+        ulink::List<ITask<priority_t>> mWaiters;
+    };
 
     /**
      * @brief Scheduler of tasklets woken by timers or events, run from a
      * pended dispatch context.
-     *
-     * @tparam event_count Number of events tasks can wait for.
      */
-    template<event_id_t event_count>
     struct TaskletScheduler : IScheduler<ITasklet, ITask<uint8_t>> {
 
         /**
@@ -146,11 +193,10 @@ namespace ucosm {
         }
 
         /**
-         * @brief Destroy the tasklet scheduler object, uninstalling its handler.
+         * @brief Destroy the tasklet scheduler object, uninstalling its handler
+         * and releasing its events.
          */
-        ~TaskletScheduler() {
-            mBackend.installHandler(nullptr, nullptr);
-        }
+        ~TaskletScheduler();
 
         /**
          * @brief Adds a task to the scheduler. Lower priority values run first.
@@ -159,7 +205,7 @@ namespace ucosm {
          * @param inTask Task instance.
          * @return true if the task was successfully added.
          * @return false if the task is unconfigured or waits for an event
-         * this scheduler doesn't have.
+         * bound to another scheduler.
          */
         bool addTask(ITasklet& inTask);
 
@@ -219,17 +265,13 @@ namespace ucosm {
          */
         bool tryGetNextDeadline(tick_t& out) const;
 
-        /**
-         * @brief Signals an event to the tasks waiting for it. ISR safe.
-         *
-         * @param inEventID Event identifier, below event_count.
-         */
-        void signalEvent(event_id_t inEventID);
-
     protected:
+
+        friend struct TaskletEvent;
 
         using itask_t = ITask<priority_t>;
         using task_list_t = ulink::List<itask_t>;
+        using event_list_t = ulink::List<TaskletEvent>;
         using base_t = IScheduler<ITasklet, ITask<uint8_t>>;
 
         // called from the dispatch context
@@ -243,6 +285,16 @@ namespace ucosm {
         void pushReadyEventTasks(task_list_t& ioList);
 
         void pushReadyTimerTasks(task_list_t& ioList, tick_t inNow);
+
+        // Queues a task on the event it waits for, binding the event if
+        // needed. Called under an ExecutionLock.
+        bool waitForEventLocked(ITasklet& inTask);
+
+        // Unbinds an event and unlinks its waiters. Called under an ExecutionLock.
+        void releaseEventLocked(TaskletEvent& inEvent);
+
+        // Called by TaskletEvent::signal(), from any context.
+        void notifyPendingEvent();
 
         // Arms a timer task inDelay ticks from now. Called under an ExecutionLock.
         void armTimerLocked(ITasklet& inTask, tick_t inDelay);
@@ -272,10 +324,10 @@ namespace ucosm {
 
         task_list_t& timerList() { return base_t::mTasks; }
 
-        // set from ISRs, consumed by run()
-        Bitset<event_count> mPendingEvents;
-        // written under an ExecutionLock only, read from ISRs
-        Bitset<event_count> mSubscribedEvents;
+        static task_list_t& waiters(TaskletEvent& inEvent) { return inEvent.mWaiters; }
+
+        // set from any context, consumed by run() : some event may be pending
+        uatom::Atomic<bool> mHasPendingEvents { false };
         uatom::Atomic<bool> mHasTimerTask { false };
         uatom::Atomic<tick_t> mNextTimer { 0 };
         // mirrors mCursor for poll(), which may run from an ISR
@@ -287,39 +339,74 @@ namespace ucosm {
         bool mNotifiedHasTimer = false;
         tick_t mNotifiedDeadline = 0;
 
-        task_list_t mEventTaskLists[event_count];
+        // bound events, only accessed under an ExecutionLock
+        event_list_t mEvents;
     };
 
 
-    template<event_id_t event_count>
-    bool TaskletScheduler<event_count>::addTask(ITasklet& inTask) {
+    // ===== TaskletEvent ===== //
+
+    inline TaskletEvent::~TaskletEvent() {
+
+        auto* scheduler = mScheduler.load(std::memory_order_relaxed);
+
+        if (!scheduler) {
+            return;
+        }
+
+        TaskletScheduler::ExecutionLock guard(*scheduler);
+
+        for (auto& t : mWaiters) {
+            // waiting again would reach a dead event
+            static_cast<ITasklet&>(t).dispose();
+        }
+
+        scheduler->releaseEventLocked(*this);
+    }
+
+    inline void TaskletEvent::signal() {
+
+        // relaxed : the scheduler outlives the binding, nothing else is read
+        auto* scheduler = mScheduler.load(std::memory_order_relaxed);
+
+        if (!scheduler) {
+            // no waiter
+            return;
+        }
+
+        // release : pairs with the acquire in pushReadyEventTasks(), so that
+        // the woken tasks see what was written before the signal
+        mPending.store(true, std::memory_order_release);
+
+        scheduler->notifyPendingEvent();
+    }
+
+
+    // ===== TaskletScheduler ===== //
+
+    inline TaskletScheduler::~TaskletScheduler() {
+
+        mBackend.installHandler(nullptr, nullptr);
+
+        // no ExecutionLock : the backend may already be unusable
+        while (!mEvents.empty()) {
+            releaseEventLocked(*mEvents.begin());
+        }
+    }
+
+    inline bool TaskletScheduler::addTask(ITasklet& inTask) {
 
         ExecutionLock guard(*this);
 
         if (inTask.isWaitingForTimer()) {
             armTimerLocked(inTask, inTask.getPeriod());
-        }
-        else if (inTask.isWaitingForEvent()) {
-
-            const auto itID = inTask.getEventID();
-
-            if (itID >= event_count) {
-                return false;
-            }
-
-            inTask.setRank(inTask.getPriority());
-            insertSort(mEventTaskLists[itID], inTask);
-            mSubscribedEvents.setLocked(itID);
-        }
-        else {
-            return false;
+            return true;
         }
 
-        return true;
+        return waitForEventLocked(inTask);
     }
 
-    template<event_id_t event_count>
-    bool TaskletScheduler<event_count>::addTask(ITasklet& inTask, tick_t inDelay) {
+    inline bool TaskletScheduler::addTask(ITasklet& inTask, tick_t inDelay) {
 
         ExecutionLock guard(*this);
 
@@ -332,8 +419,7 @@ namespace ucosm {
         return true;
     }
 
-    template<event_id_t event_count>
-    bool TaskletScheduler<event_count>::setDelay(ITasklet& inTask, tick_t inDelay) {
+    inline bool TaskletScheduler::setDelay(ITasklet& inTask, tick_t inDelay) {
 
         ExecutionLock guard(*this);
 
@@ -346,15 +432,58 @@ namespace ucosm {
         return true;
     }
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::armTimerLocked(ITasklet& inTask, tick_t inDelay) {
+    inline void TaskletScheduler::armTimerLocked(ITasklet& inTask, tick_t inDelay) {
         inTask.setRank(makeDeadline(now(), inDelay));
         this->insertByDeadline(inTask);
         updateNextTimerLocked();
     }
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::removeTask(ITasklet& inTask) {
+    inline bool TaskletScheduler::waitForEventLocked(ITasklet& inTask) {
+
+        const auto* waited = inTask.getEvent();
+
+        if (!waited) {
+            return false;
+        }
+
+        // the waiter list isn't part of the event's observable state
+        auto& event = const_cast<TaskletEvent&>(*waited);
+
+        const auto* owner = event.mScheduler.load(std::memory_order_relaxed);
+
+        if (owner != this) {
+
+            if (owner) {
+                // waited for on another scheduler
+                return false;
+            }
+
+            // signals sent while nobody was waiting are dropped
+            event.mPending.store(false, std::memory_order_relaxed);
+            mEvents.push_back(event);
+            // release : orders the reset above before any signal() binding it
+            event.mScheduler.store(this, std::memory_order_release);
+        }
+
+        inTask.setRank(inTask.getPriority());
+        insertSort(event.mWaiters, inTask);
+
+        return true;
+    }
+
+    inline void TaskletScheduler::releaseEventLocked(TaskletEvent& inEvent) {
+        inEvent.mScheduler.store(nullptr, std::memory_order_relaxed);
+        inEvent.mWaiters.clear();
+        inEvent.remove();
+    }
+
+    inline void TaskletScheduler::notifyPendingEvent() {
+        // release : pairs with the acquire in pushReadyEventTasks()
+        mHasPendingEvents.store(true, std::memory_order_release);
+        requestExecution();
+    }
+
+    inline void TaskletScheduler::removeTask(ITasklet& inTask) {
 
         ExecutionLock guard(*this);
 
@@ -364,8 +493,7 @@ namespace ucosm {
         updateNextTimerLocked();
     }
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::poll() {
+    inline void TaskletScheduler::poll() {
 
         // relaxed : a stale read only costs a spurious or one tick late wake-up
         if (!mHasTimerTask.load(std::memory_order_relaxed)) {
@@ -381,13 +509,11 @@ namespace ucosm {
 
     }
 
-    template<event_id_t event_count>
-    tick_t TaskletScheduler<event_count>::now() const {
+    inline tick_t TaskletScheduler::now() const {
         return mBackend.getTick();
     }
 
-    template<event_id_t event_count>
-    bool TaskletScheduler<event_count>::tryGetNextDeadline(tick_t& out) const {
+    inline bool TaskletScheduler::tryGetNextDeadline(tick_t& out) const {
         if (!mHasTimerTask.load(std::memory_order_acquire)) {
             return false;
         }
@@ -395,36 +521,38 @@ namespace ucosm {
         return true;
     }
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::signalEvent(event_id_t inEventID) {
+    // Called with an empty run list : every waiting task is then in its
+    // event's list, so an event found without waiters has none left.
+    // Releasing it any later, e.g. as soon as its waiters are merged, would
+    // drop the signals sent while they run.
+    inline void TaskletScheduler::pushReadyEventTasks(task_list_t& ioList) {
 
-        if ((inEventID >= event_count) || !mSubscribedEvents.get(inEventID)) {
+        // relaxed load first : on ARMv6-M the exchange masks interrupts
+        if (!mHasPendingEvents.load(std::memory_order_relaxed) ||
+            !mHasPendingEvents.exchange(false, std::memory_order_acquire)) {
             return;
         }
 
-        mPendingEvents.set(inEventID);
+        for (auto it = mEvents.begin(), endIt = mEvents.end(); it != endIt; ) {
 
-        requestExecution();
-    }
+            auto& event = *it;
+            ++it;
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::pushReadyEventTasks(task_list_t& ioList) {
-        mPendingEvents.consume(
-            [&] (uint8_t i) {
-                auto& list = mEventTaskLists[i];
-                if (list.empty()) {
-                    // task(s) have been removed
-                    mSubscribedEvents.resetLocked(i);
-                }
-                else {
-                    mergeSortedLists(ioList, list);
-                }
+            const bool isPending =
+                event.mPending.load(std::memory_order_relaxed) &&
+                event.mPending.exchange(false, std::memory_order_acquire);
+
+            if (event.mWaiters.empty()) {
+                // task(s) have been removed
+                releaseEventLocked(event);
             }
-        );
+            else if (isPending) {
+                mergeSortedLists(ioList, event.mWaiters);
+            }
+        }
     }
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::pushReadyTimerTasks(task_list_t& ioList, tick_t inNow) {
+    inline void TaskletScheduler::pushReadyTimerTasks(task_list_t& ioList, tick_t inNow) {
         auto* task = this->selectReadyTask(inNow);
         if (!task) {
             return;
@@ -456,8 +584,7 @@ namespace ucosm {
         mPublishedCursor.store(inNow, std::memory_order_relaxed);
     }
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::run() {
+    inline void TaskletScheduler::run() {
 
         ExecutionLock guard(*this);
 
@@ -482,12 +609,10 @@ namespace ucosm {
 
                 t.run();
 
-                if (!t.isLinked() || runList.empty() || &*runList.begin() != &t) {
+                if (runList.empty() || &*runList.begin() != &t) {
                     // the task removed or rescheduled itself
                     continue;
                 }
-
-                const auto itID = t.getEventID();
 
                 if (t.isWaitingForTimer()) {
 
@@ -511,13 +636,8 @@ namespace ucosm {
                     t.setRank(deadline);
                     this->insertByDeadline(t);
                 }
-                else if (t.isWaitingForEvent() && itID < event_count) {
-                    mSubscribedEvents.setLocked(itID);
-                    t.setRank(t.getPriority());
-                    insertSort(mEventTaskLists[itID], t);
-                }
-                else {
-                    // disposed, or waiting for an unknown event
+                else if (!waitForEventLocked(t)) {
+                    // disposed, or waiting for an event of another scheduler
                     t.removeTask();
                 }
             }
@@ -531,7 +651,8 @@ namespace ucosm {
                     now()
                 );
 
-            if (!(hasTimerDue || mPendingEvents.any())) {
+            // a hint only, pushReadyEventTasks() carries the ordering
+            if (!(hasTimerDue || mHasPendingEvents.load(std::memory_order_relaxed))) {
                 break;
             }
         }
@@ -539,8 +660,7 @@ namespace ucosm {
         this->mCurrentTask = nullptr;
     }
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::insertSort(task_list_t& inList, itask_t& inTask) {
+    inline void TaskletScheduler::insertSort(task_list_t& inList, itask_t& inTask) {
 
         const auto rank = inTask.getRank();
 
@@ -564,8 +684,7 @@ namespace ucosm {
         inList.insert_after(task_list_t::iterator(&*it), inTask);
     }
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::mergeSortedLists(task_list_t& ioList, task_list_t& inList) {
+    inline void TaskletScheduler::mergeSortedLists(task_list_t& ioList, task_list_t& inList) {
 
         if (inList.empty()) {
             return;
@@ -605,8 +724,7 @@ namespace ucosm {
         }
     }
 
-    template<event_id_t event_count>
-    bool TaskletScheduler<event_count>::updateNextTimerLocked(tick_t& outDeadline) {
+    inline bool TaskletScheduler::updateNextTimerLocked(tick_t& outDeadline) {
 
         bool hasTimer = false;
         tick_t deadline = 0;
@@ -633,113 +751,8 @@ namespace ucosm {
         return hasTimer;
     }
 
-    template<event_id_t event_count>
-    void TaskletScheduler<event_count>::requestExecution() const {
+    inline void TaskletScheduler::requestExecution() const {
         mBackend.requestTaskletExecution();
     }
-
-    // Written either with set() from any context, or with setLocked() /
-    // resetLocked() by one writer at a time, never both.
-    template<uint8_t size>
-    struct Bitset {
-
-        void set(uint8_t i) {
-            if (i >= size) { return; }
-            const uint8_t idx = static_cast<uint8_t>(i >> 5);
-            const uint32_t mask = static_cast<uint32_t>(1u << (i & 0x1F));
-            mStorage[idx].fetch_or(mask, std::memory_order_release);
-        }
-
-        // relaxed : the bits are a filter, they publish nothing
-        void setLocked(uint8_t i) {
-            if (i >= size) { return; }
-            const uint8_t idx = static_cast<uint8_t>(i >> 5);
-            const uint32_t mask = static_cast<uint32_t>(1u << (i & 0x1F));
-            const uint32_t v = mStorage[idx].load(std::memory_order_relaxed);
-            if ((v & mask) == 0u) {
-                mStorage[idx].store(v | mask, std::memory_order_relaxed);
-            }
-        }
-
-        void resetLocked(uint8_t i) {
-            if (i >= size) { return; }
-            const uint8_t idx = static_cast<uint8_t>(i >> 5);
-            const uint32_t mask = static_cast<uint32_t>(1u << (i & 0x1F));
-            const uint32_t v = mStorage[idx].load(std::memory_order_relaxed);
-            if ((v & mask) != 0u) {
-                mStorage[idx].store(v & ~mask, std::memory_order_relaxed);
-            }
-        }
-
-        bool get(uint8_t i) const {
-            if (i >= size) { return false; }
-            const uint32_t mask = static_cast<uint32_t>(1u << (i & 0x1F));
-            const uint32_t v = mStorage[i >> 5].load(std::memory_order_relaxed);
-            return (v & mask) != 0u;
-        }
-
-        // a hint only, consume() carries the ordering
-        bool any() const {
-            for (uint8_t i = 0; i < storage_size; ++i) {
-                if (mStorage[i].load(std::memory_order_relaxed) != 0) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        // Clears the set bits and calls f(index) for each. A bit set meanwhile
-        // may be left for the next call, so callers loop while any().
-        template<typename F>
-        void consume(F&& f) {
-            for (uint8_t wordIndex = 0; wordIndex < storage_size; ++wordIndex) {
-                if (mStorage[wordIndex].load(std::memory_order_relaxed) == 0u) {
-                    continue;
-                }
-                // pairs with the release in set()
-                uint32_t v = mStorage[wordIndex].exchange(0u, std::memory_order_acquire);
-                while (v) {
-                    const uint8_t bitOffset = firstSetBit(v);
-                    const uint8_t globalIdx = static_cast<uint8_t>((wordIndex << 5) + bitOffset);
-                    if (globalIdx >= size) { return; }
-                    f(globalIdx);
-                    v = v & (v - 1u);
-                }
-            }
-        }
-
-    private:
-
-        static uint8_t firstSetBit(uint32_t v) {
-#if (defined(__clang__) || defined(__GNUC__)) && (!defined(__arm__) || defined(__ARM_FEATURE_CLZ))
-            return static_cast<uint8_t>(__builtin_ctz(v));
-#elif defined(__arm__)
-            // no CLZ on ARMv6-M : de Bruijn lookup instead of libgcc's __ctzsi2
-            static constexpr uint8_t lookup[32] = {
-                0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
-                31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
-            };
-            return lookup[((v & (0u - v)) * 0x077CB531u) >> 27];
-#else
-            uint8_t idx = 0;
-            while ((v & 1u) == 0u) { v >>= 1; ++idx; }
-            return idx;
-#endif
-        }
-
-        static constexpr uint8_t storage_size = static_cast<uint8_t>((size + 31) / 32);
-        uatom::Atomic<uint32_t> mStorage[storage_size] {};
-    };
-
-    template<>
-    struct Bitset<0> {
-        void set(uint8_t) {}
-        void setLocked(uint8_t) {}
-        void resetLocked(uint8_t) {}
-        bool get(uint8_t) const { return false; }
-        bool any() const { return false; }
-        template<typename F>
-        void consume(F&&) {}
-    };
 
 }

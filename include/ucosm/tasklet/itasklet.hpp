@@ -34,10 +34,9 @@ namespace ucosm {
 
     using tick_t = uint32_t;
     using priority_t = tick_t;
-    using event_id_t = uint8_t;
 
-    template<event_id_t event_count>
     struct TaskletScheduler;
+    struct TaskletEvent;
 
     struct ITasklet : ITask<priority_t> {
 
@@ -51,22 +50,25 @@ namespace ucosm {
 
         void setPeriod(tick_t inPeriod) {
             mState = eState::waitingForTimer;
-            mWakeupSource = inPeriod > 0 ? inPeriod : 1;
+            mPeriod = inPeriod > 0 ? inPeriod : 1;
         }
 
         // 0 when the task is not waiting for the timer.
         tick_t getPeriod() const {
-            return isWaitingForTimer() ? mWakeupSource : 0;
+            return isWaitingForTimer() ? mPeriod : 0;
         }
 
-        void waitForEvent(event_id_t inEventID) {
+        // The event must outlive the wait. Waiting doesn't modify its
+        // observable state, hence the const reference : an event owner can
+        // hand out a wait-only view of it.
+        void waitForEvent(const TaskletEvent& inEvent) {
             mState = eState::waitingForEvent;
-            mWakeupSource = inEventID;
+            mEvent = &inEvent;
         }
 
         void dispose() {
             mState = eState::unconfigured;
-            mWakeupSource = 0;
+            mPeriod = 0;
         }
 
         bool isWaitingForTimer() const {
@@ -81,11 +83,9 @@ namespace ucosm {
             return mState != eState::unconfigured;
         }
 
-        // invalid_event_id when the task is not waiting for an event.
-        event_id_t getEventID() const {
-            return isWaitingForEvent() ?
-                static_cast<event_id_t>(mWakeupSource) :
-                invalid_event_id;
+        // nullptr when the task is not waiting for an event.
+        const TaskletEvent* getEvent() const {
+            return isWaitingForEvent() ? mEvent : nullptr;
         }
 
         ~ITasklet() = default;
@@ -97,7 +97,6 @@ namespace ucosm {
 
     private:
 
-        template<event_id_t>
         friend struct TaskletScheduler;
 
         void setScheduledDeadline(tick_t inDeadline) {
@@ -114,13 +113,14 @@ namespace ucosm {
             waitingForEvent
         };
 
-        static constexpr event_id_t invalid_event_id = static_cast<event_id_t>(-1);
-
         priority_t mPriority = static_cast<priority_t>(-1);
         tick_t mScheduledDeadline = 0;
 
-        // period or event id, depending on mState
-        tick_t mWakeupSource = 0;
+        // the member matching mState is the one last written
+        union {
+            tick_t mPeriod = 0;
+            const TaskletEvent* mEvent;
+        };
         eState mState = eState::unconfigured;
     };
 
