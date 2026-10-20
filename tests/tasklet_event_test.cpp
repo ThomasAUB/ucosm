@@ -517,3 +517,121 @@ TEST_CASE("TaskletEvent - signals during a dispatch are all delivered") {
         CHECK(t.mRuns == 1);
     }
 }
+
+TEST_CASE("TaskletEvent - adding a waiting task again keeps it waiting once") {
+
+    resetHarness();
+    TaskletScheduler sched(event_backend);
+    TaskletEvent event;
+
+    std::vector<int> log;
+    RecordTask t1(1, log);
+    RecordTask t2(2, log);
+    RecordTask t3(3, log);
+
+    t1.setPriority(1);
+    t2.setPriority(2);
+    t3.setPriority(2);
+
+    for (auto* t : { &t1, &t2, &t3 }) {
+        t->waitForEvent(event);
+        REQUIRE(sched.addTask(*t));
+    }
+
+    // last of the list, then in the middle among equal ranks, then first
+    REQUIRE(sched.addTask(t3));
+    REQUIRE(sched.addTask(t2));
+    REQUIRE(sched.addTask(t1));
+
+    event.signal();
+    pump();
+
+    // re-adding moves a task behind its equals, like a fresh add
+    CHECK(log == std::vector<int> { 1, 3, 2 });
+}
+
+TEST_CASE("TaskletEvent - a waiter signaled during a dispatch runs before lower ones") {
+
+    resetHarness();
+    TaskletScheduler sched(event_backend);
+    TaskletEvent start;
+    TaskletEvent urgent;
+
+    std::vector<int> log;
+
+    struct SignalTask : ITasklet {
+        SignalTask(int inID, std::vector<int>& outLog, TaskletEvent& inEvent) :
+            mID(inID), mLog(outLog), mEvent(inEvent) {}
+        void run() override {
+            mLog.push_back(mID);
+            mEvent.signal();
+        }
+        int mID;
+        std::vector<int>& mLog;
+        TaskletEvent& mEvent;
+    } low1(1, log, urgent);
+
+    RecordTask low2(2, log);
+    RecordTask high(0, log);
+
+    low1.setPriority(5);
+    low2.setPriority(6);
+    high.setPriority(0);
+    low1.waitForEvent(start);
+    low2.waitForEvent(start);
+    high.waitForEvent(urgent);
+    REQUIRE(sched.addTask(low1));
+    REQUIRE(sched.addTask(low2));
+    REQUIRE(sched.addTask(high));
+
+    start.signal();
+    pump();
+
+    // high is picked up as soon as low1 returns, not after low2
+    CHECK(log == std::vector<int> { 1, 0, 2 });
+}
+
+TEST_CASE("TaskletEvent - a signal to a waiter queued in the dispatch isn't dropped") {
+
+    resetHarness();
+    TaskletScheduler sched(event_backend);
+    TaskletEvent trigger;
+    TaskletEvent event;
+
+    std::vector<int> log;
+
+    // signals the event the queued task waits for, while that task is in the
+    // run list rather than the event's waiter list
+    struct SignalTask : ITasklet {
+        SignalTask(std::vector<int>& outLog, TaskletEvent& inEvent) :
+            mLog(outLog), mEvent(inEvent) {}
+        void run() override {
+            mLog.push_back(0);
+            mEvent.signal();
+        }
+        std::vector<int>& mLog;
+        TaskletEvent& mEvent;
+    } first(log, event);
+
+    RecordTask queued(1, log);
+
+    first.setPriority(0);
+    queued.setPriority(1);
+    first.waitForEvent(trigger);
+    queued.waitForEvent(event);
+    REQUIRE(sched.addTask(first));
+    REQUIRE(sched.addTask(queued));
+
+    trigger.signal();
+    event.signal();
+    pump();
+
+    // the event, found without waiters within the dispatch, is kept pending
+    // and wakes the queued task again once it waits for it
+    CHECK(log == std::vector<int> { 0, 1, 1 });
+
+    // still bound : a later signal is delivered
+    event.signal();
+    pump();
+    CHECK(log == std::vector<int> { 0, 1, 1, 1 });
+}
