@@ -34,14 +34,13 @@
 namespace ucosm {
 
     /**
-     * @brief SPSC MessageQueue that signals an event to wake a tasklet on send.
+     * @brief SPSC MessageQueue that signals its event to wake a tasklet on send.
      * Wake-ups are coalesced, so the tasklet must drain the queue on each run.
      *
      * @tparam T Message type (must be trivially copyable)
      * @tparam Size Number of messages the queue holds, a power of 2
-     * @tparam event_count Event count of the scheduler
      */
-    template<typename T, size_t Size, event_id_t event_count>
+    template<typename T, size_t Size>
     class TaskletQueue {
 
     public:
@@ -51,16 +50,6 @@ namespace ucosm {
         static constexpr size_t capacity = MessageQueue<T, Size>::capacity;
 
         /**
-         * @brief Construct a new tasklet queue object.
-         *
-         * @param inScheduler Scheduler of the tasklet to wake up.
-         * @param inEventID Event the tasklet waits for.
-         */
-        TaskletQueue(TaskletScheduler<event_count>& inScheduler, event_id_t inEventID) :
-            mScheduler(inScheduler),
-            mEventID(inEventID) {}
-
-        /**
          * @brief Try to send a message and wake the tasklet. Producer side.
          * @return true if message was queued, false if queue is full
          */
@@ -68,7 +57,7 @@ namespace ucosm {
             if (!mQueue.trySend(message)) {
                 return false;
             }
-            mScheduler.signalEvent(mEventID);
+            mEvent.signal();
             return true;
         }
 
@@ -79,7 +68,7 @@ namespace ucosm {
         size_t trySend(const T* messages, size_t count) noexcept {
             const size_t sent = mQueue.trySend(messages, count);
             if (sent) {
-                mScheduler.signalEvent(mEventID);
+                mEvent.signal();
             }
             return sent;
         }
@@ -107,12 +96,14 @@ namespace ucosm {
         // Consumer side.
         void clear() { mQueue.clear(); }
 
-        event_id_t getEventID() const { return mEventID; }
+        /**
+         * @brief Event signaled on send, for the consumer tasklet to wait for.
+         */
+        const TaskletEvent& event() const { return mEvent; }
 
     private:
         MessageQueue<T, Size> mQueue;
-        TaskletScheduler<event_count>& mScheduler;
-        const event_id_t mEventID;
+        TaskletEvent mEvent;
     };
 
 }

@@ -25,7 +25,8 @@ set(CMAKE_EXE_LINKER_FLAGS_INIT "--specs=nosys.specs")
 
 project(ucosm_arm_check LANGUAGES CXX)
 
-set(UCOSM_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+# overridable, to build the checks against another copy of the headers
+set(UCOSM_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../.. CACHE PATH "ucosm tree to check")
 
 # not the ucosm project itself : it would bring the host test suite along
 add_subdirectory(${UCOSM_ROOT}/uatom uatom)
@@ -57,3 +58,18 @@ target_compile_definitions(${PROJECT_NAME}_single_core PRIVATE UCOSM_SINGLE_CORE
 target_compile_options(${PROJECT_NAME}_single_core PRIVATE -Wall -Wextra -Werror)
 
 target_link_libraries(${PROJECT_NAME}_single_core uatom)
+
+# Event path cycle counts, linked here to keep it building : flash it from a
+# board project instead, see arm_event_bench.cpp.
+add_executable(ucosm_event_bench arm_event_bench.cpp)
+
+target_include_directories(ucosm_event_bench PRIVATE
+    ${UCOSM_ROOT}/include
+    ${UCOSM_ROOT}/ulink/include
+)
+
+target_compile_definitions(ucosm_event_bench PRIVATE UCOSM_EVENT_BENCH_MAIN=1)
+
+target_compile_options(ucosm_event_bench PRIVATE -Wall -Wextra -Werror)
+
+target_link_libraries(ucosm_event_bench uatom)

@@ -124,8 +124,7 @@ inline ucosm::tick_t get_tick() {
 // A platform that would rather sleep between deadlines than take a periodic
 // interrupt implements TaskletBackend::scheduleNextWakeup instead, arms a
 // one-shot on the deadline it is given, and never calls this.
-template<ucosm::event_id_t event_count>
-inline void tick_interrupt(ucosm::TaskletScheduler<event_count>& inScheduler) {
+inline void tick_interrupt(ucosm::TaskletScheduler& inScheduler) {
     ++detail::g_tick;
     inScheduler.poll();
 }

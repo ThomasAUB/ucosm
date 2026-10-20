@@ -70,13 +70,15 @@ namespace {
         }
     };
 
-    constexpr event_id_t stress_events = 3;
+    constexpr std::size_t stress_events = 3;
     constexpr tick_t max_delay = 60;
 
-    // Exposes the scheduler lists so the test can check their invariants.
-    struct InspectedScheduler : TaskletScheduler<stress_events> {
+    TaskletEvent g_stressEvents[stress_events];
 
-        using TaskletScheduler<stress_events>::TaskletScheduler;
+    // Exposes the scheduler lists so the test can check their invariants.
+    struct InspectedScheduler : TaskletScheduler {
+
+        using TaskletScheduler::TaskletScheduler;
 
         // Returns the number of tasks found in all lists, or -1 when an
         // invariant is broken.
@@ -99,10 +101,10 @@ namespace {
             }
 
             // event lists : sorted by priority, which is also the rank
-            for (auto& list : this->mEventTaskLists) {
+            for (auto& event : this->mEvents) {
                 bool first = true;
                 priority_t previous = 0;
-                for (auto& t : list) {
+                for (auto& t : waiters(event)) {
                     const auto& tasklet = static_cast<const ITasklet&>(t);
                     if (t.getRank() != tasklet.getPriority()) {
                         return -1;
@@ -143,7 +145,7 @@ namespace {
             ++mRuns;
             switch (mRng() % 8) {
                 case 0: setPeriod(1 + mRng() % 40); break;
-                case 1: waitForEvent(static_cast<event_id_t>(mRng() % stress_events)); break;
+                case 1: waitForEvent(g_stressEvents[mRng() % stress_events]); break;
                 case 2: this->removeTask(); break;
                 case 3: g_sched->setDelay(*this, mRng() % max_delay); break;
                 case 4: dispose(); break;
@@ -158,7 +160,7 @@ namespace {
     void configureRandomly(ChaosTask& ioTask, Rng& ioRng) {
         ioTask.setPriority(ioRng() % 8);
         if (ioRng() % 3 == 0) {
-            ioTask.waitForEvent(static_cast<event_id_t>(ioRng() % stress_events));
+            ioTask.waitForEvent(g_stressEvents[ioRng() % stress_events]);
         }
         else {
             ioTask.setPeriod(1 + ioRng() % 40);
@@ -215,7 +217,7 @@ TEST_CASE("TaskletScheduler - stress : lists stay consistent under random operat
                     sched.removeTask(task);
                     break;
                 case 4:
-                    sched.signalEvent(static_cast<event_id_t>(rng() % stress_events));
+                    g_stressEvents[rng() % stress_events].signal();
                     pump();
                     break;
                 default:
@@ -263,7 +265,7 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
     using clock = std::chrono::steady_clock;
 
     constexpr int task_count = 64;
-    constexpr event_id_t event_count = 8;
+    constexpr std::size_t event_count = 8;
     constexpr uint32_t ticks = 50'000;
 
     // Mixed periods spread the deadlines over the timer list, a single
@@ -272,7 +274,8 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
 
         resetHarness(0);
 
-        TaskletScheduler<event_count> sched(stress_backend);
+        TaskletScheduler sched(stress_backend);
+        TaskletEvent events[event_count];
 
         CountTask timerTasks[task_count];
         CountTask eventTasks[event_count];
@@ -283,9 +286,9 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
             REQUIRE(sched.addTask(timerTasks[i]));
         }
 
-        for (event_id_t i = 0; i < event_count; ++i) {
-            eventTasks[i].setPriority(i);
-            eventTasks[i].waitForEvent(i);
+        for (std::size_t i = 0; i < event_count; ++i) {
+            eventTasks[i].setPriority(static_cast<priority_t>(i));
+            eventTasks[i].waitForEvent(events[i]);
             REQUIRE(sched.addTask(eventTasks[i]));
         }
 
@@ -294,7 +297,7 @@ TEST_CASE("TaskletScheduler - benchmark : dispatch throughput") {
         for (uint32_t k = 0; k < ticks; ++k) {
             ++g_now;
             sched.poll();
-            sched.signalEvent(static_cast<event_id_t>(k % event_count));
+            events[k % event_count].signal();
             pump();
         }
 
