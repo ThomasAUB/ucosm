@@ -56,6 +56,10 @@ namespace ucosm {
          */
         tick_t getPeriod() const { return mPeriod; }
 
+    protected:
+
+        ~IPeriodicTask() = default;
+
     private:
 
         tick_t mPeriod;
