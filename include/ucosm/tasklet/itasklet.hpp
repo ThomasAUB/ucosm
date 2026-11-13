@@ -88,9 +88,9 @@ namespace ucosm {
             return isWaitingForEvent() ? mEvent : nullptr;
         }
 
-        ~ITasklet() = default;
-
     protected:
+
+        ~ITasklet() = default;
 
         // Use TaskletScheduler::removeTask() from outside the task's run().
         using ITask<priority_t>::removeTask;

@@ -42,8 +42,6 @@ namespace ucosm {
 
         using rank_t = _rank_t;
 
-        virtual ~ITask() = default;
-
         /**
          * @brief Runs the task.
          * Typically called by the scheduler when the task is ready.
@@ -75,6 +73,10 @@ namespace ucosm {
          * @return rank_t Rank value.
          */
         rank_t getRank() const;
+
+    protected:
+
+        ~ITask() = default;
 
     private:
 
